@@ -13,6 +13,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val renderDistanceLeftButton = Rectangle()
     private val renderDistanceRightButton = Rectangle()
     private val fpsCheckbox = Rectangle()
+    private val beepsCheckbox = Rectangle()
     private val pwmWarningLeftButton = Rectangle()
     private val pwmWarningRightButton = Rectangle()
 
@@ -20,6 +21,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private var leftButtonHover = 0f
     private var rightButtonHover = 0f
     private var fpsCheckboxHover = 0f
+    private var beepsCheckboxHover = 0f
     private var pwmLeftButtonHover = 0f
     private var pwmRightButtonHover = 0f
     private var enterAnimProgress = 0f
@@ -48,6 +50,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val leftHovered = renderDistanceLeftButton.contains(touchX, touchY)
         val rightHovered = renderDistanceRightButton.contains(touchX, touchY)
         val fpsHovered = fpsCheckbox.contains(touchX, touchY)
+        val beepsHovered = beepsCheckbox.contains(touchX, touchY)
         val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
         val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
 
@@ -55,6 +58,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 8f)
         rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 8f)
         fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 8f)
+        beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 8f)
         pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 8f)
         pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 8f)
 
@@ -83,36 +87,61 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             backgroundColor = UITheme.surface)
 
         // === Render Distance Setting ===
-        val settingY = panelY + panelHeight - 120f * scale
+        val settingY = panelY + panelHeight - 150f * scale
 
         // === PWM Warning Setting ===
-        val pwmSettingY = settingY - 100f * scale
+        val pwmSettingY = settingY - 110f * scale
 
-        // === FPS Counter Checkbox ===
-        val fpsSettingY = pwmSettingY - 100f * scale
+        // === Beeps Checkbox ===
+        val beepsSettingY = pwmSettingY - 80f * scale
         val checkboxSize = 40f * scale
         val checkboxX = centerX - 120f * scale
 
+        beepsCheckbox.set(checkboxX, beepsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
+
+        // Beeps checkbox background
+        val beepsCheckboxColor = if (settingsManager.beepsEnabled) UITheme.primary else UITheme.surfaceLight
+        ui.roundedRect(beepsCheckbox.x, beepsCheckbox.y, beepsCheckbox.width, beepsCheckbox.height,
+            8f * scale, beepsCheckboxColor)
+
+        // Beeps checkbox border/glow
+        if (beepsCheckboxHover > 0.1f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, beepsCheckboxHover * 0.3f)
+            ui.roundedRect(beepsCheckbox.x - 3f, beepsCheckbox.y - 3f,
+                beepsCheckbox.width + 6f, beepsCheckbox.height + 6f, 10f * scale, ui.shapes.color)
+        }
+
+        // Beeps checkmark
+        if (settingsManager.beepsEnabled) {
+            ui.shapes.color = UITheme.textPrimary
+            val cx = beepsCheckbox.x + beepsCheckbox.width / 2
+            val cy = beepsCheckbox.y + beepsCheckbox.height / 2
+            ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
+            ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
+        }
+
+        // === FPS Counter Checkbox ===
+        val fpsSettingY = beepsSettingY - 60f * scale
+
         fpsCheckbox.set(checkboxX, fpsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
 
-        // Checkbox background
-        val checkboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
+        // FPS checkbox background
+        val fpsCheckboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
         ui.roundedRect(fpsCheckbox.x, fpsCheckbox.y, fpsCheckbox.width, fpsCheckbox.height,
-            8f * scale, checkboxColor)
+            8f * scale, fpsCheckboxColor)
 
-        // Checkbox border/glow
+        // FPS checkbox border/glow
         if (fpsCheckboxHover > 0.1f) {
             ui.shapes.color = UITheme.withAlpha(UITheme.primary, fpsCheckboxHover * 0.3f)
             ui.roundedRect(fpsCheckbox.x - 3f, fpsCheckbox.y - 3f,
                 fpsCheckbox.width + 6f, fpsCheckbox.height + 6f, 10f * scale, ui.shapes.color)
         }
 
-        // Checkmark
+        // FPS checkmark
         if (settingsManager.showFps) {
             ui.shapes.color = UITheme.textPrimary
             val cx = fpsCheckbox.x + fpsCheckbox.width / 2
             val cy = fpsCheckbox.y + fpsCheckbox.height / 2
-            // Draw checkmark as two lines
             ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
             ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
         }
@@ -230,8 +259,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val pwmCurrentName = settingsManager.getPwmWarningName()
         ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, UITheme.accent)
 
+        // Beeps Checkbox label
+        UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + beepsCheckbox.width + 20f * scale,
+            beepsCheckbox.y + beepsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+
         // FPS Checkbox label
-        UIFonts.body.draw(ui.batch, "Show FPS Counter", fpsCheckbox.x + fpsCheckbox.width + 20f * scale,
+        UIFonts.body.draw(ui.batch, "Show FPS", fpsCheckbox.x + fpsCheckbox.width + 20f * scale,
             fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
 
         // Back button text
@@ -258,6 +291,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             }
             if (fpsCheckbox.contains(touchX, touchY)) {
                 settingsManager.showFps = !settingsManager.showFps
+            }
+            if (beepsCheckbox.contains(touchX, touchY)) {
+                settingsManager.beepsEnabled = !settingsManager.beepsEnabled
             }
             if (pwmWarningLeftButton.contains(touchX, touchY)) {
                 val newIndex = (pwmCurrentIndex - 1).coerceAtLeast(0)

@@ -154,6 +154,7 @@ class EucGame(
     private fun applyPwmWarningThreshold() {
         // Convert percentage (0, 60, 70, 80, 90) to float (0, 0.6, 0.7, 0.8, 0.9)
         speedWarningManager.pwmWarningThreshold = settingsManager.pwmWarning / 100f
+        speedWarningManager.beepsEnabled = settingsManager.beepsEnabled
     }
 
     override fun render() {

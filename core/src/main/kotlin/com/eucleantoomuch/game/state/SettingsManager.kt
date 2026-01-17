@@ -12,6 +12,7 @@ class SettingsManager {
         private const val KEY_RENDER_DISTANCE = "renderDistance"
         private const val KEY_SHOW_FPS = "showFps"
         private const val KEY_PWM_WARNING = "pwmWarning"
+        private const val KEY_BEEPS_ENABLED = "beepsEnabled"
 
         // Render distance presets (in meters)
         const val RENDER_DISTANCE_LOW = 100f
@@ -55,6 +56,14 @@ class SettingsManager {
         get() = prefs.getInteger(KEY_PWM_WARNING, 80)  // Default 80%
         set(value) {
             prefs.putInteger(KEY_PWM_WARNING, value)
+            prefs.flush()
+        }
+
+    // Beeps on/off
+    var beepsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_BEEPS_ENABLED, true)  // Default on
+        set(value) {
+            prefs.putBoolean(KEY_BEEPS_ENABLED, value)
             prefs.flush()
         }
 

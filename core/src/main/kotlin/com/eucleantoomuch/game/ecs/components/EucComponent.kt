@@ -74,12 +74,12 @@ class EucComponent : Component, Pool.Poolable {
     fun isPwmDanger(): Boolean = pwm >= 0.8f
 
     /**
-     * Check if PWM caused cutout (>=100%)
+     * Check if PWM caused cutout (>100% - you can ride at 100%, but going over = fall)
      */
-    fun isPwmCutout(): Boolean = pwm >= 1.0f
+    fun isPwmCutout(): Boolean = pwm > 1.0f
 
-    fun isAboutToFall(): Boolean = pwm >= 0.8f
-    fun hasFallen(): Boolean = pwm >= 1.0f
+    fun isAboutToFall(): Boolean = pwm >= 0.9f
+    fun hasFallen(): Boolean = pwm > 1.0f
 
     fun applyPuddleEffect(duration: Float) {
         inPuddle = true

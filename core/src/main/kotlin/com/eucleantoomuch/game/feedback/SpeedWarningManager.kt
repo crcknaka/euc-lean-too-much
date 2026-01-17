@@ -26,6 +26,9 @@ class SpeedWarningManager(
     // PWM warning threshold (0 = off, 0.6-0.9 = active)
     var pwmWarningThreshold: Float = 0.8f
 
+    // Beeps enabled (can be toggled in settings)
+    var beepsEnabled: Boolean = true
+
     private var isWarningActive = false
     private var beepTimer = 0f
     private var currentBeepInterval = MAX_BEEP_INTERVAL
@@ -76,10 +79,12 @@ class SpeedWarningManager(
     }
 
     private fun triggerWarning() {
-        // Play beep sound
-        platformServices.playBeep(BEEP_FREQUENCY, BEEP_DURATION)
+        // Play beep sound (if enabled)
+        if (beepsEnabled) {
+            platformServices.playBeep(BEEP_FREQUENCY, BEEP_DURATION)
+        }
 
-        // Light vibration pulse
+        // Light vibration pulse (always on if device has vibrator)
         if (platformServices.hasVibrator()) {
             platformServices.vibrate(VIBRATION_DURATION, VIBRATION_AMPLITUDE)
         }

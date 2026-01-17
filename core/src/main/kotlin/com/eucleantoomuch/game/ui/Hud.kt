@@ -206,30 +206,32 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         ui.roundedRect(barX, barY, barWidth, barHeight, 6f, UITheme.surfaceLight)
 
-        // PWM bar fill with color based on level
+        // PWM bar fill with color based on level (100% is still OK, >100% = fall)
         val pwmColor = when {
-            pwmSmooth < 0.6f -> UITheme.primary      // Green - safe
-            pwmSmooth < 0.8f -> UITheme.warning      // Yellow - caution
-            pwmSmooth < 0.95f -> UITheme.lerp(UITheme.warning, UITheme.danger, (pwmSmooth - 0.8f) / 0.15f) // Orange
-            else -> UITheme.danger                    // Red - danger!
+            pwmSmooth < 0.7f -> UITheme.primary      // Green - safe
+            pwmSmooth < 0.9f -> UITheme.warning      // Yellow - caution
+            pwmSmooth <= 1.0f -> UITheme.lerp(UITheme.warning, UITheme.danger, (pwmSmooth - 0.9f) / 0.1f) // Orange to red
+            else -> UITheme.danger                    // Red - CUTOUT!
         }
 
-        val fillWidth = (barWidth * pwmSmooth.coerceIn(0f, 1f)).coerceAtLeast(8f)
+        // Bar shows up to 110% (so you can see when you're over 100%)
+        val displayPwm = (pwmSmooth / 1.1f).coerceIn(0f, 1f)
+        val fillWidth = (barWidth * displayPwm).coerceAtLeast(8f)
         ui.roundedRect(barX, barY, fillWidth, barHeight, 6f, pwmColor)
 
-        // Danger zone marker at 80%
-        val marker80X = barX + barWidth * 0.8f
-        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.6f)
-        ui.shapes.rectLine(marker80X, barY - 2, marker80X, barY + barHeight + 2, 2f)
+        // Marker at 90% (warning zone starts)
+        val marker90X = barX + barWidth * (0.9f / 1.1f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.5f)
+        ui.shapes.rectLine(marker90X, barY - 2, marker90X, barY + barHeight + 2, 2f)
 
-        // Critical zone marker at 100%
-        val marker100X = barX + barWidth
-        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.8f)
-        ui.shapes.rectLine(marker100X - 2, barY - 3, marker100X - 2, barY + barHeight + 3, 2f)
+        // Marker at 100% (max safe, can still ride here)
+        val marker100X = barX + barWidth * (1.0f / 1.1f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.7f)
+        ui.shapes.rectLine(marker100X, barY - 3, marker100X, barY + barHeight + 3, 2f)
 
-        // Pulsing glow when PWM > 80%
-        if (pwmSmooth > 0.8f) {
-            val glowIntensity = ((pwmSmooth - 0.8f) / 0.2f).coerceIn(0f, 1f) * UITheme.Anim.pulse(6f, 0.4f, 0.8f)
+        // Pulsing glow when PWM > 90%
+        if (pwmSmooth > 0.9f) {
+            val glowIntensity = ((pwmSmooth - 0.9f) / 0.1f).coerceIn(0f, 1f) * UITheme.Anim.pulse(6f, 0.4f, 0.8f)
             ui.roundedRect(barX - 2, barY - 2, fillWidth + 4, barHeight + 4, 8f, UITheme.withAlpha(pwmColor, glowIntensity * 0.5f))
         }
 
