@@ -105,9 +105,10 @@ class GameRenderer(
                         tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
                         tempMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
 
-                        // Rotate arm around X axis (spread out or down)
+                        // Rotate arm around Z axis (spread out or down) + wave offset
                         val armRotation = if (arm.isLeftArm) -arm.armAngle else arm.armAngle
-                        tempMatrix.rotate(0f, 0f, 1f, armRotation)
+                        val totalRotation = armRotation + arm.waveOffset
+                        tempMatrix.rotate(0f, 0f, 1f, totalRotation)
                     } else {
                         // For rider: standard rotation
                         tempMatrix.rotate(transform.rotation)

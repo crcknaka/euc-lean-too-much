@@ -244,11 +244,12 @@ class EucGame : ApplicationAdapter() {
             }
 
             // Update arms position and angle based on speed
-            // Speed is in m/s, 15 km/h = 4.17 m/s
+            // Speed is in m/s: 15 km/h = 4.17 m/s, 40 km/h = 11.1 m/s
             val speed = eucComponent.speed
             val targetArmAngle = when {
-                speed <= 4.2f -> 80f  // Arms spread at low/medium speed (<=15 km/h)
-                else -> 0f            // Arms down at high speed (>15 km/h)
+                speed <= 4.2f -> 80f   // Arms spread at low speed (<=15 km/h) - balancing
+                speed >= 11.1f -> -30f // Arms behind back at high speed (>=40 km/h) - flying pose
+                else -> 0f             // Arms down at medium speed (15-40 km/h)
             }
 
             updateArm(leftArmEntity, playerTransform, eucComponent, targetArmAngle, isLeft = true, delta)
@@ -321,6 +322,24 @@ class EucGame : ApplicationAdapter() {
         armComponent.targetArmAngle = targetAngle
         val lerpSpeed = 5f
         armComponent.armAngle += (targetAngle - armComponent.armAngle) * lerpSpeed * delta
+
+        // Waving animation at low speed (when arms are spread)
+        if (eucComponent.speed <= 4.2f) {
+            // Increment wave timer with different phase for each arm
+            val waveSpeed = 3f + eucComponent.speed * 0.5f  // Faster waving at higher speeds within range
+            armComponent.waveTime += delta * waveSpeed
+
+            // Calculate wave offset using sin, with opposite phase for left/right arm
+            val phase = if (isLeft) 0f else Math.PI.toFloat()
+            armComponent.waveOffset = kotlin.math.sin(armComponent.waveTime + phase) * 15f  // ±15 degrees wave
+        } else {
+            // Reset waving when moving fast
+            armComponent.waveOffset = armComponent.waveOffset * 0.9f  // Smooth fade out
+            if (kotlin.math.abs(armComponent.waveOffset) < 0.1f) {
+                armComponent.waveOffset = 0f
+                armComponent.waveTime = 0f
+            }
+        }
 
         // Position arm at shoulder level relative to rider
         val shoulderOffsetX = if (isLeft) -0.18f else 0.18f
