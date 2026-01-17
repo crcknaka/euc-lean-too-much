@@ -47,4 +47,16 @@ object Families {
         GroundComponent::class.java,
         TransformComponent::class.java
     ).get()
+
+    val airplanes: Family = Family.all(
+        AirplaneComponent::class.java,
+        TransformComponent::class.java,
+        ModelComponent::class.java
+    ).get()
+
+    val contrailSegments: Family = Family.all(
+        ContrailSegmentComponent::class.java,
+        TransformComponent::class.java,
+        ModelComponent::class.java
+    ).get()
 }

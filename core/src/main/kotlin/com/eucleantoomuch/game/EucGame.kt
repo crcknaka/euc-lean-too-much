@@ -134,6 +134,7 @@ class EucGame(
         engine.addSystem(MovementSystem())
         engine.addSystem(PedestrianAISystem())
         engine.addSystem(CarAISystem())
+        engine.addSystem(AirplaneSystem(models))
         engine.addSystem(collisionSystem)
         engine.addSystem(CullingSystem())
 
@@ -357,6 +358,7 @@ class EucGame(
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
+                riderTransform.position.x -= 0.05f  // Slightly right to center on wheel
                 riderTransform.position.y += 0.7f  // Stand on top of EUC
                 riderTransform.yaw = playerTransform.yaw
                 riderTransform.updateRotationFromYaw()
@@ -662,6 +664,7 @@ class EucGame(
             // Update rider position with fall animation offsets
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
+                riderTransform.position.x -= 0.05f  // Slightly right to center on wheel
                 riderTransform.position.y += 0.7f + fallAnimationController.riderYOffset
                 riderTransform.position.z += fallAnimationController.riderForwardOffset
 

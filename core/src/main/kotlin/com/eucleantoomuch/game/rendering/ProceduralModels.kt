@@ -52,6 +52,15 @@ class ProceduralModels : Disposable {
     private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
     private val cloudColor = Color(1f, 1f, 1f, 0.9f)             // White cloud
 
+    // Tower crane colors
+    private val craneYellowColor = Color(0.9f, 0.75f, 0.1f, 1f)    // Construction yellow
+    private val craneMetalColor = Color(0.35f, 0.35f, 0.38f, 1f)   // Dark metal gray
+
+    // Airplane colors
+    private val airplaneBodyColor = Color(0.95f, 0.95f, 0.95f, 1f)  // White fuselage
+    private val airplaneTailColor = Color(0.2f, 0.4f, 0.7f, 1f)     // Blue tail
+    private val contrailColor = Color(1f, 1f, 1f, 0.7f)             // White contrail
+
     // Background/silhouette colors (faded to look distant) - multiple layers
     // Layer 1 - closest background (behind main buildings)
     private val bgBuildingColor1 = Color(0.5f, 0.55f, 0.65f, 1f)   // Blue-gray
@@ -788,6 +797,241 @@ class ProceduralModels : Disposable {
             cloudPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x * baseScale, y * baseScale, z * baseScale))
             cloudPart.sphere(size * scaleX * baseScale, size * 0.6f * baseScale, size * scaleZ * baseScale, 8, 8)
         }
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a tower crane model for construction sites
+     * @param height Total height of the crane tower
+     */
+    fun createTowerCraneModel(height: Float = 45f): Model {
+        modelBuilder.begin()
+
+        val yellowMaterial = Material(ColorAttribute.createDiffuse(craneYellowColor))
+        val metalMaterial = Material(ColorAttribute.createDiffuse(craneMetalColor))
+
+        // Tower dimensions
+        val towerWidth = 2.5f
+        val latticeThickness = 0.3f
+
+        // Main tower (vertical lattice structure)
+        // Four corner posts
+        val cornerOffset = towerWidth / 2 - latticeThickness / 2
+        val corners = listOf(
+            Pair(-cornerOffset, -cornerOffset),
+            Pair(cornerOffset, -cornerOffset),
+            Pair(cornerOffset, cornerOffset),
+            Pair(-cornerOffset, cornerOffset)
+        )
+
+        corners.forEachIndexed { i, (x, z) ->
+            val postPart = modelBuilder.part("tower_post_$i", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+            postPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x, height / 2, z))
+            postPart.box(latticeThickness, height, latticeThickness)
+        }
+
+        // Horizontal braces on tower (every 8 units)
+        var braceY = 4f
+        var braceIndex = 0
+        while (braceY < height - 2f) {
+            // X-direction braces
+            val braceX1 = modelBuilder.part("brace_x1_$braceIndex", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+            braceX1.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, braceY, -cornerOffset))
+            braceX1.box(towerWidth, latticeThickness * 0.8f, latticeThickness * 0.8f)
+
+            val braceX2 = modelBuilder.part("brace_x2_$braceIndex", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+            braceX2.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, braceY, cornerOffset))
+            braceX2.box(towerWidth, latticeThickness * 0.8f, latticeThickness * 0.8f)
+
+            // Z-direction braces
+            val braceZ1 = modelBuilder.part("brace_z1_$braceIndex", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+            braceZ1.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-cornerOffset, braceY, 0f))
+            braceZ1.box(latticeThickness * 0.8f, latticeThickness * 0.8f, towerWidth)
+
+            val braceZ2 = modelBuilder.part("brace_z2_$braceIndex", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+            braceZ2.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(cornerOffset, braceY, 0f))
+            braceZ2.box(latticeThickness * 0.8f, latticeThickness * 0.8f, towerWidth)
+
+            braceY += 8f
+            braceIndex++
+        }
+
+        // Slewing unit (rotating platform at top of tower)
+        val slewingY = height + 0.5f
+        val slewingPart = modelBuilder.part("slewing", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        slewingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, slewingY, 0f))
+        slewingPart.box(3.5f, 1.5f, 3.5f)
+
+        // Operator cabin
+        val cabinPart = modelBuilder.part("cabin", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        cabinPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(1.8f, slewingY + 1.5f, 0f))
+        cabinPart.box(2f, 2.5f, 2f)
+
+        // Main jib (horizontal arm extending forward) - the long working arm
+        val jibLength = 35f
+        val jibHeight = 2f
+        val jibY = slewingY + 2f
+
+        // Jib main beam
+        val jibPart = modelBuilder.part("jib", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        jibPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(jibLength / 2 - 2f, jibY, 0f))
+        jibPart.box(jibLength, latticeThickness, latticeThickness * 1.5f)
+
+        // Jib top chord
+        val jibTopPart = modelBuilder.part("jib_top", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        jibTopPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(jibLength / 2 - 2f, jibY + jibHeight, 0f))
+        jibTopPart.box(jibLength, latticeThickness * 0.7f, latticeThickness)
+
+        // Jib vertical supports
+        for (i in 0..6) {
+            val supportX = -2f + i * 5.5f
+            if (supportX < jibLength - 4f) {
+                val supportPart = modelBuilder.part("jib_support_$i", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+                supportPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(supportX, jibY + jibHeight / 2, 0f))
+                supportPart.box(latticeThickness * 0.6f, jibHeight, latticeThickness * 0.6f)
+            }
+        }
+
+        // Counter-jib (rear arm with counterweight)
+        val counterJibLength = 12f
+        val counterJibPart = modelBuilder.part("counter_jib", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        counterJibPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-counterJibLength / 2 - 1f, jibY, 0f))
+        counterJibPart.box(counterJibLength, latticeThickness, latticeThickness * 1.5f)
+
+        // Counterweight (concrete blocks at end of counter-jib)
+        val counterweightPart = modelBuilder.part("counterweight", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        counterweightPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-counterJibLength - 1f, jibY - 1f, 0f))
+        counterweightPart.box(4f, 3f, 2.5f)
+
+        // A-frame (support structure above slewing)
+        val aFrameHeight = 6f
+        val aFrameTop = slewingY + aFrameHeight
+
+        // A-frame legs
+        val aFrameLeg1 = modelBuilder.part("aframe_leg1", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        aFrameLeg1.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+            .translate(-1f, slewingY + aFrameHeight / 2, 0f)
+            .rotate(0f, 0f, 1f, 10f))
+        aFrameLeg1.box(latticeThickness, aFrameHeight, latticeThickness)
+
+        val aFrameLeg2 = modelBuilder.part("aframe_leg2", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        aFrameLeg2.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+            .translate(1f, slewingY + aFrameHeight / 2, 0f)
+            .rotate(0f, 0f, 1f, -10f))
+        aFrameLeg2.box(latticeThickness, aFrameHeight, latticeThickness)
+
+        // A-frame top
+        val aFrameTopPart = modelBuilder.part("aframe_top", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        aFrameTopPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, aFrameTop, 0f))
+        aFrameTopPart.box(1f, latticeThickness, latticeThickness)
+
+        // Pendant lines (cables from A-frame to jib tip) - simplified as thin boxes
+        val pendantPart = modelBuilder.part("pendant", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        pendantPart.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+            .translate(jibLength / 2 - 5f, jibY + jibHeight + 2f, 0f)
+            .rotate(0f, 0f, 1f, -8f))
+        pendantPart.box(0.1f, jibLength * 0.4f, 0.1f)
+
+        // Hook block hanging from jib (at roughly 2/3 of jib length)
+        val hookX = jibLength * 0.5f
+        val hookY = jibY - 8f
+
+        // Trolley on jib
+        val trolleyPart = modelBuilder.part("trolley", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        trolleyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hookX, jibY - 0.3f, 0f))
+        trolleyPart.box(1.5f, 0.8f, 1.2f)
+
+        // Hook cable
+        val cablePart = modelBuilder.part("cable", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        cablePart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hookX, (jibY + hookY) / 2, 0f))
+        cablePart.box(0.08f, jibY - hookY, 0.08f)
+
+        // Hook block
+        val hookBlockPart = modelBuilder.part("hook_block", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        hookBlockPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hookX, hookY, 0f))
+        hookBlockPart.box(0.8f, 1.5f, 0.8f)
+
+        // Hook
+        val hookPart = modelBuilder.part("hook", GL20.GL_TRIANGLES, attributes, yellowMaterial)
+        hookPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hookX, hookY - 1.2f, 0f))
+        hookPart.box(0.4f, 0.8f, 0.15f)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create an airplane model for high-altitude flight
+     * Simplified jet airliner shape visible from far below
+     */
+    fun createAirplaneModel(): Model {
+        modelBuilder.begin()
+
+        val bodyMaterial = Material(ColorAttribute.createDiffuse(airplaneBodyColor))
+        val tailMaterial = Material(ColorAttribute.createDiffuse(airplaneTailColor))
+
+        // Scale for visibility at high altitude (plane appears small but recognizable)
+        val scale = 1.5f
+
+        // Fuselage (main body) - elongated cylinder approximated with box
+        val fuselagePart = modelBuilder.part("fuselage", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        fuselagePart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0f, 0f))
+        fuselagePart.box(1.2f * scale, 1f * scale, 8f * scale)
+
+        // Nose cone
+        val nosePart = modelBuilder.part("nose", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        nosePart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0f, 4.5f * scale))
+        nosePart.cone(0.8f * scale, 2f * scale, 0.8f * scale, 8)
+
+        // Main wings
+        val leftWingPart = modelBuilder.part("left_wing", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        leftWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-3f * scale, 0f, -0.5f * scale))
+        leftWingPart.box(5f * scale, 0.15f * scale, 2f * scale)
+
+        val rightWingPart = modelBuilder.part("right_wing", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        rightWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(3f * scale, 0f, -0.5f * scale))
+        rightWingPart.box(5f * scale, 0.15f * scale, 2f * scale)
+
+        // Tail fin (vertical stabilizer)
+        val tailFinPart = modelBuilder.part("tail_fin", GL20.GL_TRIANGLES, attributes, tailMaterial)
+        tailFinPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.2f * scale, -3.5f * scale))
+        tailFinPart.box(0.15f * scale, 2f * scale, 1.5f * scale)
+
+        // Horizontal stabilizers
+        val leftStabPart = modelBuilder.part("left_stab", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        leftStabPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-1.2f * scale, 0.3f * scale, -3.5f * scale))
+        leftStabPart.box(2f * scale, 0.1f * scale, 1f * scale)
+
+        val rightStabPart = modelBuilder.part("right_stab", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        rightStabPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(1.2f * scale, 0.3f * scale, -3.5f * scale))
+        rightStabPart.box(2f * scale, 0.1f * scale, 1f * scale)
+
+        // Engines (under wings)
+        val leftEnginePart = modelBuilder.part("left_engine", GL20.GL_TRIANGLES, attributes, tailMaterial)
+        leftEnginePart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-2f * scale, -0.4f * scale, 0f))
+        leftEnginePart.cylinder(0.4f * scale, 1.2f * scale, 0.4f * scale, 8)
+
+        val rightEnginePart = modelBuilder.part("right_engine", GL20.GL_TRIANGLES, attributes, tailMaterial)
+        rightEnginePart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(2f * scale, -0.4f * scale, 0f))
+        rightEnginePart.cylinder(0.4f * scale, 1.2f * scale, 0.4f * scale, 8)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a contrail (condensation trail) segment
+     * @param alpha Opacity of the contrail (1.0 = fresh, 0.0 = faded)
+     */
+    fun createContrailSegmentModel(alpha: Float = 0.6f): Model {
+        modelBuilder.begin()
+
+        val trailColor = Color(contrailColor.r, contrailColor.g, contrailColor.b, alpha)
+        val trailMaterial = Material(ColorAttribute.createDiffuse(trailColor))
+
+        // Single contrail segment - elongated thin cloud
+        val segmentPart = modelBuilder.part("contrail", GL20.GL_TRIANGLES, attributes, trailMaterial)
+        segmentPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0f, 0f))
+        segmentPart.box(0.8f, 0.5f, 3f)
 
         return modelBuilder.end().also { models.add(it) }
     }
