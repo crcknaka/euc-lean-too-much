@@ -49,6 +49,13 @@ class ProceduralModels : Disposable {
     private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
     private val cloudColor = Color(1f, 1f, 1f, 0.9f)             // White cloud
 
+    // Building detail colors
+    private val windowColor = Color(0.6f, 0.75f, 0.9f, 1f)       // Light blue glass
+    private val windowLitColor = Color(0.95f, 0.9f, 0.7f, 1f)    // Warm yellow lit window
+    private val doorColor = Color(0.35f, 0.25f, 0.15f, 1f)       // Dark brown door
+    private val roofColor = Color(0.3f, 0.25f, 0.2f, 1f)         // Dark roof
+    private val trimColor = Color(0.85f, 0.85f, 0.8f, 1f)        // Light trim/frame
+
     // Scale for external model (adjust based on your model's size)
     var eucModelScale = 1f
         private set
@@ -224,10 +231,107 @@ class ProceduralModels : Disposable {
 
     fun createBuildingModel(height: Float, color: Color): Model {
         modelBuilder.begin()
-        val material = Material(ColorAttribute.createDiffuse(color))
-        val part = modelBuilder.part("building", GL20.GL_TRIANGLES, attributes, material)
-        part.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height / 2, 0f))
-        part.box(Constants.BUILDING_WIDTH, height, Constants.BUILDING_DEPTH)
+
+        val width = Constants.BUILDING_WIDTH
+        val depth = Constants.BUILDING_DEPTH
+        val wallMaterial = Material(ColorAttribute.createDiffuse(color))
+        val windowMat = Material(ColorAttribute.createDiffuse(windowColor))
+        val windowLitMat = Material(ColorAttribute.createDiffuse(windowLitColor))
+        val doorMat = Material(ColorAttribute.createDiffuse(doorColor))
+        val roofMat = Material(ColorAttribute.createDiffuse(roofColor))
+        val trimMat = Material(ColorAttribute.createDiffuse(trimColor))
+
+        // Main building body
+        val body = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, wallMaterial)
+        body.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height / 2, 0f))
+        body.box(width, height, depth)
+
+        // Windows only on the side facing the road (X faces)
+        val floorHeight = 3.5f
+        val numFloors = (height / floorHeight).toInt().coerceAtLeast(1)
+        val windowWidth = 1.0f
+        val windowHeight = 1.5f
+        val windowSpacingZ = 2.0f
+        val windowsPerFloor = ((depth - 1f) / windowSpacingZ).toInt().coerceAtLeast(1)
+
+        // Door dimensions (needed to skip window in door area)
+        val doorWidth = 1.2f
+        val doorHeight = 2.5f
+
+        // Collect window positions for batching - only 2 parts total (dark and lit windows)
+        data class WindowPos(val x: Float, val y: Float, val z: Float)
+        val darkWindows = mutableListOf<WindowPos>()
+        val litWindows = mutableListOf<WindowPos>()
+
+        // Collect all window positions
+        for (floor in 0 until numFloors) {
+            val windowY = floor * floorHeight + floorHeight * 0.6f
+            val isGroundFloor = floor == 0
+
+            for (w in 0 until windowsPerFloor) {
+                val windowZ = -depth / 2 + 1f + w * windowSpacingZ + windowSpacingZ / 2
+                val isNearDoor = kotlin.math.abs(windowZ) < (doorWidth / 2 + windowWidth / 2 + 0.2f)
+                if (isGroundFloor && isNearDoor) continue
+
+                val isLit = Math.random() < 0.3
+                val list = if (isLit) litWindows else darkWindows
+
+                // Left side window
+                list.add(WindowPos(-width / 2 - 0.02f, windowY, windowZ))
+                // Right side window
+                list.add(WindowPos(width / 2 + 0.02f, windowY, windowZ))
+            }
+        }
+
+        // Create single part for all dark windows
+        if (darkWindows.isNotEmpty()) {
+            val darkWindowsPart = modelBuilder.part("windows_dark", GL20.GL_TRIANGLES, attributes, windowMat)
+            val tempMatrix = com.badlogic.gdx.math.Matrix4()
+            for (win in darkWindows) {
+                darkWindowsPart.setVertexTransform(tempMatrix.idt().translate(win.x, win.y, win.z))
+                darkWindowsPart.box(0.05f, windowHeight, windowWidth)
+            }
+        }
+
+        // Create single part for all lit windows
+        if (litWindows.isNotEmpty()) {
+            val litWindowsPart = modelBuilder.part("windows_lit", GL20.GL_TRIANGLES, attributes, windowLitMat)
+            val tempMatrix = com.badlogic.gdx.math.Matrix4()
+            for (win in litWindows) {
+                litWindowsPart.setVertexTransform(tempMatrix.idt().translate(win.x, win.y, win.z))
+                litWindowsPart.box(0.05f, windowHeight, windowWidth)
+            }
+        }
+
+        // Left side door
+        val doorLeft = modelBuilder.part("door_left", GL20.GL_TRIANGLES, attributes, doorMat)
+        doorLeft.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-width / 2 - 0.03f, doorHeight / 2, 0f))
+        doorLeft.box(0.06f, doorHeight, doorWidth)
+
+        // Right side door
+        val doorRight = modelBuilder.part("door_right", GL20.GL_TRIANGLES, attributes, doorMat)
+        doorRight.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.03f, doorHeight / 2, 0f))
+        doorRight.box(0.06f, doorHeight, doorWidth)
+
+        // Door frames
+        val frameThickness = 0.15f
+        // Left door frame
+        val frameLeftTop = modelBuilder.part("frame_l_top", GL20.GL_TRIANGLES, attributes, trimMat)
+        frameLeftTop.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-width / 2 - 0.04f, doorHeight + frameThickness / 2, 0f))
+        frameLeftTop.box(0.08f, frameThickness, doorWidth + frameThickness * 2)
+
+        // Right door frame
+        val frameRightTop = modelBuilder.part("frame_r_top", GL20.GL_TRIANGLES, attributes, trimMat)
+        frameRightTop.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.04f, doorHeight + frameThickness / 2, 0f))
+        frameRightTop.box(0.08f, frameThickness, doorWidth + frameThickness * 2)
+
+        // Roof ledge
+        val ledgeHeight = 0.3f
+        val ledgeOverhang = 0.2f
+        val ledge = modelBuilder.part("ledge", GL20.GL_TRIANGLES, attributes, roofMat)
+        ledge.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height + ledgeHeight / 2, 0f))
+        ledge.box(width + ledgeOverhang * 2, ledgeHeight, depth + ledgeOverhang * 2)
+
         return modelBuilder.end().also { models.add(it) }
     }
 
@@ -341,11 +445,24 @@ class ProceduralModels : Disposable {
 
     fun getRandomBuildingColor(): Color {
         val colors = listOf(
-            Color(0.7f, 0.7f, 0.7f, 1f),   // Light gray
-            Color(0.5f, 0.5f, 0.5f, 1f),   // Gray
-            Color(0.8f, 0.75f, 0.7f, 1f),  // Beige
-            Color(0.6f, 0.5f, 0.4f, 1f),   // Brown-ish
-            Color(0.7f, 0.6f, 0.5f, 1f),   // Tan
+            // Classic colors
+            Color(0.75f, 0.75f, 0.75f, 1f),  // Light gray
+            Color(0.55f, 0.55f, 0.55f, 1f),  // Gray
+            Color(0.85f, 0.8f, 0.72f, 1f),   // Beige/cream
+            Color(0.65f, 0.55f, 0.45f, 1f),  // Brown
+            Color(0.75f, 0.65f, 0.55f, 1f),  // Tan
+            // Brick-like colors
+            Color(0.7f, 0.45f, 0.35f, 1f),   // Red brick
+            Color(0.6f, 0.4f, 0.3f, 1f),     // Dark brick
+            Color(0.8f, 0.6f, 0.5f, 1f),     // Light brick
+            // Modern colors
+            Color(0.9f, 0.9f, 0.88f, 1f),    // Off-white
+            Color(0.4f, 0.45f, 0.5f, 1f),    // Blue-gray
+            Color(0.5f, 0.55f, 0.5f, 1f),    // Green-gray
+            Color(0.55f, 0.5f, 0.55f, 1f),   // Purple-gray
+            // Warm tones
+            Color(0.9f, 0.85f, 0.7f, 1f),    // Light yellow
+            Color(0.85f, 0.75f, 0.65f, 1f),  // Peach
         )
         return colors.random()
     }
