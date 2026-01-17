@@ -62,16 +62,16 @@ object UITheme {
             return cachedScale
         }
 
-        // Larger buttons for better touch targets (increased from 100/80)
+        // Larger buttons for better touch targets
         val buttonHeight: Float get() = 120f * scale()
         val buttonHeightSmall: Float get() = 100f * scale()
         val buttonHeightMedium: Float get() = 110f * scale()
 
-        // More rounded corners for modern look (increased)
+        // More rounded corners for modern look
         val buttonRadius: Float get() = 24f * scale()
         val panelRadius: Float get() = 28f * scale()
 
-        // Generous padding (increased)
+        // Generous padding
         val padding: Float get() = 40f * scale()
         val paddingSmall: Float get() = 28f * scale()
         val paddingTiny: Float get() = 14f * scale()
@@ -80,7 +80,7 @@ object UITheme {
         val shadowOffset: Float get() = 8f * scale()
         val borderWidth: Float get() = 3f * scale()
 
-        // New dimensions for consistent spacing
+        // UI element sizes
         val iconSize: Float get() = 48f * scale()
         val checkboxSize: Float get() = 52f * scale()
         val arrowButtonSize: Float get() = 72f * scale()

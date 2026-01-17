@@ -28,14 +28,15 @@ object UIFonts : Disposable {
     }
 
     // Base sizes for 1080p screen (in points, will be scaled for screen)
+    // Sized to look good on large UI elements (buttons 100-120px)
     private val baseFontSizes = mapOf(
-        FontStyle.DISPLAY to 72,    // Big titles, countdown
-        FontStyle.TITLE to 48,      // Screen titles
-        FontStyle.HEADING to 36,    // Section headings, values
-        FontStyle.BUTTON to 28,     // Button text
-        FontStyle.BODY to 22,       // Body text, labels
-        FontStyle.CAPTION to 18,    // Hints, secondary info
-        FontStyle.TINY to 14        // Debug info
+        FontStyle.DISPLAY to 96,    // Big titles, countdown
+        FontStyle.TITLE to 64,      // Screen titles (GAME OVER, PAUSED, SETTINGS)
+        FontStyle.HEADING to 48,    // Section headings, values
+        FontStyle.BUTTON to 40,     // Button text (fits 120px buttons)
+        FontStyle.BODY to 32,       // Body text, labels
+        FontStyle.CAPTION to 26,    // Hints, secondary info
+        FontStyle.TINY to 20        // Debug info, FPS
     )
 
     // Characters to include in font
