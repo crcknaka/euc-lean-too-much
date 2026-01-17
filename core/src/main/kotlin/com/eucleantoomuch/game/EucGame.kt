@@ -243,6 +243,27 @@ class EucGame : ApplicationAdapter() {
     private fun renderCountdown(delta: Float) {
         // Render the game world in background
         updateGameWorld(delta, processInput = false)
+
+        // Position rider standing next to EUC during countdown (waiting to mount)
+        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
+        if (playerTransform != null) {
+            riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
+                riderTransform.position.set(playerTransform.position)
+                riderTransform.position.x += 0.7f  // Standing to the left of EUC (positive X is left from camera view)
+                riderTransform.position.z -= 0.8f  // Closer to camera (behind EUC)
+                riderTransform.position.y += 0f    // Standing on ground level
+                riderTransform.yaw = playerTransform.yaw
+                riderTransform.updateRotationFromYaw()
+            }
+
+            // Position arms with rider during countdown
+            updateArmPositionForCountdown(leftArmEntity, playerTransform, isLeft = true)
+            updateArmPositionForCountdown(rightArmEntity, playerTransform, isLeft = false)
+
+            // Update camera
+            renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
+        }
+
         renderer.render()
 
         // Render countdown overlay
@@ -252,6 +273,29 @@ class EucGame : ApplicationAdapter() {
         if (countdownTimer <= 0) {
             stateManager.transition(GameState.Playing(session))
         }
+    }
+
+    private fun updateArmPositionForCountdown(armEntity: Entity?, playerTransform: TransformComponent, isLeft: Boolean) {
+        armEntity ?: return
+
+        val armTransform = armEntity.getComponent(TransformComponent::class.java) ?: return
+        val armComponent = armEntity.getComponent(ArmComponent::class.java) ?: return
+
+        // Arms down by sides during countdown
+        armComponent.armAngle = 0f
+        armComponent.waveOffset = 0f
+
+        // Position arm at shoulder level relative to rider (who is standing next to EUC)
+        val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
+        val riderOffsetX = 0.7f  // Same as rider offset (positive X = left from camera view)
+        val riderOffsetZ = -0.8f  // Same as rider offset
+
+        armTransform.position.set(playerTransform.position)
+        armTransform.position.x += riderOffsetX + shoulderOffsetX
+        armTransform.position.z += riderOffsetZ
+        armTransform.position.y += 1.5f  // Shoulder height on ground-standing rider
+        armTransform.yaw = playerTransform.yaw
+        armTransform.updateRotationFromYaw()
     }
 
     private fun renderPlaying(delta: Float) {
