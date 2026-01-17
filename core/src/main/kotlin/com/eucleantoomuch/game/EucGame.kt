@@ -13,6 +13,7 @@ import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
+import com.eucleantoomuch.game.feedback.FallAnimationController
 import com.eucleantoomuch.game.feedback.MotorSoundManager
 import com.eucleantoomuch.game.feedback.SpeedWarningManager
 import com.eucleantoomuch.game.input.AccelerometerInput
@@ -75,6 +76,9 @@ class EucGame(
 
     // Motor sound synthesis
     private lateinit var motorSoundManager: MotorSoundManager
+
+    // Fall animation controller
+    private lateinit var fallAnimationController: FallAnimationController
 
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
@@ -152,6 +156,9 @@ class EucGame(
         motorSoundManager = MotorSoundManager(platformServices)
         applyAvasSetting()
 
+        // Initialize fall animation controller
+        fallAnimationController = FallAnimationController(platformServices)
+
         // Start at menu
         stateManager.transition(GameState.Menu)
     }
@@ -186,6 +193,7 @@ class EucGame(
             is GameState.Countdown -> renderCountdown(delta)
             is GameState.Playing -> renderPlaying(delta)
             is GameState.Paused -> renderPaused()
+            is GameState.Falling -> renderFalling(delta)
             is GameState.GameOver -> renderGameOver()
         }
 
@@ -566,11 +574,124 @@ class EucGame(
         // Record score
         isNewHighScore = highScoreManager.recordGame(session)
 
-        // Reset game over animations
-        gameOverRenderer.reset()
+        // Start fall animation
+        val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
+        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
+        if (eucComponent != null && playerTransform != null) {
+            fallAnimationController.start(
+                speed = eucComponent.speed,
+                forwardLean = eucComponent.forwardLean,
+                sideLean = eucComponent.sideLean,
+                yaw = playerTransform.yaw
+            )
+        }
 
-        // Transition to game over
-        stateManager.transition(GameState.GameOver(session))
+        // Transition to falling state (will show animation before game over)
+        stateManager.transition(GameState.Falling(session))
+    }
+
+    private fun renderFalling(delta: Float) {
+        val state = stateManager.current() as GameState.Falling
+
+        // Update fall animation
+        fallAnimationController.update(delta)
+
+        // Get base transforms
+        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
+        val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
+
+        if (playerTransform != null && eucComponent != null) {
+            // Apply camera effects
+            renderer.cameraController.setShake(fallAnimationController.cameraShake)
+            renderer.cameraController.setFovPunch(fallAnimationController.fovPunch)
+            renderer.cameraController.setDropOffset(fallAnimationController.cameraDropOffset)
+            renderer.cameraController.setForwardOffset(fallAnimationController.cameraForwardOffset)
+
+            // Update rider position with fall animation offsets
+            riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
+                riderTransform.position.set(playerTransform.position)
+                riderTransform.position.y += 0.7f + fallAnimationController.riderYOffset
+                riderTransform.position.z += fallAnimationController.riderForwardOffset
+
+                // Apply fall rotation to rider's visual lean
+                riderTransform.yaw = playerTransform.yaw
+                riderTransform.updateRotationFromYaw()
+            }
+            riderEntity?.getComponent(EucComponent::class.java)?.let { riderEuc ->
+                // Apply fall pitch/roll to visual lean (converts rotation to lean values)
+                riderEuc.visualForwardLean = eucComponent.visualForwardLean + fallAnimationController.riderPitch / 90f
+                riderEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
+            }
+
+            // Update EUC position with fall animation (rolling away)
+            playerTransform.position.z += fallAnimationController.eucForwardOffset * delta * 2f
+            playerTransform.position.x += fallAnimationController.eucSideOffset * delta * 2f
+
+            // Apply EUC roll to visual lean
+            eucComponent.visualSideLean = eucComponent.sideLean + fallAnimationController.eucRoll / 90f
+
+            // Update arms - spread outward during fall
+            updateArmForFall(leftArmEntity, playerTransform, eucComponent, isLeft = true)
+            updateArmForFall(rightArmEntity, playerTransform, eucComponent, isLeft = false)
+
+            // Keep camera following (with effects applied)
+            renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta, 0f)
+        }
+
+        // Render the scene
+        renderer.render()
+
+        // Check if animation is complete
+        if (fallAnimationController.isComplete) {
+            // Reset camera effects
+            renderer.cameraController.setShake(0f)
+            renderer.cameraController.setFovPunch(0f)
+            renderer.cameraController.setDropOffset(0f)
+            renderer.cameraController.setForwardOffset(0f)
+
+            // Reset fall animation
+            fallAnimationController.reset()
+
+            // Reset game over animations
+            gameOverRenderer.reset()
+
+            // Transition to game over
+            stateManager.transition(GameState.GameOver(state.session))
+        }
+    }
+
+    private fun updateArmForFall(
+        armEntity: Entity?,
+        playerTransform: TransformComponent,
+        eucComponent: EucComponent,
+        isLeft: Boolean
+    ) {
+        armEntity ?: return
+
+        val armTransform = armEntity.getComponent(TransformComponent::class.java) ?: return
+        val armComponent = armEntity.getComponent(ArmComponent::class.java) ?: return
+        val armEuc = armEntity.getComponent(EucComponent::class.java) ?: return
+
+        // Arms spread outward during fall (protective reflex)
+        val targetAngle = 90f * fallAnimationController.armSpread
+        armComponent.armAngle = targetAngle
+        armComponent.waveOffset = 0f
+
+        // Position arm following rider during fall
+        val riderYOffset = 0.7f + fallAnimationController.riderYOffset
+        val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
+        val shoulderOffsetY = riderYOffset + 1.75f
+
+        armTransform.position.set(playerTransform.position)
+        armTransform.position.y += shoulderOffsetY
+        armTransform.position.x += shoulderOffsetX
+        armTransform.position.z += fallAnimationController.riderForwardOffset
+        armTransform.yaw = playerTransform.yaw
+        armTransform.updateRotationFromYaw()
+
+        // Copy visual lean from rider (with fall effect)
+        armEuc.visualForwardLean = eucComponent.visualForwardLean + fallAnimationController.riderPitch / 90f
+        armEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
     }
 
     override fun resize(width: Int, height: Int) {

@@ -5,7 +5,9 @@
       "Bash(./gradlew.bat :core:compileKotlin:*)",
       "Bash(./gradlew :core:compileKotlin:*)",
       "Bash(cmd /c \"gradlew.bat :core:compileKotlin\")",
-      "Bash(./gradlew assembleDebug:*)"
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(cmd /c \"gradlew.bat compileDebugKotlin\")",
+      "Bash(./gradlew.bat compileDebugKotlin:*)"
     ]
   }
 }

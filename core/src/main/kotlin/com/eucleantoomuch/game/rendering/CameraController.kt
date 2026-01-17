@@ -26,6 +26,12 @@ class CameraController(private val camera: PerspectiveCamera) {
     private val baseOffsetZ = Constants.CAMERA_OFFSET_Z
     private val minOffsetZ = Constants.CAMERA_OFFSET_Z + 3.5f  // Move 3.5m closer at max speed
 
+    // Fall animation effects
+    private var shakeIntensity = 0f
+    private var fovPunch = 0f
+    private var dropOffset = 0f
+    private var forwardOffset = 0f  // Moves camera forward (toward player)
+
     fun initialize(playerPosition: Vector3) {
         currentPosition.set(playerPosition).add(offset)
         currentLookAt.set(playerPosition).add(lookAheadOffset)
@@ -65,10 +71,10 @@ class CameraController(private val camera: PerspectiveCamera) {
         currentPosition.lerp(targetPosition, smoothFactor)
         currentLookAt.lerp(targetLookAt, smoothFactor)
 
-        // Update FOV based on speed
+        // Update FOV based on speed + FOV punch effect from fall
         currentSpeed = speed
         val speedRatio = (currentSpeed / maxSpeed).coerceIn(0f, 1f)
-        val targetFov = MathUtils.lerp(baseFov, maxFov, speedRatio)
+        val targetFov = MathUtils.lerp(baseFov, maxFov, speedRatio) + fovPunch
         currentFov = MathUtils.lerp(currentFov, targetFov, deltaTime * 5f)  // Smooth FOV transition
         camera.fieldOfView = currentFov
 
@@ -76,8 +82,25 @@ class CameraController(private val camera: PerspectiveCamera) {
         val targetOffsetZ = MathUtils.lerp(baseOffsetZ, minOffsetZ, speedRatio)
         offset.z = MathUtils.lerp(offset.z, targetOffsetZ, deltaTime * 5f)
 
-        // Apply to camera
+        // Apply to camera with fall effects
         camera.position.set(currentPosition)
+        camera.position.y += dropOffset
+
+        // Apply forward offset (move camera toward where player is looking)
+        if (forwardOffset != 0f) {
+            val forwardX = sin * forwardOffset
+            val forwardZ = cos * forwardOffset
+            camera.position.add(forwardX, 0f, forwardZ)
+        }
+
+        // Apply screen shake - stronger shake effect
+        if (shakeIntensity > 0.01f) {
+            val shakeX = MathUtils.random(-shakeIntensity, shakeIntensity) * 0.25f
+            val shakeY = MathUtils.random(-shakeIntensity, shakeIntensity) * 0.25f
+            val shakeZ = MathUtils.random(-shakeIntensity, shakeIntensity) * 0.1f
+            camera.position.add(shakeX, shakeY, shakeZ)
+        }
+
         camera.lookAt(currentLookAt)
         camera.up.set(Vector3.Y)
         camera.update()
@@ -88,5 +111,22 @@ class CameraController(private val camera: PerspectiveCamera) {
         val shakeY = MathUtils.random(-intensity, intensity)
         camera.position.add(shakeX, shakeY, 0f)
         camera.update()
+    }
+
+    // Fall animation effect setters
+    fun setShake(intensity: Float) {
+        shakeIntensity = intensity
+    }
+
+    fun setFovPunch(punch: Float) {
+        fovPunch = punch
+    }
+
+    fun setDropOffset(offset: Float) {
+        dropOffset = offset
+    }
+
+    fun setForwardOffset(offset: Float) {
+        forwardOffset = offset
     }
 }

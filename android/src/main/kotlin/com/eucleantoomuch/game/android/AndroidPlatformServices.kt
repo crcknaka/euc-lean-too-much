@@ -401,4 +401,116 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
             else -> x
         }
     }
+
+    // === Crash Sound Implementation ===
+
+    override fun playCrashSound(intensity: Float) {
+        Thread {
+            try {
+                // Duration: 150-250ms based on intensity
+                val durationMs = (150 + intensity * 100).toInt().coerceIn(150, 300)
+                val numSamples = sampleRate * durationMs / 1000
+                val samples = ShortArray(numSamples)
+
+                // Volume based on intensity
+                val volume = (0.5f + intensity * 0.3f).coerceIn(0.4f, 0.9f)
+
+                // Generate crash sound: noise burst + descending tone
+                var noiseEnvelope = 1f
+                var tonePhase = 0.0
+                var toneFreq = 800.0 + intensity * 400.0  // Start frequency (higher with more intensity)
+                val freqDecay = 0.9997  // How fast frequency drops
+
+                for (i in 0 until numSamples) {
+                    val t = i.toFloat() / numSamples
+
+                    // Envelope: sharp attack, quick decay
+                    val envelope = when {
+                        t < 0.02f -> t / 0.02f  // Quick attack
+                        t < 0.15f -> 1f - (t - 0.02f) / 0.13f * 0.4f  // Initial drop
+                        else -> 0.6f * (1f - (t - 0.15f) / 0.85f)  // Long decay
+                    }
+
+                    // Noise component (crack/crunch)
+                    noiseEnvelope *= 0.9985f  // Noise decays faster
+                    val noise = (Random.nextFloat() * 2f - 1f) * noiseEnvelope
+
+                    // Filtered noise for body impact sound
+                    val filteredNoise = noise * 0.7f
+
+                    // Descending tone component (thud)
+                    toneFreq *= freqDecay
+                    val tone = sin(tonePhase) * (1f - t * 0.8f)  // Tone fades
+                    tonePhase += 2.0 * Math.PI * toneFreq / sampleRate
+
+                    // Mix: more noise at start, more tone as it settles
+                    val noiseMix = (1f - t * 0.6f).coerceIn(0.3f, 1f)
+                    val toneMix = (t * 1.5f).coerceIn(0.2f, 0.7f)
+
+                    val mixed = (filteredNoise * noiseMix + tone.toFloat() * toneMix) * envelope * volume
+
+                    // Add some low frequency thump
+                    val thump = sin(2.0 * Math.PI * (60.0 + t * 20.0) * i / sampleRate).toFloat()
+                    val thumpEnvelope = if (t < 0.1f) t / 0.1f else (1f - (t - 0.1f) / 0.3f).coerceIn(0f, 1f)
+                    val finalMix = mixed + thump * thumpEnvelope * 0.3f * volume
+
+                    samples[i] = (finalMix * Short.MAX_VALUE).toInt().coerceIn(-32768, 32767).toShort()
+                }
+
+                // Apply fade out to last 10% to avoid click
+                val fadeStart = (numSamples * 0.9f).toInt()
+                for (i in fadeStart until numSamples) {
+                    val fade = 1f - (i - fadeStart).toFloat() / (numSamples - fadeStart)
+                    samples[i] = (samples[i] * fade).toInt().toShort()
+                }
+
+                val bufferSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+
+                val track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    AudioTrack.Builder()
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_GAME)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(sampleRate)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(maxOf(bufferSize, samples.size * 2))
+                        .setTransferMode(AudioTrack.MODE_STATIC)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    AudioTrack(
+                        AudioManager.STREAM_MUSIC,
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        maxOf(bufferSize, samples.size * 2),
+                        AudioTrack.MODE_STATIC
+                    )
+                }
+
+                track.write(samples, 0, samples.size)
+                track.play()
+
+                // Wait for playback, then release
+                Thread.sleep(durationMs.toLong() + 50)
+                track.stop()
+                track.release()
+
+            } catch (e: Exception) {
+                // Audio errors not critical
+            }
+        }.start()
+    }
 }

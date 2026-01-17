@@ -55,6 +55,15 @@ interface PlatformServices {
      * Check if motor sound is currently playing.
      */
     fun isMotorSoundPlaying(): Boolean
+
+    // === Crash Sound Effect ===
+
+    /**
+     * Play a crash/impact sound effect.
+     * Short "crack" noise with descending pitch.
+     * @param intensity Impact intensity (0.3 to 1.5), affects volume and pitch
+     */
+    fun playCrashSound(intensity: Float)
 }
 
 /**
@@ -88,4 +97,8 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun isMotorSoundPlaying(): Boolean = false
+
+    override fun playCrashSound(intensity: Float) {
+        // No-op on desktop/unsupported platforms
+    }
 }
