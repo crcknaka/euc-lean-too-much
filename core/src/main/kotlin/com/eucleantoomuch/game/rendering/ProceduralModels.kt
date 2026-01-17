@@ -61,6 +61,12 @@ class ProceduralModels : Disposable {
     private val airplaneTailColor = Color(0.2f, 0.4f, 0.7f, 1f)     // Blue tail
     private val contrailColor = Color(1f, 1f, 1f, 0.7f)             // White contrail
 
+    // Pigeon colors
+    private val pigeonBodyColor = Color(0.45f, 0.45f, 0.5f, 1f)     // Gray body
+    private val pigeonHeadColor = Color(0.35f, 0.4f, 0.45f, 1f)     // Darker gray head
+    private val pigeonWingColor = Color(0.5f, 0.5f, 0.55f, 1f)      // Lighter gray wings
+    private val pigeonBeakColor = Color(0.6f, 0.5f, 0.4f, 1f)       // Orange-ish beak
+
     // Background/silhouette colors (faded to look distant) - multiple layers
     // Layer 1 - closest background (behind main buildings)
     private val bgBuildingColor1 = Color(0.5f, 0.55f, 0.65f, 1f)   // Blue-gray
@@ -1032,6 +1038,80 @@ class ProceduralModels : Disposable {
         val segmentPart = modelBuilder.part("contrail", GL20.GL_TRIANGLES, attributes, trailMaterial)
         segmentPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0f, 0f))
         segmentPart.box(0.8f, 0.5f, 3f)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a pigeon model
+     * Small bird that walks on sidewalks and flies away when player approaches
+     * @param isFlying If true, wings are spread for flying pose
+     */
+    fun createPigeonModel(isFlying: Boolean = false): Model {
+        modelBuilder.begin()
+
+        val bodyMaterial = Material(ColorAttribute.createDiffuse(pigeonBodyColor))
+        val headMaterial = Material(ColorAttribute.createDiffuse(pigeonHeadColor))
+        val wingMaterial = Material(ColorAttribute.createDiffuse(pigeonWingColor))
+        val beakMaterial = Material(ColorAttribute.createDiffuse(pigeonBeakColor))
+
+        // Pigeon size - visible but not too large
+        val scale = 0.35f
+
+        // Body (oval shape)
+        val bodyPart = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.8f * scale, 0f))
+        bodyPart.sphere(1.2f * scale, 0.9f * scale, 1.8f * scale, 8, 8)
+
+        // Head (smaller sphere)
+        val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, headMaterial)
+        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.3f * scale, 0.9f * scale))
+        headPart.sphere(0.6f * scale, 0.55f * scale, 0.6f * scale, 6, 6)
+
+        // Beak
+        val beakPart = modelBuilder.part("beak", GL20.GL_TRIANGLES, attributes, beakMaterial)
+        beakPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.2f * scale, 1.3f * scale))
+        beakPart.box(0.15f * scale, 0.1f * scale, 0.3f * scale)
+
+        // Tail feathers
+        val tailPart = modelBuilder.part("tail", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        tailPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.7f * scale, -0.9f * scale))
+        tailPart.box(0.4f * scale, 0.1f * scale, 0.6f * scale)
+
+        if (isFlying) {
+            // Wings spread out for flying
+            val leftWingPart = modelBuilder.part("left_wing", GL20.GL_TRIANGLES, attributes, wingMaterial)
+            leftWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+                .translate(-1.0f * scale, 1.0f * scale, 0f)
+                .rotate(0f, 0f, 1f, -30f))
+            leftWingPart.box(1.4f * scale, 0.08f * scale, 0.8f * scale)
+
+            val rightWingPart = modelBuilder.part("right_wing", GL20.GL_TRIANGLES, attributes, wingMaterial)
+            rightWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+                .translate(1.0f * scale, 1.0f * scale, 0f)
+                .rotate(0f, 0f, 1f, 30f))
+            rightWingPart.box(1.4f * scale, 0.08f * scale, 0.8f * scale)
+        } else {
+            // Wings folded at sides for walking
+            val leftWingPart = modelBuilder.part("left_wing", GL20.GL_TRIANGLES, attributes, wingMaterial)
+            leftWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.5f * scale, 0.8f * scale, -0.1f * scale))
+            leftWingPart.box(0.3f * scale, 0.5f * scale, 1.0f * scale)
+
+            val rightWingPart = modelBuilder.part("right_wing", GL20.GL_TRIANGLES, attributes, wingMaterial)
+            rightWingPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.5f * scale, 0.8f * scale, -0.1f * scale))
+            rightWingPart.box(0.3f * scale, 0.5f * scale, 1.0f * scale)
+        }
+
+        // Legs (simple sticks)
+        val legMaterial = Material(ColorAttribute.createDiffuse(pigeonBeakColor))
+
+        val leftLegPart = modelBuilder.part("left_leg", GL20.GL_TRIANGLES, attributes, legMaterial)
+        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.2f * scale, 0.2f * scale, 0.1f * scale))
+        leftLegPart.box(0.06f * scale, 0.4f * scale, 0.06f * scale)
+
+        val rightLegPart = modelBuilder.part("right_leg", GL20.GL_TRIANGLES, attributes, legMaterial)
+        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.2f * scale, 0.2f * scale, 0.1f * scale))
+        rightLegPart.box(0.06f * scale, 0.4f * scale, 0.06f * scale)
 
         return modelBuilder.end().also { models.add(it) }
     }

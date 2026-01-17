@@ -59,4 +59,10 @@ object Families {
         TransformComponent::class.java,
         ModelComponent::class.java
     ).get()
+
+    val pigeons: Family = Family.all(
+        PigeonComponent::class.java,
+        TransformComponent::class.java,
+        ModelComponent::class.java
+    ).get()
 }

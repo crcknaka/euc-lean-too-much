@@ -58,9 +58,16 @@ class WorldGenerator(
     // Airplane model
     private lateinit var airplaneModel: ModelInstance
 
+    // Pigeon models (walking and flying)
+    private lateinit var pigeonWalkingModel: ModelInstance
+    private lateinit var pigeonFlyingModel: ModelInstance
+
     // Track airplane spawning (very rare, one at a time in sky)
     private var lastAirplaneChunk = -100
     private var activeAirplaneEntity: Entity? = null
+
+    // Track pigeon flock ID for group behavior
+    private var nextFlockId = 0
 
     // Zebra crossing model
     private var zebraCrossingModel: ModelInstance
@@ -150,6 +157,10 @@ class WorldGenerator(
         // Create airplane model
         airplaneModel = ModelInstance(models.createAirplaneModel())
 
+        // Create pigeon models
+        pigeonWalkingModel = ModelInstance(models.createPigeonModel(isFlying = false))
+        pigeonFlyingModel = ModelInstance(models.createPigeonModel(isFlying = true))
+
         // Create background building variants for each fog layer
         // Near layer (less fog)
         for (i in 0..5) {
@@ -238,6 +249,9 @@ class WorldGenerator(
 
         // Clouds in the sky
         entities.addAll(generateClouds(chunkIndex, chunkStartZ))
+
+        // Pigeons on sidewalks
+        entities.addAll(generatePigeons(chunkIndex, chunkStartZ))
 
         // Airplanes in the sky (very rare)
         trySpawnAirplane(chunkIndex, chunkStartZ)
@@ -914,6 +928,85 @@ class WorldGenerator(
         return entity
     }
 
+    private fun generatePigeons(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Pigeons appear in small flocks on sidewalks
+        // 40% chance to have pigeons in this chunk
+        if (MathUtils.random() > 0.4f) return entities
+
+        // Sidewalk positions
+        val roadHalfWidth = Constants.ROAD_WIDTH / 2
+        val sidewalkLeftX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
+        val sidewalkRightX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+
+        // Choose a side for the flock
+        val isLeftSide = MathUtils.randomBoolean()
+        val baseX = if (isLeftSide) sidewalkLeftX else sidewalkRightX
+
+        // Flock center position
+        val flockCenterZ = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+
+        // Assign a unique flock ID so they startle together
+        val flockId = nextFlockId++
+
+        // 2-5 pigeons per flock
+        val numPigeons = MathUtils.random(2, 5)
+
+        for (i in 0 until numPigeons) {
+            // Spread pigeons around the flock center
+            val x = baseX + MathUtils.random(-1.5f, 1.5f)
+            val z = flockCenterZ + MathUtils.random(-2f, 2f)
+
+            entities.add(createPigeonEntity(x, z, chunkIndex, flockId))
+        }
+
+        return entities
+    }
+
+    private fun createPigeonEntity(x: Float, z: Float, chunkIndex: Int, flockId: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            yaw = MathUtils.random(0f, 360f)  // Random facing direction
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(pigeonWalkingModel.model)
+        })
+
+        entity.add(PigeonComponent().apply {
+            this.flockId = flockId
+            spawnPosition.set(x, 0f, z)
+
+            // Randomize initial state
+            state = if (MathUtils.random() < 0.3f) {
+                PigeonComponent.State.PECKING
+            } else {
+                PigeonComponent.State.WALKING
+            }
+
+            // Vary detection radius slightly
+            detectionRadius = MathUtils.random(3.5f, 5f)
+
+            // Random walk direction
+            walkDirection = MathUtils.random(0f, 360f)
+            timeToNextDirectionChange = MathUtils.random(1f, 3f)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        // No collider - pigeons are small and fly away, not an obstacle
+
+        engine.addEntity(entity)
+        return entity
+    }
+
     private fun createFogWallEntity(z: Float, chunkIndex: Int): Entity {
         val entity = engine.createEntity()
 
@@ -1433,5 +1526,7 @@ class WorldGenerator(
         // Reset airplane tracking
         lastAirplaneChunk = -100
         activeAirplaneEntity = null
+        // Reset pigeon flock tracking
+        nextFlockId = 0
     }
 }

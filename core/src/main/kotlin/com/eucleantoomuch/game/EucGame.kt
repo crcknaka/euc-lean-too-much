@@ -135,6 +135,7 @@ class EucGame(
         engine.addSystem(PedestrianAISystem())
         engine.addSystem(CarAISystem())
         engine.addSystem(AirplaneSystem(models))
+        engine.addSystem(PigeonSystem(models))
         engine.addSystem(collisionSystem)
         engine.addSystem(CullingSystem())
 
