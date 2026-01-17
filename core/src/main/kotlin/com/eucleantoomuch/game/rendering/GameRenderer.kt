@@ -100,11 +100,8 @@ class GameRenderer(
                 val isPlayer = playerMapper.get(entity) != null
 
                 if (euc != null && isPlayer) {
-                    // For EUC model: first apply yaw (turn left/right), then model fix rotation, then lean
-                    // Yaw rotation (turn left/right) + visual turn based on side lean
-                    // Side lean causes visible wheel turn in the direction of lean
-                    val visualTurn = euc.visualSideLean * 8f  // Wheel turns slightly in lean direction
-                    tempMatrix.rotate(0f, 1f, 0f, transform.yaw + visualTurn)
+                    // For EUC model: apply yaw (turn left/right), then model fix rotation, then lean
+                    tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
 
                     // Model orientation fix (flip upside down model)
                     if (models.eucModelRotationX != 0f) {
@@ -123,8 +120,8 @@ class GameRenderer(
                     // Check if this is an arm
                     val arm = armMapper.get(entity)
                     if (arm != null) {
-                        // For arm: apply rotation with arm angle
-                        tempMatrix.rotate(transform.rotation)
+                        // For arm: apply yaw rotation
+                        tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
 
                         // Lean forward and side
                         val forwardLeanAngle = euc.visualForwardLean * 20f
@@ -137,10 +134,10 @@ class GameRenderer(
                         val totalRotation = armRotation + arm.waveOffset
                         tempMatrix.rotate(0f, 0f, 1f, totalRotation)
                     } else {
-                        // For rider: standard rotation
-                        tempMatrix.rotate(transform.rotation)
+                        // For rider: apply yaw rotation
+                        tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
 
-                        // Lean forward and side (inverted side lean for rider)
+                        // Lean forward and side
                         val forwardLeanAngle = euc.visualForwardLean * 20f
                         val sideLeanAngle = euc.visualSideLean * 15f
                         tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)

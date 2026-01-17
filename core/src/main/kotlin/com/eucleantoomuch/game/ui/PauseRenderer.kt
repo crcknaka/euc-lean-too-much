@@ -73,7 +73,6 @@ class PauseRenderer : Disposable {
         val buttonX = centerX - buttonWidth / 2
 
         // Calculate buttons from top to bottom (more space from title)
-        val bottomPadding = 60f * scale  // Space below the bottom button
         val firstButtonY = panelY + panelHeight - 220f * scale  // More space below title
 
         resumeButton.set(buttonX, firstButtonY, buttonWidth, buttonHeight)
