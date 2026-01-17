@@ -245,23 +245,46 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createPedestrianModel(): Model {
+    fun createPedestrianModel(shirtColor: Color = pedestrianColor): Model {
         modelBuilder.begin()
-        val material = Material(ColorAttribute.createDiffuse(pedestrianColor))
+        val scale = 1.4f  // Make pedestrians 40% bigger
+        val shirtMaterial = Material(ColorAttribute.createDiffuse(shirtColor))
+        val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.2f, 0.2f, 0.3f, 1f)))  // Dark pants
 
-        // Body
-        val bodyPart = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, material)
-        bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.7f, 0f))
-        bodyPart.box(Constants.PEDESTRIAN_WIDTH, 1f, 0.3f)
+        // Legs (pants) - from ground to waist, no overlap with torso
+        val legsPart = modelBuilder.part("legs", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        legsPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.35f * scale, 0f))
+        legsPart.box(Constants.PEDESTRIAN_WIDTH * 0.8f * scale, 0.7f * scale, 0.2f * scale)
+
+        // Torso (shirt) - starts above legs
+        val torsoPart = modelBuilder.part("torso", GL20.GL_TRIANGLES, attributes, shirtMaterial)
+        torsoPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.95f * scale, 0f))
+        torsoPart.box(Constants.PEDESTRIAN_WIDTH * scale, 0.5f * scale, 0.25f * scale)
 
         // Head
         val skinMaterial = Material(ColorAttribute.createDiffuse(riderSkinColor))
         val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, skinMaterial)
-        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.4f, 0f))
-        headPart.sphere(0.2f, 0.25f, 0.2f, 8, 8)
+        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.4f * scale, 0f))
+        headPart.sphere(0.2f * scale, 0.25f * scale, 0.2f * scale, 8, 8)
 
         return modelBuilder.end().also { models.add(it) }
     }
+
+    // Shirt colors for pedestrians
+    private val shirtColors = listOf(
+        Color(0.8f, 0.2f, 0.2f, 1f),   // Red
+        Color(0.2f, 0.5f, 0.8f, 1f),   // Blue
+        Color(0.2f, 0.7f, 0.3f, 1f),   // Green
+        Color(0.9f, 0.9f, 0.2f, 1f),   // Yellow
+        Color(0.9f, 0.5f, 0.1f, 1f),   // Orange
+        Color(0.6f, 0.2f, 0.7f, 1f),   // Purple
+        Color(0.9f, 0.9f, 0.9f, 1f),   // White
+        Color(0.1f, 0.1f, 0.1f, 1f),   // Black
+        Color(0.3f, 0.6f, 0.6f, 1f),   // Teal
+        Color(0.8f, 0.4f, 0.6f, 1f),   // Pink
+    )
+
+    fun getRandomShirtColor(): Color = shirtColors.random()
 
     fun createCarModel(color: Color = carColor1): Model {
         modelBuilder.begin()
@@ -506,6 +529,30 @@ class ProceduralModels : Disposable {
                 flowerPart.sphere(0.12f, 0.12f, 0.12f, 6, 6)
                 flowerIndex++
             }
+        }
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createZebraCrossingModel(): Model {
+        modelBuilder.begin()
+
+        val lineMaterial = Material(ColorAttribute.createDiffuse(roadLineColor))
+
+        // Zebra crossing - white stripes perpendicular to road (across the road width)
+        val zebraSpacing = 0.5f
+        val zebraWidth = 0.4f
+        val zebraLength = 4f  // Length along Z axis (crossing width)
+
+        var x = -Constants.ROAD_WIDTH / 2 + 0.5f  // Start from left edge of road
+        var stripeIndex = 0
+        while (x < Constants.ROAD_WIDTH / 2 - 0.3f) {
+            val stripe = modelBuilder.part("zebra_$stripeIndex", GL20.GL_TRIANGLES, attributes, lineMaterial)
+            stripe.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x, 0.012f, 0f))
+            stripe.box(zebraWidth, 0.01f, zebraLength)  // Rotated: width along X, length along Z
+
+            x += zebraSpacing + zebraWidth
+            stripeIndex++
         }
 
         return modelBuilder.end().also { models.add(it) }

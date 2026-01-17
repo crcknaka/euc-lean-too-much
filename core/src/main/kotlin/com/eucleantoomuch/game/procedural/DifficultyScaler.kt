@@ -25,7 +25,7 @@ class DifficultyScaler {
      * Get pedestrian spawn probability
      */
     fun getPedestrianProbability(distance: Float): Float {
-        return lerp(0.1f, 0.35f, getDifficulty(distance))
+        return lerp(0.25f, 0.5f, getDifficulty(distance))  // More pedestrians in the city
     }
 
     /**

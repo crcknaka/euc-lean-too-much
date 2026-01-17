@@ -3,6 +3,7 @@ package com.eucleantoomuch.game.procedural
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Vector3
@@ -26,7 +27,9 @@ class WorldGenerator(
     private var puddleModel = models.createPuddleModel()
     private var curbModel = models.createCurbModel()
     private var potholeModel = models.createPotholeModel()
-    private var pedestrianModel = models.createPedestrianModel()
+
+    // Pedestrian models with different shirt colors
+    private val pedestrianModels = mutableListOf<Model>()
 
     // Pre-create some building models with different heights
     private val buildingModels = mutableListOf<Pair<Float, ModelInstance>>()
@@ -43,7 +46,21 @@ class WorldGenerator(
     // Cloud models
     private val cloudModels = mutableListOf<ModelInstance>()
 
+    // Zebra crossing model
+    private var zebraCrossingModel: ModelInstance
+
+    // Track which chunks have zebra crossings
+    private var lastZebraCrossingChunk = -10  // Start with no recent crossing
+
     init {
+        // Create zebra crossing model
+        zebraCrossingModel = ModelInstance(models.createZebraCrossingModel())
+
+        // Create pedestrians with different shirt colors
+        for (i in 0..9) {
+            pedestrianModels.add(models.createPedestrianModel(models.getRandomShirtColor()))
+        }
+
         // Create variety of buildings
         for (i in 0..5) {
             val height = MathUtils.random(Constants.BUILDING_MIN_HEIGHT, Constants.BUILDING_MAX_HEIGHT)
@@ -111,11 +128,29 @@ class WorldGenerator(
         val entities = mutableListOf<Entity>()
         val chunkStartZ = chunkIndex * Constants.CHUNK_LENGTH
 
+        // Check if this chunk should have a zebra crossing
+        // Crossings appear every 2-4 chunks, starting from chunk 1
+        val hasZebraCrossing = chunkIndex > 0 &&
+                chunkIndex - lastZebraCrossingChunk >= 2 &&
+                MathUtils.random() < 0.5f  // 50% chance when conditions met
+
+        if (hasZebraCrossing) {
+            lastZebraCrossingChunk = chunkIndex
+        }
+
         // Ground segment (road + sidewalks)
         entities.add(createGroundEntity(chunkIndex, chunkStartZ))
 
         // Grass areas on both sides
         entities.add(createGrassEntity(chunkIndex, chunkStartZ))
+
+        // Add zebra crossing if this chunk has one
+        val crossingZ = chunkStartZ + Constants.CHUNK_LENGTH / 2
+        if (hasZebraCrossing) {
+            entities.add(createZebraCrossingEntity(chunkIndex, crossingZ))
+            // Add pedestrians crossing the road
+            entities.addAll(generateCrossingPedestrians(chunkIndex, crossingZ, totalDistance))
+        }
 
         // Buildings on both sides
         entities.addAll(generateBuildings(chunkIndex, chunkStartZ))
@@ -123,16 +158,307 @@ class WorldGenerator(
         // Scenery between buildings (trees, benches, etc.)
         entities.addAll(generateScenery(chunkIndex, chunkStartZ))
 
+        // Sidewalk pedestrians (not crossing, just walking around)
+        entities.addAll(generateSidewalkPedestrians(chunkIndex, chunkStartZ))
+
         // Clouds in the sky
         entities.addAll(generateClouds(chunkIndex, chunkStartZ))
 
         // Skip obstacles in the very first chunk (give player time to start)
         if (chunkIndex > 0) {
-            // Generate obstacles
-            entities.addAll(generateObstacles(chunkStartZ, totalDistance))
+            // Generate obstacles (skip area near zebra crossing)
+            entities.addAll(generateObstacles(chunkStartZ, totalDistance, hasZebraCrossing))
         }
 
         activeChunks[chunkIndex] = entities
+    }
+
+    private fun createZebraCrossingEntity(chunkIndex: Int, z: Float): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(0f, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(zebraCrossingModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun generateCrossingPedestrians(chunkIndex: Int, crossingZ: Float, totalDistance: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // More pedestrians at crossings based on difficulty
+        val difficultyFactor = (totalDistance / Constants.HARD_DISTANCE).coerceIn(0f, 1f)
+        val minPedestrians = 3
+        val maxPedestrians = 5 + (difficultyFactor * 5).toInt()  // 3-10 pedestrians based on difficulty
+
+        val numPedestrians = MathUtils.random(minPedestrians, maxPedestrians)
+
+        // Sidewalk center positions
+        val roadHalfWidth = Constants.ROAD_WIDTH / 2
+        val leftSidewalkX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
+        val rightSidewalkX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+
+        for (i in 0 until numPedestrians) {
+            // Choose which side pedestrian starts from
+            val fromLeft = MathUtils.randomBoolean()
+            val crossingDirectionX = if (fromLeft) 1f else -1f
+
+            // Sidewalk X position with small variation
+            val sidewalkX = if (fromLeft) {
+                leftSidewalkX + MathUtils.random(-0.5f, 0.5f)
+            } else {
+                rightSidewalkX + MathUtils.random(-0.5f, 0.5f)
+            }
+
+            // Spawn pedestrians at various Z positions - some already at crossing, some walking towards it
+            val progressRoll = MathUtils.random()
+            val startZ: Float
+            val state: PedestrianState
+
+            when {
+                // 30% - already at zebra, crossing
+                progressRoll < 0.3f -> {
+                    startZ = crossingZ + MathUtils.random(-1.5f, 1.5f)
+                    state = PedestrianState.CROSSING
+                }
+                // 40% - walking towards zebra on sidewalk (behind the crossing)
+                progressRoll < 0.7f -> {
+                    // Spawn behind the crossing (negative Z offset = closer to player)
+                    startZ = crossingZ - MathUtils.random(3f, 12f)
+                    state = PedestrianState.WALKING_TO_CROSSING
+                }
+                // 30% - walking towards zebra from ahead of it
+                else -> {
+                    // Spawn ahead of the crossing
+                    startZ = crossingZ + MathUtils.random(3f, 12f)
+                    state = PedestrianState.WALKING_TO_CROSSING
+                }
+            }
+
+            val entity = createCrossingPedestrianEntity(
+                sidewalkX, startZ, crossingZ, chunkIndex, crossingDirectionX, state
+            )
+            entities.add(entity)
+        }
+
+        return entities
+    }
+
+    private fun createCrossingPedestrianEntity(
+        x: Float,
+        z: Float,
+        crossingZ: Float,
+        chunkIndex: Int,
+        crossingDirectionX: Float,
+        state: PedestrianState
+    ): Entity {
+        val entity = engine.createEntity()
+
+        // Determine initial yaw based on state
+        // MovementSystem rotates velocity by yaw: yaw -90 moves +X, yaw 90 moves -X
+        val initialYaw = when (state) {
+            PedestrianState.WALKING_TO_CROSSING -> {
+                // Face towards the crossing (along Z axis)
+                if (z < crossingZ) 0f else 180f  // 0 = forward (+Z), 180 = backward (-Z)
+            }
+            PedestrianState.CROSSING -> {
+                // Face the direction of crossing (along X axis)
+                // yaw -90 = moving +X (right), yaw 90 = moving -X (left)
+                if (crossingDirectionX > 0) -90f else 90f
+            }
+            else -> 0f
+        }
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0.01f, z)  // Slightly above ground to prevent z-fighting
+            yaw = initialYaw
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(pedestrianModels.random())
+        })
+
+        entity.add(ColliderComponent().apply {
+            setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.PEDESTRIAN
+            causesGameOver = true
+        })
+
+        // Vary speed for natural look
+        val speed = MathUtils.random(Constants.PEDESTRIAN_MIN_SPEED * 0.8f, Constants.PEDESTRIAN_MAX_SPEED * 1.2f)
+        entity.add(VelocityComponent())
+
+        // Add PedestrianComponent so PedestrianAISystem can process them
+        entity.add(PedestrianComponent().apply {
+            isSidewalkPedestrian = false
+            this.state = state
+            targetCrossingZ = crossingZ
+            this.crossingDirectionX = crossingDirectionX
+            walkSpeed = speed
+            // Set bounds
+            minX = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH
+            maxX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun generateSidewalkPedestrians(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Sidewalk boundaries
+        val roadHalfWidth = Constants.ROAD_WIDTH / 2
+        val sidewalkLeftX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
+        val sidewalkRightX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+
+        // 0-2 pedestrians per chunk on each side (reduced)
+        val numPedestriansPerSide = MathUtils.random(0, 2)
+
+        // Left sidewalk
+        for (i in 0 until numPedestriansPerSide) {
+            val z = chunkStartZ + MathUtils.random(5f, Constants.CHUNK_LENGTH - 5f)
+            val x = sidewalkLeftX + MathUtils.random(-1f, 1f)
+            entities.add(createSidewalkPedestrianEntity(x, z, chunkIndex))
+        }
+
+        // Right sidewalk
+        for (i in 0 until numPedestriansPerSide) {
+            val z = chunkStartZ + MathUtils.random(5f, Constants.CHUNK_LENGTH - 5f)
+            val x = sidewalkRightX + MathUtils.random(-1f, 1f)
+            entities.add(createSidewalkPedestrianEntity(x, z, chunkIndex))
+        }
+
+        // Sometimes add a pair of chatting pedestrians (10% chance)
+        if (MathUtils.random() < 0.1f) {
+            val side = if (MathUtils.randomBoolean()) sidewalkLeftX else sidewalkRightX
+            val z = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+            entities.addAll(createChattingPedestrianPair(side, z, chunkIndex))
+        }
+
+        return entities
+    }
+
+    private fun createSidewalkPedestrianEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        // Random initial direction
+        val walkDirection = if (MathUtils.randomBoolean()) 1f else -1f
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0.01f, z)  // Slightly above ground to prevent z-fighting
+            yaw = if (walkDirection > 0) 0f else 180f
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(pedestrianModels.random())
+        })
+
+        entity.add(ColliderComponent().apply {
+            setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.PEDESTRIAN
+            causesGameOver = true
+        })
+
+        entity.add(VelocityComponent())
+
+        entity.add(PedestrianComponent().apply {
+            isSidewalkPedestrian = true
+            walkDirectionZ = walkDirection
+            walkSpeed = MathUtils.random(0.8f, 2.0f)
+            state = if (MathUtils.random() < 0.1f) PedestrianState.STANDING else PedestrianState.WALKING
+            stateTimer = MathUtils.random(0f, 3f)  // Random start offset
+            nextStateChange = MathUtils.random(3f, 8f)
+            standDuration = MathUtils.random(2f, 5f)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createChattingPedestrianPair(x: Float, z: Float, chunkIndex: Int): List<Entity> {
+        val entities = mutableListOf<Entity>()
+        val chatTime = MathUtils.random(5f, 15f)
+
+        // First pedestrian
+        val entity1 = engine.createEntity()
+        entity1.add(TransformComponent().apply {
+            position.set(x - 0.4f, 0.01f, z)  // Slightly above ground to prevent z-fighting
+            yaw = 90f  // Face each other
+            updateRotationFromYaw()
+        })
+        entity1.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
+        entity1.add(ColliderComponent().apply {
+            setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+        entity1.add(ObstacleComponent().apply { type = ObstacleType.PEDESTRIAN; causesGameOver = true })
+        entity1.add(VelocityComponent())
+        entity1.add(PedestrianComponent().apply {
+            isSidewalkPedestrian = true
+            state = PedestrianState.CHATTING
+            chatDuration = chatTime
+            stateTimer = 0f
+        })
+        entity1.add(GroundComponent().apply { type = GroundType.ROAD; this.chunkIndex = chunkIndex })
+        engine.addEntity(entity1)
+        entities.add(entity1)
+
+        // Second pedestrian
+        val entity2 = engine.createEntity()
+        entity2.add(TransformComponent().apply {
+            position.set(x + 0.4f, 0.01f, z)  // Slightly above ground to prevent z-fighting
+            yaw = -90f  // Face first pedestrian
+            updateRotationFromYaw()
+        })
+        entity2.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
+        entity2.add(ColliderComponent().apply {
+            setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+        entity2.add(ObstacleComponent().apply { type = ObstacleType.PEDESTRIAN; causesGameOver = true })
+        entity2.add(VelocityComponent())
+        entity2.add(PedestrianComponent().apply {
+            isSidewalkPedestrian = true
+            state = PedestrianState.CHATTING
+            chatDuration = chatTime
+            stateTimer = 0f
+        })
+        entity2.add(GroundComponent().apply { type = GroundType.ROAD; this.chunkIndex = chunkIndex })
+        engine.addEntity(entity2)
+        entities.add(entity2)
+
+        return entities
     }
 
     private fun createGroundEntity(chunkIndex: Int, startZ: Float): Entity {
@@ -531,14 +857,25 @@ class WorldGenerator(
         return entity
     }
 
-    private fun generateObstacles(chunkStartZ: Float, totalDistance: Float): List<Entity> {
+    private fun generateObstacles(chunkStartZ: Float, totalDistance: Float, hasZebraCrossing: Boolean = false): List<Entity> {
         val entities = mutableListOf<Entity>()
         val minSpacing = difficultyScaler.getMinObstacleSpacing(totalDistance)
         val density = difficultyScaler.getObstacleDensity(totalDistance)
 
+        // Zebra crossing zone - fewer obstacles near crossings (pedestrians are the main hazard there)
+        val crossingCenterZ = chunkStartZ + Constants.CHUNK_LENGTH / 2
+        val crossingClearance = 8f  // Reduced obstacles within 8m of zebra crossing
+
         var z = chunkStartZ + MathUtils.random(2f, 5f)
         while (z < chunkStartZ + Constants.CHUNK_LENGTH - 2f) {
-            if (MathUtils.random() < density) {
+            // Skip some obstacles near zebra crossing (pedestrians crossing are the main challenge)
+            val effectiveDensity = if (hasZebraCrossing && kotlin.math.abs(z - crossingCenterZ) < crossingClearance) {
+                density * 0.2f  // Only 20% of normal density near zebra crossings
+            } else {
+                density
+            }
+
+            if (MathUtils.random() < effectiveDensity) {
                 val obstacle = generateRandomObstacle(z, totalDistance)
                 obstacle?.let { entities.add(it) }
             }
@@ -550,14 +887,13 @@ class WorldGenerator(
     }
 
     private fun generateRandomObstacle(z: Float, totalDistance: Float): Entity? {
-        val pedProb = difficultyScaler.getPedestrianProbability(totalDistance)
+        // Pedestrians only cross at zebra crossings now
         val carProb = difficultyScaler.getCarProbability(totalDistance)
 
         val roll = MathUtils.random()
 
         return when {
-            roll < pedProb -> createPedestrianEntity(z, totalDistance)
-            roll < pedProb + carProb -> createCarEntity(z, totalDistance)
+            roll < carProb -> createCarEntity(z, totalDistance)
             else -> {
                 // Static obstacle
                 val staticRoll = MathUtils.random()
@@ -662,7 +998,7 @@ class WorldGenerator(
         val x = startSide * (Constants.ROAD_WIDTH / 2 + 1f)
 
         entity.add(TransformComponent().apply { position.set(x, 0f, z) })
-        entity.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModel) })
+        entity.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
         entity.add(VelocityComponent())
         entity.add(ColliderComponent().apply {
             setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, 0.3f)
@@ -731,5 +1067,7 @@ class WorldGenerator(
     fun reset() {
         // Remove all chunks
         activeChunks.keys.toList().forEach { removeChunk(it) }
+        // Reset zebra crossing tracking
+        lastZebraCrossingChunk = -10
     }
 }

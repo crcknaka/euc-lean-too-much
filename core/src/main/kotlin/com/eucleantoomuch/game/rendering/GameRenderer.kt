@@ -46,7 +46,7 @@ class GameRenderer(
     private val skyB = 0.9f
 
     init {
-        camera.near = 0.1f
+        camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
         camera.far = 300f
         camera.update()
     }
