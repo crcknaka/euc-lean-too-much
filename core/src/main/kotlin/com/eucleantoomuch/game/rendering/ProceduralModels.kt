@@ -47,6 +47,7 @@ class ProceduralModels : Disposable {
     private val benchMetalColor = Color(0.2f, 0.2f, 0.2f, 1f)    // Dark metal
     private val trashCanColor = Color(0.15f, 0.25f, 0.15f, 1f)   // Dark green
     private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
+    private val cloudColor = Color(1f, 1f, 1f, 0.9f)             // White cloud
 
     // Scale for external model (adjust based on your model's size)
     var eucModelScale = 1f
@@ -505,6 +506,36 @@ class ProceduralModels : Disposable {
                 flowerPart.sphere(0.12f, 0.12f, 0.12f, 6, 6)
                 flowerIndex++
             }
+        }
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createCloudModel(scaleX: Float = 1f, scaleZ: Float = 1f): Model {
+        modelBuilder.begin()
+
+        val cloudMaterial = Material(ColorAttribute.createDiffuse(cloudColor))
+        val baseScale = 3f  // Make clouds 3x bigger
+
+        // Cloud made of several overlapping spheres for fluffy look
+        val positions = listOf(
+            Triple(0f, 0f, 0f),           // Center
+            Triple(-3f * scaleX, -0.5f, 0f),    // Left
+            Triple(3f * scaleX, -0.3f, 0f),     // Right
+            Triple(-1.5f * scaleX, 0.5f, 1f * scaleZ),   // Front-left up
+            Triple(1.5f * scaleX, 0.3f, -1f * scaleZ),   // Back-right
+            Triple(0f, -0.7f, 1.5f * scaleZ),   // Front-bottom
+        )
+
+        positions.forEachIndexed { i, (x, y, z) ->
+            val size = when (i) {
+                0 -> 4f  // Center is biggest
+                1, 2 -> 3f  // Sides
+                else -> 2.5f  // Others
+            }
+            val cloudPart = modelBuilder.part("cloud_$i", GL20.GL_TRIANGLES, attributes, cloudMaterial)
+            cloudPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x * baseScale, y * baseScale, z * baseScale))
+            cloudPart.sphere(size * scaleX * baseScale, size * 0.6f * baseScale, size * scaleZ * baseScale, 8, 8)
         }
 
         return modelBuilder.end().also { models.add(it) }

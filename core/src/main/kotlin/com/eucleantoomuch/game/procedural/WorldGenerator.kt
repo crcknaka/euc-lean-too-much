@@ -40,6 +40,9 @@ class WorldGenerator(
     private var bushModel: ModelInstance
     private var flowerBedModel: ModelInstance
 
+    // Cloud models
+    private val cloudModels = mutableListOf<ModelInstance>()
+
     init {
         // Create variety of buildings
         for (i in 0..5) {
@@ -70,6 +73,13 @@ class WorldGenerator(
         trashCanModel = ModelInstance(models.createTrashCanModel())
         bushModel = ModelInstance(models.createBushModel())
         flowerBedModel = ModelInstance(models.createFlowerBedModel())
+
+        // Create cloud variants
+        for (i in 0..4) {
+            val scaleX = MathUtils.random(0.8f, 1.5f)
+            val scaleZ = MathUtils.random(0.8f, 1.2f)
+            cloudModels.add(ModelInstance(models.createCloudModel(scaleX, scaleZ)))
+        }
     }
 
     fun setRenderDistance(distance: Float) {
@@ -112,6 +122,9 @@ class WorldGenerator(
 
         // Scenery between buildings (trees, benches, etc.)
         entities.addAll(generateScenery(chunkIndex, chunkStartZ))
+
+        // Clouds in the sky
+        entities.addAll(generateClouds(chunkIndex, chunkStartZ))
 
         // Skip obstacles in the very first chunk (give player time to start)
         if (chunkIndex > 0) {
@@ -171,20 +184,25 @@ class WorldGenerator(
 
         var z = chunkStartZ
         while (z < chunkStartZ + Constants.CHUNK_LENGTH) {
-            // Left side building
+            // Random X offset for variety (-2 to +3 meters from base position)
+            // Positive = further from road, negative = closer to road
+            val leftXOffset = MathUtils.random(-2f, 3f)
+            val rightXOffset = MathUtils.random(-2f, 3f)
+
+            // Left side building (negative X, so subtract offset to move further from road)
             val (heightL, instanceL) = buildingModels.random()
             entities.add(createBuildingEntity(
-                -Constants.BUILDING_OFFSET_X,
+                -Constants.BUILDING_OFFSET_X - leftXOffset,
                 z + MathUtils.random(-2f, 2f),
                 heightL,
                 ModelInstance(instanceL.model),
                 chunkIndex
             ))
 
-            // Right side building
+            // Right side building (positive X, so add offset to move further from road)
             val (heightR, instanceR) = buildingModels.random()
             entities.add(createBuildingEntity(
-                Constants.BUILDING_OFFSET_X,
+                Constants.BUILDING_OFFSET_X + rightXOffset,
                 z + MathUtils.random(-2f, 2f),
                 heightR,
                 ModelInstance(instanceR.model),
@@ -259,21 +277,74 @@ class WorldGenerator(
             z += MathUtils.random(5f, 10f)
         }
 
-        // Add lamp posts at regular intervals - closer to road (on sidewalk near road edge)
-        z = chunkStartZ + 5f
-        while (z < chunkStartZ + Constants.CHUNK_LENGTH - 5f) {
-            val lampOffsetX = Constants.ROAD_WIDTH / 2 + 0.5f  // Just 0.5m from road edge, on sidewalk
+        // Add lamp posts with variety - sometimes none, sometimes one side, sometimes both
+        // Lamp pattern varies per chunk: 0 = no lamps, 1 = left only, 2 = right only, 3 = both sides
+        val lampPattern = when {
+            MathUtils.random() < 0.15f -> 0  // 15% - no lamps this chunk
+            MathUtils.random() < 0.25f -> 1  // ~21% - left side only
+            MathUtils.random() < 0.35f -> 2  // ~22% - right side only
+            else -> 3                         // ~42% - both sides
+        }
 
-            // Left side lamp - arm should point towards road (positive Z direction = towards road)
-            entities.add(createLampPostEntity(-lampOffsetX, z, chunkIndex, isLeftSide = true))
+        if (lampPattern > 0) {
+            z = chunkStartZ + 5f
+            while (z < chunkStartZ + Constants.CHUNK_LENGTH - 5f) {
+                val lampOffsetX = Constants.ROAD_WIDTH / 2 + 0.5f  // Just 0.5m from road edge, on sidewalk
 
-            // Right side lamp
-            entities.add(createLampPostEntity(lampOffsetX, z, chunkIndex, isLeftSide = false))
+                // Left side lamp
+                if (lampPattern == 1 || lampPattern == 3) {
+                    entities.add(createLampPostEntity(-lampOffsetX, z, chunkIndex, isLeftSide = true))
+                }
 
-            z += 25f
+                // Right side lamp
+                if (lampPattern == 2 || lampPattern == 3) {
+                    entities.add(createLampPostEntity(lampOffsetX, z, chunkIndex, isLeftSide = false))
+                }
+
+                z += 25f
+            }
         }
 
         return entities
+    }
+
+    private fun generateClouds(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Generate 2-4 clouds per chunk at random positions in the sky
+        val numClouds = MathUtils.random(2, 4)
+        for (i in 0 until numClouds) {
+            val x = MathUtils.random(-50f, 50f)  // Wide range across the sky
+            val y = MathUtils.random(50f, 80f)   // Higher in the sky (above buildings)
+            val z = chunkStartZ + MathUtils.random(0f, Constants.CHUNK_LENGTH)
+
+            entities.add(createCloudEntity(x, y, z, chunkIndex))
+        }
+
+        return entities
+    }
+
+    private fun createCloudEntity(x: Float, y: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, y, z)
+            // Random rotation for variety
+            yaw = MathUtils.random(0f, 360f)
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(cloudModels.random().model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING  // Just for chunk tracking
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
     }
 
     private fun createSceneryItem(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {

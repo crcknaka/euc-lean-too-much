@@ -52,8 +52,8 @@ object Constants {
     const val CAMERA_SMOOTHNESS = 5f
 
     // Building generation
-    const val BUILDING_MIN_HEIGHT = 12f
-    const val BUILDING_MAX_HEIGHT = 35f
+    const val BUILDING_MIN_HEIGHT = 18f
+    const val BUILDING_MAX_HEIGHT = 50f
     const val BUILDING_WIDTH = 6f
     const val BUILDING_DEPTH = 8f
     const val BUILDING_OFFSET_X = 14f       // Distance from road center (leaves room for grass)
