@@ -40,11 +40,15 @@ class FallAnimationController(
     // Arm animation state
     var armSpread = 0f          // Arms swing outward on impact (0-1)
         private set
+    var armForwardAngle = 0f    // Arms reach forward (degrees, for catching fall)
+        private set
 
     // EUC animation state
     var eucRoll = 0f            // EUC tips over
         private set
-    var eucForwardOffset = 0f   // EUC continues forward momentum
+    var eucYOffset = 0f         // EUC drops as it falls on its side
+        private set
+    var eucForwardOffset = 0f   // EUC slides forward slightly
         private set
     var eucSideOffset = 0f      // EUC veers off to side
         private set
@@ -98,7 +102,9 @@ class FallAnimationController(
         riderYOffset = 0f
         riderForwardOffset = 0f
         armSpread = 0f
+        armForwardAngle = 0f
         eucRoll = 0f
+        eucYOffset = 0f
         eucForwardOffset = 0f
         eucSideOffset = 0f
         cameraShake = 0f
@@ -124,9 +130,9 @@ class FallAnimationController(
         // Bounce formula: multiple damped impacts
         val bounceOffset = calculateBounce(t, speedFactor)
 
-        // === PHASE 1: Impact (0 - 0.1s) ===
-        if (t < 0.1f) {
-            val impactT = t / 0.1f  // 0-1 during impact phase
+        // === PHASE 1: Impact (0 - 0.15s) ===
+        if (t < 0.15f) {
+            val impactT = t / 0.15f  // 0-1 during impact phase
 
             // Trigger impact effects once
             if (!impactTriggered && t > 0.02f) {
@@ -135,93 +141,103 @@ class FallAnimationController(
             }
 
             // Camera shake peaks at impact
-            cameraShake = impactT * speedFactor * 2f
+            cameraShake = impactT * speedFactor * 2.5f
 
-            // Camera drops fast + bounce
-            cameraDropOffset = easeInQuad(impactT) * -1.5f + bounceOffset
+            // Camera drops and bounces
+            cameraDropOffset = easeInQuad(impactT) * -0.8f + bounceOffset
 
-            // Camera roll - starts tilting on impact
-            cameraRoll = easeOutQuad(impactT) * 15f * rollDirection * speedFactor
+            // Camera roll - tilts on impact
+            cameraRoll = easeOutQuad(impactT) * 12f * rollDirection * speedFactor
 
-            // FOV punch (quick zoom in/out)
-            fovPunch = MathUtils.sin(impactT * MathUtils.PI) * 8f * speedFactor
+            // FOV punch (quick zoom)
+            fovPunch = MathUtils.sin(impactT * MathUtils.PI) * 10f * speedFactor
 
-            // Rider starts pitching forward immediately
-            riderPitch = easeOutQuad(impactT) * 45f  // Start tilting toward ground
+            // Rider leans forward aggressively (like extreme forward lean)
+            riderPitch = easeOutQuad(impactT) * 60f  // Strong forward lean
+            riderYOffset = easeInQuad(impactT) * -0.3f  // Slight drop toward ground
+            riderForwardOffset = easeOutQuad(impactT) * 0.5f * speedFactor
 
-            // Arms start spreading outward (protective reflex)
-            armSpread = easeOutQuad(impactT) * 0.8f
+            // Arms go FORWARD (protective reflex - hands out to catch fall)
+            armSpread = easeOutQuad(impactT) * 0.3f  // Slight spread
+            armForwardAngle = easeOutQuad(impactT) * 60f  // Arms reach forward
 
-            // EUC starts tipping based on initial lean direction
+            // EUC starts tipping to side
             val eucRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
-            eucRoll = easeOutQuad(impactT) * 15f * eucRollDir
+            eucRoll = easeOutQuad(impactT) * 25f * eucRollDir
+            eucYOffset = easeInQuad(impactT) * -0.05f
+            eucForwardOffset = easeOutQuad(impactT) * 0.2f * speedFactor  // Starts sliding
 
-        // === PHASE 2: Tumble (0.1 - 0.4s) ===
-        } else if (t < 0.4f) {
-            val tumbleT = (t - 0.1f) / 0.3f  // 0-1 during tumble phase
+        // === PHASE 2: Tumble (0.15 - 0.5s) ===
+        } else if (t < 0.5f) {
+            val tumbleT = (t - 0.15f) / 0.35f  // 0-1 during tumble phase
 
             // Camera shake decreases
-            cameraShake = (1f - tumbleT * 0.7f) * speedFactor * 1.5f
+            cameraShake = (1f - tumbleT * 0.6f) * speedFactor * 1.8f
 
-            // Camera continues dropping + bounce effect
-            cameraDropOffset = -1.5f + easeInQuad(tumbleT) * -0.3f + bounceOffset
+            // Camera drops more + bounce effect
+            cameraDropOffset = -0.8f + easeInQuad(tumbleT) * -0.5f + bounceOffset
 
-            // Camera roll oscillates and settles
-            cameraRoll = 15f * rollDirection * speedFactor * (1f - tumbleT * 0.5f)
+            // Camera roll oscillates
+            cameraRoll = 12f * rollDirection * speedFactor * (1f - tumbleT * 0.3f)
 
             // FOV returns to normal
-            fovPunch = (1f - tumbleT) * 4f * speedFactor
+            fovPunch = (1f - tumbleT) * 5f * speedFactor
 
-            // Rider continues tumbling forward and starts falling - pitch beyond 90 degrees (face down)
-            riderPitch = 45f + easeInQuad(tumbleT) * 75f  // 45 -> 120 degrees (past horizontal)
-            riderYOffset = easeInQuad(tumbleT) * -1.5f  // Falls much lower to hit the ground
-            riderForwardOffset = easeOutQuad(tumbleT) * 1.5f * speedFactor  // Thrown forward
+            // Rider leans forward to ground (like falling face-first)
+            riderPitch = 60f + easeInQuad(tumbleT) * 30f  // 60 -> 90 degrees (horizontal)
+            riderYOffset = -0.3f + easeInQuad(tumbleT) * -0.5f  // Falls toward ground
+            riderForwardOffset = 0.5f * speedFactor + easeOutQuad(tumbleT) * 1.5f * speedFactor
 
             // Rider gains some roll as they tumble
             val riderRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
-            riderRoll = easeInOutQuad(tumbleT) * 20f * riderRollDir
+            riderRoll = easeInOutQuad(tumbleT) * 15f * riderRollDir
 
-            // Arms fully spread
-            armSpread = 0.8f + tumbleT * 0.2f
+            // Arms stay forward (catching fall)
+            armSpread = 0.3f + tumbleT * 0.2f  // Slight spread
+            armForwardAngle = 60f + easeOutQuad(tumbleT) * 30f  // Arms fully forward (90 degrees)
 
-            // EUC continues rolling and moves away
-            eucRoll = 15f + easeInQuad(tumbleT) * 60f * (if (initialSideLean >= 0) 1f else -1f)
-            eucForwardOffset = easeOutQuad(tumbleT) * 2f * speedFactor
-            eucSideOffset = easeOutQuad(tumbleT) * 0.8f * sign(eucRoll)
+            // EUC falls over to its side and slides forward
+            val eucRollDir = if (initialSideLean >= 0) 1f else -1f
+            eucRoll = 25f * eucRollDir + easeInQuad(tumbleT) * 55f * eucRollDir  // 25 -> 80 degrees
+            eucYOffset = -0.05f + easeInQuad(tumbleT) * -0.25f  // Drop as it tips
+            eucForwardOffset = 0.2f * speedFactor + easeOutQuad(tumbleT) * 1.2f * speedFactor  // Slides forward
+            eucSideOffset = easeOutQuad(tumbleT) * 0.3f * eucRollDir
 
-        // === PHASE 3: Settle (0.4 - 1.0s) ===
+        // === PHASE 3: Settle (0.5 - 1.0s) ===
         } else {
-            val settleT = (t - 0.4f) / 0.6f  // 0-1 during settle phase
+            val settleT = (t - 0.5f) / 0.5f  // 0-1 during settle phase
 
             // Camera shake fades out
-            cameraShake = (1f - settleT) * 0.4f * speedFactor
+            cameraShake = (1f - settleT) * 0.5f * speedFactor
 
-            // Camera at low position + residual bounce
-            cameraDropOffset = -1.8f + bounceOffset
+            // Camera settles at low position + residual bounce
+            cameraDropOffset = -1.3f + bounceOffset * (1f - settleT)
 
             // Camera roll settles back to normal
-            cameraRoll = 15f * rollDirection * speedFactor * 0.5f * (1f - easeOutQuad(settleT))
+            cameraRoll = 12f * rollDirection * speedFactor * 0.7f * (1f - easeOutQuad(settleT))
 
             // FOV settles
             fovPunch = 0f
 
-            // Rider on ground - fully fallen (face down on ground)
-            riderPitch = 120f  // Past horizontal - face down
-            riderYOffset = -1.5f  // On the ground
-            riderForwardOffset = 1.5f * speedFactor + settleT * 0.3f
+            // Rider on ground - leaned forward with hands out
+            riderPitch = 90f  // Horizontal - face down toward ground
+            riderYOffset = -0.8f  // Close to ground (fallen)
+            riderForwardOffset = 2f * speedFactor + settleT * 0.2f
 
             // Roll settles
             val riderRollDir = if (initialSideLean >= 0) 1f else -1f
-            riderRoll = 20f * riderRollDir + easeInOutQuad(settleT) * 5f * riderRollDir
+            riderRoll = 15f * riderRollDir
 
-            // Arms relax slightly
-            armSpread = 1f - settleT * 0.1f
+            // Arms forward (bracing on ground)
+            armSpread = 0.5f
+            armForwardAngle = 90f  // Fully forward
 
-            // EUC has rolled over and slides to a stop
-            val eucRollTarget = 85f * (if (initialSideLean >= 0) 1f else -1f)
-            eucRoll = 75f * sign(eucRollTarget) + easeOutQuad(settleT) * 10f * sign(eucRollTarget)
-            eucForwardOffset = 2f * speedFactor + easeOutQuad(settleT) * 0.5f
-            eucSideOffset = 0.8f * sign(eucRoll) + easeOutQuad(settleT) * 0.3f * sign(eucRoll)
+            // EUC lying on its side, sliding to a stop
+            val eucRollDir = if (initialSideLean >= 0) 1f else -1f
+            eucRoll = 80f * eucRollDir + easeOutQuad(settleT) * 10f * eucRollDir  // Settles to 90
+            eucYOffset = -0.3f  // On the ground
+            eucForwardOffset = 1.4f * speedFactor + easeOutQuad(settleT) * 0.3f * speedFactor  // Slides to stop
+            eucSideOffset = 0.3f * eucRollDir
         }
     }
 
@@ -285,7 +301,9 @@ class FallAnimationController(
         riderYOffset = 0f
         riderForwardOffset = 0f
         armSpread = 0f
+        armForwardAngle = 0f
         eucRoll = 0f
+        eucYOffset = 0f
         eucForwardOffset = 0f
         eucSideOffset = 0f
         cameraShake = 0f

@@ -43,9 +43,9 @@ class CameraController(private val camera: PerspectiveCamera) {
     }
 
     fun update(playerPosition: Vector3, playerYaw: Float, deltaTime: Float, speed: Float = 0f) {
-        // Calculate rotated offset based on player yaw
-        val cos = MathUtils.cosDeg(playerYaw)
-        val sin = MathUtils.sinDeg(playerYaw)
+        // Calculate rotated offset based on player yaw (negated to match visual direction)
+        val cos = MathUtils.cosDeg(-playerYaw)
+        val sin = MathUtils.sinDeg(-playerYaw)
 
         // Rotate offset by yaw
         val rotatedOffsetX = offset.x * cos - offset.z * sin

@@ -101,7 +101,8 @@ class GameRenderer(
 
                 if (euc != null && isPlayer) {
                     // For EUC model: apply yaw (turn left/right), then model fix rotation, then lean
-                    tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                    // Negate yaw to match visual direction with input direction
+                    tempMatrix.rotate(0f, 1f, 0f, -transform.yaw)
 
                     // Model orientation fix (flip upside down model)
                     if (models.eucModelRotationX != 0f) {
@@ -120,8 +121,8 @@ class GameRenderer(
                     // Check if this is an arm
                     val arm = armMapper.get(entity)
                     if (arm != null) {
-                        // For arm: apply yaw rotation
-                        tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                        // For arm: apply yaw rotation (negated to match visual direction)
+                        tempMatrix.rotate(0f, 1f, 0f, -transform.yaw)
 
                         // Lean forward and side
                         val forwardLeanAngle = euc.visualForwardLean * 20f
@@ -134,8 +135,8 @@ class GameRenderer(
                         val totalRotation = armRotation + arm.waveOffset
                         tempMatrix.rotate(0f, 0f, 1f, totalRotation)
                     } else {
-                        // For rider: apply yaw rotation
-                        tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                        // For rider: apply yaw rotation (negated to match visual direction)
+                        tempMatrix.rotate(0f, 1f, 0f, -transform.yaw)
 
                         // Lean forward and side
                         val forwardLeanAngle = euc.visualForwardLean * 20f

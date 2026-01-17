@@ -475,6 +475,10 @@ class EucGame(
         val armComponent = armEntity.getComponent(ArmComponent::class.java) ?: return
         val armEuc = armEntity.getComponent(EucComponent::class.java) ?: return
 
+        // Get rider transform - arms are attached to body, not wheel
+        val riderTransform = riderEntity?.getComponent(TransformComponent::class.java)
+        val riderEuc = riderEntity?.getComponent(EucComponent::class.java)
+
         // Smoothly interpolate arm angle
         armComponent.targetArmAngle = targetAngle
         val lerpSpeed = 5f
@@ -498,21 +502,68 @@ class EucGame(
             }
         }
 
-        // Position arm at shoulder level relative to rider (scaled 1.4x)
+        // Position arm at shoulder level relative to rider body (not wheel)
         val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
-        val shoulderOffsetY = 0.7f + 1.75f  // rider offset + shoulder height on scaled rider
+        val shoulderHeight = 1.75f  // Shoulder height on rider
 
-        armTransform.position.set(playerTransform.position)
-        armTransform.position.y += shoulderOffsetY
-        armTransform.position.x += shoulderOffsetX
-        armTransform.yaw = playerTransform.yaw
+        // Calculate shoulder position accounting for body lean rotation
+        // Body rotates around its base, so shoulders move when leaning
+        val forwardLean = riderEuc?.visualForwardLean ?: eucComponent.visualForwardLean
+        val sideLean = riderEuc?.visualSideLean ?: eucComponent.visualSideLean
+
+        // Forward lean angle in radians (same formula as in GameRenderer: visualForwardLean * 20f degrees)
+        val forwardAngleRad = forwardLean * 20f * com.badlogic.gdx.math.MathUtils.degreesToRadians
+        val sideAngleRad = sideLean * 15f * com.badlogic.gdx.math.MathUtils.degreesToRadians
+
+        // When body rotates forward, shoulder moves forward by sin(angle)*height and down by (1-cos(angle))*height
+        val shoulderForwardOffset = kotlin.math.sin(forwardAngleRad) * shoulderHeight
+        val shoulderDownOffset = (1f - kotlin.math.cos(forwardAngleRad)) * shoulderHeight
+
+        // Side lean also affects shoulder position (in local space)
+        val shoulderSideOffset = kotlin.math.sin(sideAngleRad) * shoulderHeight * (if (isLeft) 1f else -1f)
+
+        // Get yaw for rotating local offsets to world space (negated to match visual direction)
+        val yaw = riderTransform?.yaw ?: playerTransform.yaw
+        val yawRad = -yaw * com.badlogic.gdx.math.MathUtils.degreesToRadians
+
+        // Calculate local offsets (relative to body orientation)
+        val localX = shoulderOffsetX + shoulderSideOffset
+        val localZ = shoulderForwardOffset
+
+        // Rotate local offsets by yaw to get world offsets
+        val cosYaw = kotlin.math.cos(yawRad)
+        val sinYaw = kotlin.math.sin(yawRad)
+        val worldOffsetX = localX * cosYaw - localZ * sinYaw
+        val worldOffsetZ = localX * sinYaw + localZ * cosYaw
+
+        // Use rider position if available, otherwise fall back to player position with offset
+        if (riderTransform != null) {
+            armTransform.position.set(riderTransform.position)
+            armTransform.position.y += shoulderHeight - shoulderDownOffset
+            armTransform.position.x += worldOffsetX
+            armTransform.position.z += worldOffsetZ
+            armTransform.yaw = riderTransform.yaw
+        } else {
+            armTransform.position.set(playerTransform.position)
+            armTransform.position.y += 0.7f + shoulderHeight - shoulderDownOffset
+            armTransform.position.x += worldOffsetX
+            armTransform.position.z += worldOffsetZ
+            armTransform.yaw = playerTransform.yaw
+        }
         armTransform.updateRotationFromYaw()
 
-        // Copy lean values
-        armEuc.forwardLean = eucComponent.forwardLean
-        armEuc.sideLean = eucComponent.sideLean
-        armEuc.visualForwardLean = eucComponent.visualForwardLean
-        armEuc.visualSideLean = eucComponent.visualSideLean
+        // Copy lean values from rider (body lean), not from EUC wheel
+        if (riderEuc != null) {
+            armEuc.forwardLean = riderEuc.forwardLean
+            armEuc.sideLean = riderEuc.sideLean
+            armEuc.visualForwardLean = riderEuc.visualForwardLean
+            armEuc.visualSideLean = riderEuc.visualSideLean
+        } else {
+            armEuc.forwardLean = eucComponent.forwardLean
+            armEuc.sideLean = eucComponent.sideLean
+            armEuc.visualForwardLean = eucComponent.visualForwardLean
+            armEuc.visualSideLean = eucComponent.visualSideLean
+        }
     }
 
     private fun startGame() {
@@ -624,11 +675,12 @@ class EucGame(
                 riderEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
             }
 
-            // Update EUC position with fall animation (rolling away)
-            playerTransform.position.z += fallAnimationController.eucForwardOffset * delta * 2f
-            playerTransform.position.x += fallAnimationController.eucSideOffset * delta * 2f
+            // Update EUC position with fall animation (falling on its side)
+            playerTransform.position.y = fallAnimationController.eucYOffset
+            playerTransform.position.z += fallAnimationController.eucForwardOffset * delta
+            playerTransform.position.x += fallAnimationController.eucSideOffset * delta
 
-            // Apply EUC roll to visual lean
+            // Apply EUC roll to visual lean (90 degrees = lying on side)
             eucComponent.visualSideLean = eucComponent.sideLean + fallAnimationController.eucRoll / 90f
 
             // Update arms - spread outward during fall
@@ -674,26 +726,48 @@ class EucGame(
         val armComponent = armEntity.getComponent(ArmComponent::class.java) ?: return
         val armEuc = armEntity.getComponent(EucComponent::class.java) ?: return
 
-        // Arms spread outward during fall (protective reflex)
-        val targetAngle = 90f * fallAnimationController.armSpread
-        armComponent.armAngle = targetAngle
+        // Arms spread to sides during fall
+        val sideSpread = 30f * fallAnimationController.armSpread
+        armComponent.armAngle = sideSpread
         armComponent.waveOffset = 0f
 
-        // Position arm following rider during fall
-        val riderYOffset = 0.7f + fallAnimationController.riderYOffset
+        // Position arm at shoulder level - follow rider exactly
         val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
-        val shoulderOffsetY = riderYOffset + 1.75f
+        val riderBaseY = 0.7f  // Rider sits 0.7 above player
+        val shoulderHeight = 1.75f  // Shoulder height on rider
+
+        // Get yaw for rotating local offsets to world space (negated to match visual direction)
+        val yaw = playerTransform.yaw
+        val yawRad = -yaw * com.badlogic.gdx.math.MathUtils.degreesToRadians
+
+        // Calculate local offsets (relative to body orientation)
+        val localX = shoulderOffsetX
+        val localZ = fallAnimationController.riderForwardOffset
+
+        // Rotate local offsets by yaw to get world offsets
+        val cosYaw = kotlin.math.cos(yawRad)
+        val sinYaw = kotlin.math.sin(yawRad)
+        val worldOffsetX = localX * cosYaw - localZ * sinYaw
+        val worldOffsetZ = localX * sinYaw + localZ * cosYaw
 
         armTransform.position.set(playerTransform.position)
-        armTransform.position.y += shoulderOffsetY
-        armTransform.position.x += shoulderOffsetX
-        armTransform.position.z += fallAnimationController.riderForwardOffset
+        armTransform.position.y += riderBaseY + shoulderHeight + fallAnimationController.riderYOffset
+        armTransform.position.x += worldOffsetX
+        armTransform.position.z += worldOffsetZ
         armTransform.yaw = playerTransform.yaw
         armTransform.updateRotationFromYaw()
 
-        // Copy visual lean from rider (with fall effect)
-        armEuc.visualForwardLean = eucComponent.visualForwardLean + fallAnimationController.riderPitch / 90f
-        armEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
+        // Get rider's current lean
+        val riderEuc = riderEntity?.getComponent(EucComponent::class.java)
+        val riderForwardLean = riderEuc?.visualForwardLean ?: 0f
+        val riderSideLean = riderEuc?.visualSideLean ?: 0f
+
+        // Arms follow rider's lean exactly, plus small extra forward reach
+        // armForwardAngle goes from 0 to 90, divide by 90 to get 0-1 range, then scale
+        val armExtraForward = fallAnimationController.armForwardAngle / 90f * 0.5f
+
+        armEuc.visualForwardLean = riderForwardLean + armExtraForward
+        armEuc.visualSideLean = riderSideLean
     }
 
     override fun resize(width: Int, height: Int) {
