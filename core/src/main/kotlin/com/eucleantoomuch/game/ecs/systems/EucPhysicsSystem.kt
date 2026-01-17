@@ -55,8 +55,11 @@ class EucPhysicsSystem(
         euc.visualForwardLean = lerp(euc.visualForwardLean, euc.forwardLean, deltaTime * 8f)
         euc.visualSideLean = lerp(euc.visualSideLean, euc.sideLean, deltaTime * 8f)
 
-        // Check for fall condition
-        if (EucPhysics.checkFall(euc.forwardLean, euc.sideLean)) {
+        // Calculate PWM (motor load) - this determines cutout
+        euc.calculatePwm()
+
+        // Check for fall condition (PWM cutout at 100%)
+        if (euc.isPwmCutout()) {
             player.isAlive = false
             player.hasFallen = true
             velocity.linear.setZero()

@@ -13,11 +13,15 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val renderDistanceLeftButton = Rectangle()
     private val renderDistanceRightButton = Rectangle()
     private val fpsCheckbox = Rectangle()
+    private val pwmWarningLeftButton = Rectangle()
+    private val pwmWarningRightButton = Rectangle()
 
     private var backButtonHover = 0f
     private var leftButtonHover = 0f
     private var rightButtonHover = 0f
     private var fpsCheckboxHover = 0f
+    private var pwmLeftButtonHover = 0f
+    private var pwmRightButtonHover = 0f
     private var enterAnimProgress = 0f
 
     enum class Action {
@@ -44,11 +48,15 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val leftHovered = renderDistanceLeftButton.contains(touchX, touchY)
         val rightHovered = renderDistanceRightButton.contains(touchX, touchY)
         val fpsHovered = fpsCheckbox.contains(touchX, touchY)
+        val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
+        val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
 
         backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 8f)
         leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 8f)
         rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 8f)
         fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 8f)
+        pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 8f)
+        pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 8f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -66,7 +74,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Settings panel
         val panelWidth = 700f * scale
-        val panelHeight = 480f * scale
+        val panelHeight = 560f * scale
         val panelX = centerX - panelWidth / 2
         val panelY = sh / 2 - panelHeight / 2 + 50f * scale
 
@@ -77,8 +85,11 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // === Render Distance Setting ===
         val settingY = panelY + panelHeight - 120f * scale
 
+        // === PWM Warning Setting ===
+        val pwmSettingY = settingY - 100f * scale
+
         // === FPS Counter Checkbox ===
-        val fpsSettingY = settingY - 120f * scale
+        val fpsSettingY = pwmSettingY - 100f * scale
         val checkboxSize = 40f * scale
         val checkboxX = centerX - 120f * scale
 
@@ -105,8 +116,36 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
             ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
         }
+
         val arrowButtonSize = 60f * scale
         val valueBoxWidth = 200f * scale
+
+        // === PWM Warning arrows and value box ===
+        pwmWarningLeftButton.set(
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 20f * scale,
+            pwmSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(pwmWarningLeftButton, UITheme.secondary, glowIntensity = pwmLeftButtonHover * 0.5f)
+
+        pwmWarningRightButton.set(
+            centerX + valueBoxWidth / 2 + 20f * scale,
+            pwmSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(pwmWarningRightButton, UITheme.secondary, glowIntensity = pwmRightButtonHover * 0.5f)
+
+        // PWM Value box
+        ui.panel(
+            centerX - valueBoxWidth / 2,
+            pwmSettingY - 30f * scale,
+            valueBoxWidth,
+            60f * scale,
+            radius = 10f * scale,
+            backgroundColor = UITheme.surfaceLight
+        )
 
         // Left arrow button
         renderDistanceLeftButton.set(
@@ -172,6 +211,25 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val currentDistance = settingsManager.renderDistance.toInt()
         ui.textCentered("$currentName (${currentDistance}m)", centerX, settingY, UIFonts.body, UITheme.accent)
 
+        // PWM Warning label
+        val pwmLabelY = pwmSettingY + 60f * scale
+        ui.textCentered("PWM Warning", centerX, pwmLabelY, UIFonts.body, UITheme.textSecondary)
+
+        // PWM Arrow symbols
+        ui.textCentered("<",
+            pwmWarningLeftButton.x + pwmWarningLeftButton.width / 2,
+            pwmWarningLeftButton.y + pwmWarningLeftButton.height / 2,
+            UIFonts.button, UITheme.textPrimary)
+
+        ui.textCentered(">",
+            pwmWarningRightButton.x + pwmWarningRightButton.width / 2,
+            pwmWarningRightButton.y + pwmWarningRightButton.height / 2,
+            UIFonts.button, UITheme.textPrimary)
+
+        // PWM Current value
+        val pwmCurrentName = settingsManager.getPwmWarningName()
+        ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, UITheme.accent)
+
         // FPS Checkbox label
         UIFonts.body.draw(ui.batch, "Show FPS Counter", fpsCheckbox.x + fpsCheckbox.width + 20f * scale,
             fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
@@ -185,6 +243,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         ui.endBatch()
 
         // === Handle Input ===
+        val pwmCurrentIndex = settingsManager.getPwmWarningIndex()
         if (Gdx.input.justTouched()) {
             if (backButton.contains(touchX, touchY)) {
                 return Action.BACK
@@ -199,6 +258,14 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             }
             if (fpsCheckbox.contains(touchX, touchY)) {
                 settingsManager.showFps = !settingsManager.showFps
+            }
+            if (pwmWarningLeftButton.contains(touchX, touchY)) {
+                val newIndex = (pwmCurrentIndex - 1).coerceAtLeast(0)
+                settingsManager.setPwmWarningByIndex(newIndex)
+            }
+            if (pwmWarningRightButton.contains(touchX, touchY)) {
+                val newIndex = (pwmCurrentIndex + 1).coerceAtMost(SettingsManager.PWM_WARNING_OPTIONS.size - 1)
+                settingsManager.setPwmWarningByIndex(newIndex)
             }
         }
 

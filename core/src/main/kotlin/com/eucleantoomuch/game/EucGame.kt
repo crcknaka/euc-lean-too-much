@@ -139,6 +139,7 @@ class EucGame(
 
         // Initialize speed warning system
         speedWarningManager = SpeedWarningManager(platformServices)
+        applyPwmWarningThreshold()
 
         // Start at menu
         stateManager.transition(GameState.Menu)
@@ -148,6 +149,11 @@ class EucGame(
         val distance = settingsManager.renderDistance
         worldGenerator.setRenderDistance(distance)
         renderer.setCameraFar(distance)
+    }
+
+    private fun applyPwmWarningThreshold() {
+        // Convert percentage (0, 60, 70, 80, 90) to float (0, 0.6, 0.7, 0.8, 0.9)
+        speedWarningManager.pwmWarningThreshold = settingsManager.pwmWarning / 100f
     }
 
     override fun render() {
@@ -219,8 +225,9 @@ class EucGame(
 
         when (settingsRenderer.render()) {
             SettingsRenderer.Action.BACK -> {
-                // Apply render distance to world generator and camera
+                // Apply settings
                 applyRenderDistance()
+                applyPwmWarningThreshold()
                 stateManager.transition(GameState.Menu)
             }
             SettingsRenderer.Action.NONE -> {}
@@ -352,8 +359,8 @@ class EucGame(
             // Update camera
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
 
-            // Update speed warning system (beeps at 55+ km/h, overpower on hard acceleration)
-            speedWarningManager.update(eucComponent.speed, delta, eucComponent.forwardLean)
+            // Update PWM warning system (beeps when PWM exceeds threshold)
+            speedWarningManager.update(eucComponent.pwm, delta)
         }
 
         // Render
@@ -361,7 +368,7 @@ class EucGame(
 
         // Render HUD
         if (eucComponent != null) {
-            hud.render(session, eucComponent, speedWarningManager.isActive(), speedWarningManager.isOverpowerWarning())
+            hud.render(session, eucComponent, speedWarningManager.isActive())
         }
     }
 

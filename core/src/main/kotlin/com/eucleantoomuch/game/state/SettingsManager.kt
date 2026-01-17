@@ -11,6 +11,7 @@ class SettingsManager {
     companion object {
         private const val KEY_RENDER_DISTANCE = "renderDistance"
         private const val KEY_SHOW_FPS = "showFps"
+        private const val KEY_PWM_WARNING = "pwmWarning"
 
         // Render distance presets (in meters)
         const val RENDER_DISTANCE_LOW = 100f
@@ -23,6 +24,15 @@ class SettingsManager {
             "Medium" to RENDER_DISTANCE_MEDIUM,
             "High" to RENDER_DISTANCE_HIGH,
             "Ultra" to RENDER_DISTANCE_ULTRA
+        )
+
+        // PWM warning threshold options (percentage)
+        val PWM_WARNING_OPTIONS = listOf(
+            "Off" to 0,
+            "60%" to 60,
+            "70%" to 70,
+            "80%" to 80,
+            "90%" to 90
         )
     }
 
@@ -39,6 +49,29 @@ class SettingsManager {
             prefs.putBoolean(KEY_SHOW_FPS, value)
             prefs.flush()
         }
+
+    // PWM warning threshold (0 = off, 60-90 = percentage)
+    var pwmWarning: Int
+        get() = prefs.getInteger(KEY_PWM_WARNING, 80)  // Default 80%
+        set(value) {
+            prefs.putInteger(KEY_PWM_WARNING, value)
+            prefs.flush()
+        }
+
+    fun getPwmWarningIndex(): Int {
+        val current = pwmWarning
+        return PWM_WARNING_OPTIONS.indexOfFirst { it.second == current }.takeIf { it >= 0 } ?: 3  // Default to 80%
+    }
+
+    fun setPwmWarningByIndex(index: Int) {
+        if (index in PWM_WARNING_OPTIONS.indices) {
+            pwmWarning = PWM_WARNING_OPTIONS[index].second
+        }
+    }
+
+    fun getPwmWarningName(): String {
+        return PWM_WARNING_OPTIONS.getOrNull(getPwmWarningIndex())?.first ?: "80%"
+    }
 
     fun getRenderDistanceIndex(): Int {
         val current = renderDistance

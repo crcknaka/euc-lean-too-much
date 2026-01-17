@@ -17,10 +17,10 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var lastScore = 0
     private var warningFlash = 0f
     private var speedBarSmooth = 0f
-    private var speedWarningFlash = 0f
-    private var overpowerFlash = 0f
+    private var pwmWarningFlash = 0f
+    private var pwmSmooth = 0f
 
-    fun render(session: GameSession, euc: EucComponent, speedWarningActive: Boolean = false, overpowerWarningActive: Boolean = false) {
+    fun render(session: GameSession, euc: EucComponent, pwmWarningActive: Boolean = false) {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
 
@@ -38,6 +38,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val targetSpeed = (euc.speed / 25f).coerceIn(0f, 1f)
         speedBarSmooth = UITheme.Anim.ease(speedBarSmooth, targetSpeed, 5f)
 
+        // Smooth PWM
+        pwmSmooth = UITheme.Anim.ease(pwmSmooth, euc.pwm, 8f)
+
         // Warning flash (about to fall)
         if (euc.isAboutToFall()) {
             warningFlash += Gdx.graphics.deltaTime * 8f
@@ -45,18 +48,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             warningFlash = UITheme.Anim.ease(warningFlash, 0f, 5f)
         }
 
-        // Speed warning flash (55+ km/h)
-        if (speedWarningActive) {
-            speedWarningFlash += Gdx.graphics.deltaTime * 10f
+        // PWM warning flash
+        if (pwmWarningActive) {
+            pwmWarningFlash += Gdx.graphics.deltaTime * 10f
         } else {
-            speedWarningFlash = UITheme.Anim.ease(speedWarningFlash, 0f, 5f)
-        }
-
-        // Overpower flash (hard acceleration)
-        if (overpowerWarningActive) {
-            overpowerFlash = 1f  // Instant flash
-        } else {
-            overpowerFlash = UITheme.Anim.ease(overpowerFlash, 0f, 8f)  // Quick fade
+            pwmWarningFlash = UITheme.Anim.ease(pwmWarningFlash, 0f, 5f)
         }
 
         val scale = UITheme.Dimensions.scale()
@@ -72,6 +68,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         // === Speed Panel (bottom left) ===
         drawSpeedPanel(euc)
+
+        // === PWM Panel (above speed panel) ===
+        drawPwmPanel(euc)
 
         // === Lean Indicator (bottom right) ===
         drawLeanIndicator(euc)
@@ -117,18 +116,12 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 30)
         }
 
-        // Speed warning indicator (55+ km/h)
-        if (speedWarningFlash > 0.1f) {
-            val speedKmh = (euc.speed * 3.6f).toInt()
-            val warningPulse = MathUtils.sin(speedWarningFlash * 8f) * 0.5f + 0.5f
+        // PWM warning indicator
+        if (pwmWarningFlash > 0.1f) {
+            val pwmPercent = euc.getPwmPercent()
+            val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
-            drawWarningBadge("⚠ SPEED $speedKmh km/h", warningColor, sh / 2 + 80)
-        }
-
-        // Overpower warning indicator (hard acceleration)
-        if (overpowerFlash > 0.1f) {
-            val overpowerColor = UITheme.withAlpha(UITheme.danger, overpowerFlash)
-            drawWarningBadge("⚡ OVERPOWER!", overpowerColor, sh / 2 + 130)
+            drawWarningBadge("PWM $pwmPercent%", warningColor, sh / 2 + 80)
         }
 
         // FPS counter (top-left, small)
@@ -190,6 +183,67 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.layout.setText(UIFonts.title, "$speedKmh")
         UIFonts.caption.color = UITheme.textSecondary
         UIFonts.caption.draw(ui.batch, "km/h", panelX + 25 + ui.layout.width, panelY + panelHeight - 28)
+
+        ui.endBatch()
+        ui.beginShapes()
+    }
+
+    private fun drawPwmPanel(euc: EucComponent) {
+        val scale = UITheme.Dimensions.scale()
+        val panelWidth = 200f * scale
+        val panelHeight = 80f * scale
+        val panelX = 25f * scale
+        val panelY = 145f * scale  // Above speed panel
+
+        // Panel background
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 14f, UITheme.withAlpha(UITheme.surface, 0.9f))
+
+        // PWM bar background
+        val barX = panelX + 12
+        val barY = panelY + 12
+        val barWidth = panelWidth - 24
+        val barHeight = 12f
+
+        ui.roundedRect(barX, barY, barWidth, barHeight, 6f, UITheme.surfaceLight)
+
+        // PWM bar fill with color based on level
+        val pwmColor = when {
+            pwmSmooth < 0.6f -> UITheme.primary      // Green - safe
+            pwmSmooth < 0.8f -> UITheme.warning      // Yellow - caution
+            pwmSmooth < 0.95f -> UITheme.lerp(UITheme.warning, UITheme.danger, (pwmSmooth - 0.8f) / 0.15f) // Orange
+            else -> UITheme.danger                    // Red - danger!
+        }
+
+        val fillWidth = (barWidth * pwmSmooth.coerceIn(0f, 1f)).coerceAtLeast(8f)
+        ui.roundedRect(barX, barY, fillWidth, barHeight, 6f, pwmColor)
+
+        // Danger zone marker at 80%
+        val marker80X = barX + barWidth * 0.8f
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.6f)
+        ui.shapes.rectLine(marker80X, barY - 2, marker80X, barY + barHeight + 2, 2f)
+
+        // Critical zone marker at 100%
+        val marker100X = barX + barWidth
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.8f)
+        ui.shapes.rectLine(marker100X - 2, barY - 3, marker100X - 2, barY + barHeight + 3, 2f)
+
+        // Pulsing glow when PWM > 80%
+        if (pwmSmooth > 0.8f) {
+            val glowIntensity = ((pwmSmooth - 0.8f) / 0.2f).coerceIn(0f, 1f) * UITheme.Anim.pulse(6f, 0.4f, 0.8f)
+            ui.roundedRect(barX - 2, barY - 2, fillWidth + 4, barHeight + 4, 8f, UITheme.withAlpha(pwmColor, glowIntensity * 0.5f))
+        }
+
+        // PWM text
+        ui.endShapes()
+        ui.beginBatch()
+
+        val pwmPercent = euc.getPwmPercent()
+        UIFonts.heading.color = pwmColor
+        UIFonts.heading.draw(ui.batch, "$pwmPercent%", panelX + 20, panelY + panelHeight - 12)
+
+        ui.layout.setText(UIFonts.heading, "$pwmPercent%")
+        UIFonts.caption.color = UITheme.textSecondary
+        UIFonts.caption.draw(ui.batch, "PWM", panelX + 28 + ui.layout.width, panelY + panelHeight - 18)
 
         ui.endBatch()
         ui.beginShapes()
