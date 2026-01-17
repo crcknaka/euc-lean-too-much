@@ -174,7 +174,7 @@ class UIRenderer : Disposable {
         }
     }
 
-    /** Draw a modern button with 3D effect */
+    /** Draw a modern button with 3D effect and smooth glow */
     fun button(
         rect: Rectangle,
         color: Color,
@@ -184,39 +184,40 @@ class UIRenderer : Disposable {
         val x = rect.x
         val y = rect.y - pressedOffset
         val radius = UITheme.Dimensions.buttonRadius
+        val scale = UITheme.Dimensions.scale()
 
-        // Glow effect
+        // Enhanced glow effect for hover
         if (glowIntensity > 0) {
-            val glowColor = UITheme.withAlpha(color, 0.3f * glowIntensity)
-            for (i in 3 downTo 1) {
+            val glowColor = UITheme.withAlpha(color, 0.35f * glowIntensity)
+            for (i in 4 downTo 1) {
                 roundedRect(
-                    x - i * 2, y - i * 2,
-                    rect.width + i * 4, rect.height + i * 4,
-                    radius + i * 2,
-                    UITheme.withAlpha(glowColor, glowIntensity * 0.1f * i)
+                    x - i * 3f * scale, y - i * 3f * scale,
+                    rect.width + i * 6f * scale, rect.height + i * 6f * scale,
+                    radius + i * 3f * scale,
+                    UITheme.withAlpha(glowColor, glowIntensity * 0.12f * i)
                 )
             }
         }
 
-        // Shadow (pressed buttons have less shadow)
-        val shadowOffset = (4f - pressedOffset * 2).coerceAtLeast(0f)
+        // Deeper shadow for more depth
+        val shadowOffset = (6f * scale - pressedOffset * 2).coerceAtLeast(0f)
         if (shadowOffset > 0) {
             roundedRect(
-                x + 2, y - shadowOffset,
+                x + 3f * scale, y - shadowOffset,
                 rect.width, rect.height, radius,
-                UITheme.withAlpha(Color.BLACK, 0.35f)
+                UITheme.withAlpha(Color.BLACK, 0.4f)
             )
         }
 
-        // Button base (darker)
-        roundedRect(x, y - 3 + pressedOffset, rect.width, rect.height, radius, UITheme.darken(color, 0.15f))
+        // Button base (darker) for 3D depth
+        roundedRect(x, y - 4f * scale + pressedOffset, rect.width, rect.height, radius, UITheme.darken(color, 0.18f))
 
-        // Button top (main color with subtle gradient effect)
+        // Button main body
         roundedRect(x, y, rect.width, rect.height, radius, color)
 
-        // Highlight at top
-        shapes.color = UITheme.withAlpha(Color.WHITE, 0.1f)
-        roundedRect(x + 4, y + rect.height - 12, rect.width - 8, 6f, 3f, shapes.color)
+        // Top highlight for glass effect
+        shapes.color = UITheme.withAlpha(Color.WHITE, 0.12f)
+        roundedRect(x + 6f * scale, y + rect.height - 16f * scale, rect.width - 12f * scale, 8f * scale, 4f * scale, shapes.color)
     }
 
     /** Draw a circular gauge/indicator */

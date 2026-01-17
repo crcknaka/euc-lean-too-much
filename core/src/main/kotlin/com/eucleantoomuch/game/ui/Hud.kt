@@ -9,6 +9,10 @@ import com.eucleantoomuch.game.state.GameSession
 import com.eucleantoomuch.game.state.SettingsManager
 import kotlin.math.sqrt
 
+/**
+ * Modern in-game HUD with clean, readable panels.
+ * Designed for quick glances during gameplay with clear visual hierarchy.
+ */
 class Hud(private val settingsManager: SettingsManager) : Disposable {
     private val ui = UIRenderer()
 
@@ -26,10 +30,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         val sw = ui.screenWidth
         val sh = ui.screenHeight
+        val scale = UITheme.Dimensions.scale()
 
         // Score pop animation
         if (session.score != lastScore) {
-            scorePopScale = 1.3f
+            scorePopScale = 1.25f
             lastScore = session.score
         }
         scorePopScale = UITheme.Anim.ease(scorePopScale, 1f, 8f)
@@ -55,16 +60,14 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             pwmWarningFlash = UITheme.Anim.ease(pwmWarningFlash, 0f, 5f)
         }
 
-        val scale = UITheme.Dimensions.scale()
-
         ui.beginShapes()
 
         // === Top Score Panel ===
-        val topPanelWidth = 280f * scale
-        val topPanelHeight = 100f * scale
-        val topPanelY = sh - topPanelHeight - 20f * scale
+        val topPanelWidth = 320f * scale
+        val topPanelHeight = 120f * scale
+        val topPanelY = sh - topPanelHeight - 28f * scale
         ui.roundedRect(sw / 2 - topPanelWidth / 2, topPanelY, topPanelWidth, topPanelHeight,
-            16f * scale, UITheme.withAlpha(UITheme.surface, 0.9f))
+            20f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
 
         // === Speed Panel (bottom left) ===
         drawSpeedPanel(euc)
@@ -77,16 +80,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         // === Warning Overlay ===
         if (warningFlash > 0.1f) {
-            val flashAlpha = (MathUtils.sin(warningFlash * 3f) * 0.5f + 0.5f) * 0.15f
+            val flashAlpha = (MathUtils.sin(warningFlash * 3f) * 0.5f + 0.5f) * 0.18f
             ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha)
             ui.shapes.rect(0f, 0f, sw, sh)
 
             // Red vignette at edges
-            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha * 2)
-            ui.shapes.rect(0f, 0f, 20f, sh)
-            ui.shapes.rect(sw - 20f, 0f, 20f, sh)
-            ui.shapes.rect(0f, 0f, sw, 20f)
-            ui.shapes.rect(0f, sh - 20f, sw, 20f)
+            val vignetteWidth = 28f * scale
+            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha * 2.2f)
+            ui.shapes.rect(0f, 0f, vignetteWidth, sh)
+            ui.shapes.rect(sw - vignetteWidth, 0f, vignetteWidth, sh)
+            ui.shapes.rect(0f, 0f, sw, vignetteWidth)
+            ui.shapes.rect(0f, sh - vignetteWidth, sw, vignetteWidth)
         }
 
         ui.endShapes()
@@ -95,9 +99,8 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.beginBatch()
 
         // Score
-        val scoreLabelY = topPanelY + topPanelHeight - 25f * scale
-        val scoreValueY = scoreLabelY - 40f * scale
-        UIFonts.caption.color = UITheme.textSecondary
+        val scoreLabelY = topPanelY + topPanelHeight - 30f * scale
+        val scoreValueY = scoreLabelY - 48f * scale
         ui.textCentered("SCORE", sw / 2, scoreLabelY, UIFonts.caption, UITheme.textSecondary)
 
         // Score value with pop effect
@@ -106,14 +109,14 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.textCentered(session.score.toString(), sw / 2, scoreValueY, UIFonts.title, UITheme.textPrimary)
         UIFonts.title.data.setScale(originalScale)
 
-        // Warnings
+        // Warnings - centered on screen
         if (euc.inPuddle) {
-            drawWarningBadge("SLIPPERY!", UITheme.cyan, sh / 2 + 30)
+            drawWarningBadge("SLIPPERY!", UITheme.cyan, sh / 2 + 40f * scale)
         }
 
         if (euc.isAboutToFall()) {
             val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
-            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 30)
+            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 40f * scale)
         }
 
         // PWM warning indicator
@@ -121,10 +124,10 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val pwmPercent = euc.getPwmPercent()
             val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
-            drawWarningBadge("PWM $pwmPercent%", warningColor, sh / 2 + 80)
+            drawWarningBadge("PWM $pwmPercent%", warningColor, sh / 2 + 100f * scale)
         }
 
-        // FPS counter (top-left, small)
+        // FPS counter (top-left, visible but unobtrusive)
         if (settingsManager.showFps) {
             val fps = Gdx.graphics.framesPerSecond
             val fpsColor = when {
@@ -133,7 +136,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
                 else -> UITheme.danger
             }
             UIFonts.caption.color = fpsColor
-            UIFonts.caption.draw(ui.batch, "FPS: $fps", 10f * scale, sh - 10f * scale)
+            UIFonts.caption.draw(ui.batch, "FPS: $fps", 14f * scale, sh - 14f * scale)
         }
 
         ui.endBatch()
@@ -141,21 +144,21 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     private fun drawSpeedPanel(euc: EucComponent) {
         val scale = UITheme.Dimensions.scale()
-        val panelWidth = 200f * scale
-        val panelHeight = 110f * scale
-        val panelX = 25f * scale
-        val panelY = 25f * scale
+        val panelWidth = 240f * scale
+        val panelHeight = 130f * scale
+        val panelX = 30f * scale
+        val panelY = 30f * scale
 
         // Panel background
-        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 14f, UITheme.withAlpha(UITheme.surface, 0.9f))
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
 
         // Speed bar background
-        val barX = panelX + 12
-        val barY = panelY + 12
-        val barWidth = panelWidth - 24
-        val barHeight = 8f
+        val barX = panelX + 16f * scale
+        val barY = panelY + 16f * scale
+        val barWidth = panelWidth - 32f * scale
+        val barHeight = 12f * scale
 
-        ui.roundedRect(barX, barY, barWidth, barHeight, 4f, UITheme.surfaceLight)
+        ui.roundedRect(barX, barY, barWidth, barHeight, 6f * scale, UITheme.surfaceLight)
 
         // Speed bar fill with color gradient
         val speedColor = when {
@@ -163,13 +166,13 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             speedBarSmooth < 0.7f -> UITheme.warning
             else -> UITheme.danger
         }
-        val fillWidth = (barWidth * speedBarSmooth).coerceAtLeast(8f)
-        ui.roundedRect(barX, barY, fillWidth, barHeight, 4f, speedColor)
+        val fillWidth = (barWidth * speedBarSmooth).coerceAtLeast(12f * scale)
+        ui.roundedRect(barX, barY, fillWidth, barHeight, 6f * scale, speedColor)
 
         // Glow effect at high speed
         if (speedBarSmooth > 0.7f) {
-            val glowAlpha = (speedBarSmooth - 0.7f) / 0.3f * UITheme.Anim.pulse(4f, 0.3f, 0.6f)
-            ui.roundedRect(barX, barY - 2, fillWidth, barHeight + 4, 5f, UITheme.withAlpha(speedColor, glowAlpha))
+            val glowAlpha = (speedBarSmooth - 0.7f) / 0.3f * UITheme.Anim.pulse(4f, 0.35f, 0.65f)
+            ui.roundedRect(barX, barY - 3f, fillWidth, barHeight + 6f, 8f * scale, UITheme.withAlpha(speedColor, glowAlpha))
         }
 
         // Speed text
@@ -178,11 +181,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         val speedKmh = (euc.speed * 3.6f).toInt()
         UIFonts.title.color = UITheme.textPrimary
-        UIFonts.title.draw(ui.batch, "$speedKmh", panelX + 20, panelY + panelHeight - 18)
+        UIFonts.title.draw(ui.batch, "$speedKmh", panelX + 24f * scale, panelY + panelHeight - 22f * scale)
 
         ui.layout.setText(UIFonts.title, "$speedKmh")
         UIFonts.caption.color = UITheme.textSecondary
-        UIFonts.caption.draw(ui.batch, "km/h", panelX + 25 + ui.layout.width, panelY + panelHeight - 28)
+        UIFonts.caption.draw(ui.batch, "km/h", panelX + 30f * scale + ui.layout.width, panelY + panelHeight - 32f * scale)
 
         ui.endBatch()
         ui.beginShapes()
@@ -190,49 +193,49 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     private fun drawPwmPanel(euc: EucComponent) {
         val scale = UITheme.Dimensions.scale()
-        val panelWidth = 200f * scale
-        val panelHeight = 80f * scale
-        val panelX = 25f * scale
-        val panelY = 145f * scale  // Above speed panel
+        val panelWidth = 240f * scale
+        val panelHeight = 100f * scale
+        val panelX = 30f * scale
+        val panelY = 170f * scale  // Above speed panel
 
         // Panel background
-        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 14f, UITheme.withAlpha(UITheme.surface, 0.9f))
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
 
         // PWM bar background
-        val barX = panelX + 12
-        val barY = panelY + 12
-        val barWidth = panelWidth - 24
-        val barHeight = 12f
+        val barX = panelX + 16f * scale
+        val barY = panelY + 16f * scale
+        val barWidth = panelWidth - 32f * scale
+        val barHeight = 16f * scale
 
-        ui.roundedRect(barX, barY, barWidth, barHeight, 6f, UITheme.surfaceLight)
+        ui.roundedRect(barX, barY, barWidth, barHeight, 8f * scale, UITheme.surfaceLight)
 
-        // PWM bar fill with color based on level (100% is still OK, >100% = fall)
+        // PWM bar fill with color based on level
         val pwmColor = when {
-            pwmSmooth < 0.7f -> UITheme.primary      // Green - safe
-            pwmSmooth < 0.9f -> UITheme.warning      // Yellow - caution
-            pwmSmooth <= 1.0f -> UITheme.lerp(UITheme.warning, UITheme.danger, (pwmSmooth - 0.9f) / 0.1f) // Orange to red
-            else -> UITheme.danger                    // Red - CUTOUT!
+            pwmSmooth < 0.7f -> UITheme.primary
+            pwmSmooth < 0.9f -> UITheme.warning
+            pwmSmooth <= 1.0f -> UITheme.lerp(UITheme.warning, UITheme.danger, (pwmSmooth - 0.9f) / 0.1f)
+            else -> UITheme.danger
         }
 
-        // Bar shows up to 110% (so you can see when you're over 100%)
+        // Bar shows up to 110%
         val displayPwm = (pwmSmooth / 1.1f).coerceIn(0f, 1f)
-        val fillWidth = (barWidth * displayPwm).coerceAtLeast(8f)
-        ui.roundedRect(barX, barY, fillWidth, barHeight, 6f, pwmColor)
+        val fillWidth = (barWidth * displayPwm).coerceAtLeast(12f * scale)
+        ui.roundedRect(barX, barY, fillWidth, barHeight, 8f * scale, pwmColor)
 
-        // Marker at 90% (warning zone starts)
+        // Marker at 90%
         val marker90X = barX + barWidth * (0.9f / 1.1f)
-        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.5f)
-        ui.shapes.rectLine(marker90X, barY - 2, marker90X, barY + barHeight + 2, 2f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.55f)
+        ui.shapes.rectLine(marker90X, barY - 3f, marker90X, barY + barHeight + 3f, 2.5f * scale)
 
-        // Marker at 100% (max safe, can still ride here)
+        // Marker at 100%
         val marker100X = barX + barWidth * (1.0f / 1.1f)
-        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.7f)
-        ui.shapes.rectLine(marker100X, barY - 3, marker100X, barY + barHeight + 3, 2f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.75f)
+        ui.shapes.rectLine(marker100X, barY - 4f, marker100X, barY + barHeight + 4f, 2.5f * scale)
 
         // Pulsing glow when PWM > 90%
         if (pwmSmooth > 0.9f) {
-            val glowIntensity = ((pwmSmooth - 0.9f) / 0.1f).coerceIn(0f, 1f) * UITheme.Anim.pulse(6f, 0.4f, 0.8f)
-            ui.roundedRect(barX - 2, barY - 2, fillWidth + 4, barHeight + 4, 8f, UITheme.withAlpha(pwmColor, glowIntensity * 0.5f))
+            val glowIntensity = ((pwmSmooth - 0.9f) / 0.1f).coerceIn(0f, 1f) * UITheme.Anim.pulse(6f, 0.4f, 0.85f)
+            ui.roundedRect(barX - 3f, barY - 3f, fillWidth + 6f, barHeight + 6f, 10f * scale, UITheme.withAlpha(pwmColor, glowIntensity * 0.55f))
         }
 
         // PWM text
@@ -241,11 +244,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         val pwmPercent = euc.getPwmPercent()
         UIFonts.heading.color = pwmColor
-        UIFonts.heading.draw(ui.batch, "$pwmPercent%", panelX + 20, panelY + panelHeight - 12)
+        UIFonts.heading.draw(ui.batch, "$pwmPercent%", panelX + 24f * scale, panelY + panelHeight - 16f * scale)
 
         ui.layout.setText(UIFonts.heading, "$pwmPercent%")
         UIFonts.caption.color = UITheme.textSecondary
-        UIFonts.caption.draw(ui.batch, "PWM", panelX + 28 + ui.layout.width, panelY + panelHeight - 18)
+        UIFonts.caption.draw(ui.batch, "PWM", panelX + 32f * scale + ui.layout.width, panelY + panelHeight - 22f * scale)
 
         ui.endBatch()
         ui.beginShapes()
@@ -253,43 +256,43 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     private fun drawLeanIndicator(euc: EucComponent) {
         val scale = UITheme.Dimensions.scale()
-        val indicatorSize = 130f * scale
-        val indicatorX = ui.screenWidth - indicatorSize - 25f * scale
-        val indicatorY = 25f * scale
+        val indicatorSize = 160f * scale
+        val indicatorX = ui.screenWidth - indicatorSize - 30f * scale
+        val indicatorY = 30f * scale
         val centerX = indicatorX + indicatorSize / 2
         val centerY = indicatorY + indicatorSize / 2
 
         // Shadow
-        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.3f)
-        ui.shapes.circle(centerX + 2, centerY - 2, indicatorSize / 2 + 2)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.35f)
+        ui.shapes.circle(centerX + 3f, centerY - 3f, indicatorSize / 2 + 3f)
 
         // Background with zones
         ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.95f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2)
 
         // Danger zone (outer red)
-        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.25f)
-        ui.shapes.circle(centerX, centerY, indicatorSize / 2 - 3)
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.22f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 - 4f)
 
         // Warning zone (yellow)
-        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.2f)
-        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.75f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.18f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.72f)
 
         // Safe zone (green center)
-        ui.shapes.color = UITheme.withAlpha(UITheme.primary, 0.25f)
-        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.5f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.primary, 0.22f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.45f)
 
         // Grid lines
-        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.2f)
-        ui.shapes.rectLine(centerX - indicatorSize / 2 + 8, centerY,
-            centerX + indicatorSize / 2 - 8, centerY, 1f)
-        ui.shapes.rectLine(centerX, centerY - indicatorSize / 2 + 8,
-            centerX, centerY + indicatorSize / 2 - 8, 1f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.18f)
+        ui.shapes.rectLine(centerX - indicatorSize / 2 + 12f, centerY,
+            centerX + indicatorSize / 2 - 12f, centerY, 1.5f * scale)
+        ui.shapes.rectLine(centerX, centerY - indicatorSize / 2 + 12f,
+            centerX, centerY + indicatorSize / 2 - 12f, 1.5f * scale)
 
         // Current lean position
         val totalLean = sqrt(euc.forwardLean * euc.forwardLean + euc.sideLean * euc.sideLean)
-        val dotX = centerX + euc.sideLean * indicatorSize / 2 * 0.8f
-        val dotY = centerY + euc.forwardLean * indicatorSize / 2 * 0.8f
+        val dotX = centerX + euc.sideLean * indicatorSize / 2 * 0.78f
+        val dotY = centerY + euc.forwardLean * indicatorSize / 2 * 0.78f
 
         // Dot color based on danger
         val dotColor = when {
@@ -299,22 +302,22 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         }
 
         // Dot shadow
-        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.4f)
-        ui.shapes.circle(dotX + 1.5f, dotY - 1.5f, 10f)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.45f)
+        ui.shapes.circle(dotX + 2f, dotY - 2f, 13f * scale)
 
         // Main dot
         ui.shapes.color = dotColor
-        ui.shapes.circle(dotX, dotY, 9f)
+        ui.shapes.circle(dotX, dotY, 12f * scale)
 
         // Dot highlight
-        ui.shapes.color = UITheme.withAlpha(Color.WHITE, 0.4f)
-        ui.shapes.circle(dotX - 2.5f, dotY + 2.5f, 3f)
+        ui.shapes.color = UITheme.withAlpha(Color.WHITE, 0.45f)
+        ui.shapes.circle(dotX - 3.5f * scale, dotY + 3.5f * scale, 4f * scale)
 
         // Danger glow when leaning too much
         if (totalLean > 0.7f) {
-            val glowIntensity = (totalLean - 0.7f) / 0.3f * UITheme.Anim.pulse(5f, 0.3f, 0.7f)
-            ui.shapes.color = UITheme.withAlpha(UITheme.danger, glowIntensity * 0.3f)
-            ui.shapes.circle(dotX, dotY, 15f)
+            val glowIntensity = (totalLean - 0.7f) / 0.3f * UITheme.Anim.pulse(5f, 0.35f, 0.75f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.danger, glowIntensity * 0.35f)
+            ui.shapes.circle(dotX, dotY, 20f * scale)
         }
     }
 
@@ -330,16 +333,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
         val sw = ui.screenWidth
         val sh = ui.screenHeight
+        val scale = UITheme.Dimensions.scale()
 
         ui.beginShapes()
 
-        // Dark circle background
-        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.9f)
-        ui.shapes.circle(sw / 2, sh / 2, 80f)
+        // Dark circle background - larger
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.92f)
+        ui.shapes.circle(sw / 2, sh / 2, 100f * scale)
 
         // Ring
         val ringColor = if (seconds > 0) UITheme.warning else UITheme.primary
-        ui.gauge(sw / 2, sh / 2, 70f, 1f, UITheme.surfaceLight, ringColor, 6f)
+        ui.gauge(sw / 2, sh / 2, 85f * scale, 1f, UITheme.surfaceLight, ringColor, 8f * scale)
 
         ui.endShapes()
 

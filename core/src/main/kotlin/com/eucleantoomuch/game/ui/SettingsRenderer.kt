@@ -6,6 +6,10 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.state.SettingsManager
 
+/**
+ * Modern settings screen with large, touch-friendly controls.
+ * Clean layout with clear visual hierarchy.
+ */
 class SettingsRenderer(private val settingsManager: SettingsManager) : Disposable {
     private val ui = UIRenderer()
 
@@ -40,7 +44,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val scale = UITheme.Dimensions.scale()
 
         // Update animations
-        enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 3f)
+        enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 4f)
 
         // Check hover state
         val touchX = Gdx.input.x.toFloat()
@@ -54,13 +58,13 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
         val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
 
-        backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 8f)
-        leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 8f)
-        rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 8f)
-        fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 8f)
-        beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 8f)
-        pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 8f)
-        pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 8f)
+        backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 10f)
+        leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 10f)
+        rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 10f)
+        fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 10f)
+        beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
+        pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 10f)
+        pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -76,138 +80,139 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             ui.shapes.rect(0f, stripY, sw, stripHeight)
         }
 
-        // Settings panel
-        val panelWidth = 700f * scale
-        val panelHeight = 560f * scale
+        // Main settings panel
+        val panelWidth = 780f * scale * enterAnimProgress
+        val panelHeight = 650f * scale * enterAnimProgress
         val panelX = centerX - panelWidth / 2
-        val panelY = sh / 2 - panelHeight / 2 + 50f * scale
+        val panelY = sh / 2 - panelHeight / 2 + 40f * scale
 
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             radius = UITheme.Dimensions.panelRadius,
             backgroundColor = UITheme.surface)
 
+        // Setting row dimensions
+        val rowHeight = 100f * scale
+        val arrowButtonSize = UITheme.Dimensions.arrowButtonSize
+        val valueBoxWidth = 260f * scale
+        val checkboxSize = UITheme.Dimensions.checkboxSize
+
         // === Render Distance Setting ===
-        val settingY = panelY + panelHeight - 150f * scale
+        val renderDistanceY = panelY + panelHeight - 180f * scale
 
-        // === PWM Warning Setting ===
-        val pwmSettingY = settingY - 110f * scale
-
-        // === Beeps Checkbox ===
-        val beepsSettingY = pwmSettingY - 80f * scale
-        val checkboxSize = 40f * scale
-        val checkboxX = centerX - 120f * scale
-
-        beepsCheckbox.set(checkboxX, beepsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
-
-        // Beeps checkbox background
-        val beepsCheckboxColor = if (settingsManager.beepsEnabled) UITheme.primary else UITheme.surfaceLight
-        ui.roundedRect(beepsCheckbox.x, beepsCheckbox.y, beepsCheckbox.width, beepsCheckbox.height,
-            8f * scale, beepsCheckboxColor)
-
-        // Beeps checkbox border/glow
-        if (beepsCheckboxHover > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, beepsCheckboxHover * 0.3f)
-            ui.roundedRect(beepsCheckbox.x - 3f, beepsCheckbox.y - 3f,
-                beepsCheckbox.width + 6f, beepsCheckbox.height + 6f, 10f * scale, ui.shapes.color)
-        }
-
-        // Beeps checkmark
-        if (settingsManager.beepsEnabled) {
-            ui.shapes.color = UITheme.textPrimary
-            val cx = beepsCheckbox.x + beepsCheckbox.width / 2
-            val cy = beepsCheckbox.y + beepsCheckbox.height / 2
-            ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
-            ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
-        }
-
-        // === FPS Counter Checkbox ===
-        val fpsSettingY = beepsSettingY - 60f * scale
-
-        fpsCheckbox.set(checkboxX, fpsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
-
-        // FPS checkbox background
-        val fpsCheckboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
-        ui.roundedRect(fpsCheckbox.x, fpsCheckbox.y, fpsCheckbox.width, fpsCheckbox.height,
-            8f * scale, fpsCheckboxColor)
-
-        // FPS checkbox border/glow
-        if (fpsCheckboxHover > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, fpsCheckboxHover * 0.3f)
-            ui.roundedRect(fpsCheckbox.x - 3f, fpsCheckbox.y - 3f,
-                fpsCheckbox.width + 6f, fpsCheckbox.height + 6f, 10f * scale, ui.shapes.color)
-        }
-
-        // FPS checkmark
-        if (settingsManager.showFps) {
-            ui.shapes.color = UITheme.textPrimary
-            val cx = fpsCheckbox.x + fpsCheckbox.width / 2
-            val cy = fpsCheckbox.y + fpsCheckbox.height / 2
-            ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
-            ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
-        }
-
-        val arrowButtonSize = 60f * scale
-        val valueBoxWidth = 200f * scale
-
-        // === PWM Warning arrows and value box ===
-        pwmWarningLeftButton.set(
-            centerX - valueBoxWidth / 2 - arrowButtonSize - 20f * scale,
-            pwmSettingY - arrowButtonSize / 2,
-            arrowButtonSize,
-            arrowButtonSize
-        )
-        ui.button(pwmWarningLeftButton, UITheme.secondary, glowIntensity = pwmLeftButtonHover * 0.5f)
-
-        pwmWarningRightButton.set(
-            centerX + valueBoxWidth / 2 + 20f * scale,
-            pwmSettingY - arrowButtonSize / 2,
-            arrowButtonSize,
-            arrowButtonSize
-        )
-        ui.button(pwmWarningRightButton, UITheme.secondary, glowIntensity = pwmRightButtonHover * 0.5f)
-
-        // PWM Value box
-        ui.panel(
-            centerX - valueBoxWidth / 2,
-            pwmSettingY - 30f * scale,
-            valueBoxWidth,
-            60f * scale,
-            radius = 10f * scale,
-            backgroundColor = UITheme.surfaceLight
-        )
-
-        // Left arrow button
         renderDistanceLeftButton.set(
-            centerX - valueBoxWidth / 2 - arrowButtonSize - 20f * scale,
-            settingY - arrowButtonSize / 2,
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
+            renderDistanceY - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(renderDistanceLeftButton, UITheme.secondary, glowIntensity = leftButtonHover * 0.5f)
+        ui.button(renderDistanceLeftButton, UITheme.secondary, glowIntensity = leftButtonHover * 0.6f)
 
-        // Right arrow button
         renderDistanceRightButton.set(
-            centerX + valueBoxWidth / 2 + 20f * scale,
-            settingY - arrowButtonSize / 2,
+            centerX + valueBoxWidth / 2 + 16f * scale,
+            renderDistanceY - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(renderDistanceRightButton, UITheme.secondary, glowIntensity = rightButtonHover * 0.5f)
+        ui.button(renderDistanceRightButton, UITheme.secondary, glowIntensity = rightButtonHover * 0.6f)
 
         // Value box
         ui.panel(
             centerX - valueBoxWidth / 2,
-            settingY - 30f * scale,
+            renderDistanceY - 40f * scale,
             valueBoxWidth,
-            60f * scale,
-            radius = 10f * scale,
-            backgroundColor = UITheme.surfaceLight
+            80f * scale,
+            radius = 14f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
         )
 
+        // === PWM Warning Setting ===
+        val pwmSettingY = renderDistanceY - 130f * scale
+
+        pwmWarningLeftButton.set(
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
+            pwmSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(pwmWarningLeftButton, UITheme.secondary, glowIntensity = pwmLeftButtonHover * 0.6f)
+
+        pwmWarningRightButton.set(
+            centerX + valueBoxWidth / 2 + 16f * scale,
+            pwmSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(pwmWarningRightButton, UITheme.secondary, glowIntensity = pwmRightButtonHover * 0.6f)
+
+        // PWM Value box
+        ui.panel(
+            centerX - valueBoxWidth / 2,
+            pwmSettingY - 40f * scale,
+            valueBoxWidth,
+            80f * scale,
+            radius = 14f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
+        )
+
+        // === Beeps Checkbox ===
+        val beepsSettingY = pwmSettingY - 110f * scale
+        val checkboxX = centerX - 160f * scale
+
+        beepsCheckbox.set(checkboxX, beepsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
+
+        // Checkbox background with glow on hover
+        if (beepsCheckboxHover > 0.1f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, beepsCheckboxHover * 0.25f)
+            ui.roundedRect(beepsCheckbox.x - 5f, beepsCheckbox.y - 5f,
+                beepsCheckbox.width + 10f, beepsCheckbox.height + 10f, 14f * scale, ui.shapes.color)
+        }
+
+        val beepsCheckboxColor = if (settingsManager.beepsEnabled) UITheme.primary else UITheme.surfaceLight
+        ui.roundedRect(beepsCheckbox.x, beepsCheckbox.y, beepsCheckbox.width, beepsCheckbox.height,
+            12f * scale, beepsCheckboxColor)
+
+        // Checkmark
+        if (settingsManager.beepsEnabled) {
+            ui.shapes.color = UITheme.textPrimary
+            val cx = beepsCheckbox.x + beepsCheckbox.width / 2
+            val cy = beepsCheckbox.y + beepsCheckbox.height / 2
+            val checkScale = checkboxSize / 52f
+            ui.shapes.rectLine(cx - 14f * checkScale, cy, cx - 4f * checkScale, cy - 14f * checkScale, 4f * checkScale)
+            ui.shapes.rectLine(cx - 4f * checkScale, cy - 14f * checkScale, cx + 16f * checkScale, cy + 10f * checkScale, 4f * checkScale)
+        }
+
+        // === FPS Checkbox ===
+        val fpsSettingY = beepsSettingY - 80f * scale
+
+        fpsCheckbox.set(checkboxX, fpsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
+
+        // Checkbox background with glow on hover
+        if (fpsCheckboxHover > 0.1f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, fpsCheckboxHover * 0.25f)
+            ui.roundedRect(fpsCheckbox.x - 5f, fpsCheckbox.y - 5f,
+                fpsCheckbox.width + 10f, fpsCheckbox.height + 10f, 14f * scale, ui.shapes.color)
+        }
+
+        val fpsCheckboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
+        ui.roundedRect(fpsCheckbox.x, fpsCheckbox.y, fpsCheckbox.width, fpsCheckbox.height,
+            12f * scale, fpsCheckboxColor)
+
+        // Checkmark
+        if (settingsManager.showFps) {
+            ui.shapes.color = UITheme.textPrimary
+            val cx = fpsCheckbox.x + fpsCheckbox.width / 2
+            val cy = fpsCheckbox.y + fpsCheckbox.height / 2
+            val checkScale = checkboxSize / 52f
+            ui.shapes.rectLine(cx - 14f * checkScale, cy, cx - 4f * checkScale, cy - 14f * checkScale, 4f * checkScale)
+            ui.shapes.rectLine(cx - 4f * checkScale, cy - 14f * checkScale, cx + 16f * checkScale, cy + 10f * checkScale, 4f * checkScale)
+        }
+
         // Back button
-        val buttonWidth = 300f * scale
+        val buttonWidth = 340f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 30f * scale, buttonWidth, buttonHeight)
+        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 36f * scale, buttonWidth, buttonHeight)
         ui.button(backButton, UITheme.primary, glowIntensity = backButtonHover * 0.8f)
 
         ui.endShapes()
@@ -216,62 +221,66 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         ui.beginBatch()
 
         // Title
-        val titleY = panelY + panelHeight - 40f * scale
-        ui.textCentered("SETTINGS", centerX, titleY, UIFonts.heading, UITheme.textPrimary)
+        val titleY = panelY + panelHeight - 55f * scale
+        ui.textCentered("SETTINGS", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
         // Render Distance label
-        val labelY = settingY + 60f * scale
-        ui.textCentered("Render Distance", centerX, labelY, UIFonts.body, UITheme.textSecondary)
+        val rdLabelY = renderDistanceY + 70f * scale
+        ui.textCentered("Render Distance", centerX, rdLabelY, UIFonts.body, UITheme.textSecondary)
 
-        // Arrow symbols
+        // Arrow symbols (larger)
         ui.textCentered("<",
             renderDistanceLeftButton.x + renderDistanceLeftButton.width / 2,
             renderDistanceLeftButton.y + renderDistanceLeftButton.height / 2,
-            UIFonts.button, UITheme.textPrimary)
+            UIFonts.heading, UITheme.textPrimary)
 
         ui.textCentered(">",
             renderDistanceRightButton.x + renderDistanceRightButton.width / 2,
             renderDistanceRightButton.y + renderDistanceRightButton.height / 2,
-            UIFonts.button, UITheme.textPrimary)
+            UIFonts.heading, UITheme.textPrimary)
 
-        // Current value
+        // Render Distance current value
         val currentIndex = settingsManager.getRenderDistanceIndex()
         val currentName = settingsManager.getRenderDistanceName()
         val currentDistance = settingsManager.renderDistance.toInt()
-        ui.textCentered("$currentName (${currentDistance}m)", centerX, settingY, UIFonts.body, UITheme.accent)
+        ui.textCentered("$currentName (${currentDistance}m)", centerX, renderDistanceY, UIFonts.body, UITheme.accent)
 
         // PWM Warning label
-        val pwmLabelY = pwmSettingY + 60f * scale
+        val pwmLabelY = pwmSettingY + 70f * scale
         ui.textCentered("PWM Warning", centerX, pwmLabelY, UIFonts.body, UITheme.textSecondary)
 
         // PWM Arrow symbols
         ui.textCentered("<",
             pwmWarningLeftButton.x + pwmWarningLeftButton.width / 2,
             pwmWarningLeftButton.y + pwmWarningLeftButton.height / 2,
-            UIFonts.button, UITheme.textPrimary)
+            UIFonts.heading, UITheme.textPrimary)
 
         ui.textCentered(">",
             pwmWarningRightButton.x + pwmWarningRightButton.width / 2,
             pwmWarningRightButton.y + pwmWarningRightButton.height / 2,
-            UIFonts.button, UITheme.textPrimary)
+            UIFonts.heading, UITheme.textPrimary)
 
         // PWM Current value
         val pwmCurrentName = settingsManager.getPwmWarningName()
         ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, UITheme.accent)
 
         // Beeps Checkbox label
-        UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + beepsCheckbox.width + 20f * scale,
+        UIFonts.body.color = UITheme.textPrimary
+        UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + beepsCheckbox.width + 24f * scale,
             beepsCheckbox.y + beepsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
 
         // FPS Checkbox label
-        UIFonts.body.draw(ui.batch, "Show FPS", fpsCheckbox.x + fpsCheckbox.width + 20f * scale,
+        UIFonts.body.color = UITheme.textPrimary
+        UIFonts.body.draw(ui.batch, "Show FPS", fpsCheckbox.x + fpsCheckbox.width + 24f * scale,
             fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
 
         // Back button text
-        ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2, UIFonts.button, UITheme.textPrimary)
+        ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2,
+            UIFonts.button, UITheme.textPrimary)
 
         // Hint at bottom
-        ui.textCentered("Higher distance = better view, lower FPS", centerX, panelY + 40f * scale, UIFonts.caption, UITheme.textMuted)
+        ui.textCentered("Higher distance = better view, lower FPS", centerX, panelY + 50f * scale,
+            UIFonts.caption, UITheme.textMuted)
 
         ui.endBatch()
 

@@ -6,8 +6,11 @@ import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
-import kotlin.math.sin
 
+/**
+ * Modern main menu with EUC-themed design.
+ * Features large touch-friendly buttons and clean typography.
+ */
 class MenuRenderer : Disposable {
     private val ui = UIRenderer()
 
@@ -25,20 +28,21 @@ class MenuRenderer : Disposable {
     private var enterAnimProgress = 0f
 
     // Particle system for background
-    private val particles = Array(30) { BackgroundParticle() }
+    private val particles = Array(40) { BackgroundParticle() }
 
     private class BackgroundParticle {
         var x = MathUtils.random(0f, 1f)
         var y = MathUtils.random(0f, 1f)
-        var size = MathUtils.random(2f, 6f)
-        var speed = MathUtils.random(0.01f, 0.03f)
-        var alpha = MathUtils.random(0.1f, 0.3f)
+        var size = MathUtils.random(3f, 8f)
+        var speed = MathUtils.random(0.015f, 0.04f)
+        var alpha = MathUtils.random(0.15f, 0.4f)
 
         fun update() {
             y += speed * Gdx.graphics.deltaTime
             if (y > 1.1f) {
                 y = -0.1f
                 x = MathUtils.random(0f, 1f)
+                size = MathUtils.random(3f, 8f)
             }
         }
     }
@@ -58,7 +62,7 @@ class MenuRenderer : Disposable {
 
         // Update animations
         enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 3f)
-        titlePulse = UITheme.Anim.pulse(1.5f, 0.95f, 1f)
+        titlePulse = UITheme.Anim.pulse(1.5f, 0.97f, 1f)
 
         // Update particles
         particles.forEach { it.update() }
@@ -71,15 +75,17 @@ class MenuRenderer : Disposable {
         val settingsHovered = settingsButton.contains(touchX, touchY)
         val exitHovered = exitButton.contains(touchX, touchY)
 
-        playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 8f)
-        calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 8f)
-        settingsButtonHover = UITheme.Anim.ease(settingsButtonHover, if (settingsHovered) 1f else 0f, 8f)
-        exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 8f)
+        playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 10f)
+        calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 10f)
+        settingsButtonHover = UITheme.Anim.ease(settingsButtonHover, if (settingsHovered) 1f else 0f, 10f)
+        exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 10f)
+
+        val scale = UITheme.Dimensions.scale()
 
         // === Draw Background ===
         ui.beginShapes()
 
-        // Gradient background
+        // Gradient background with subtle animation
         val bgTop = UITheme.backgroundLight
         val bgBottom = UITheme.background
         for (i in 0 until 20) {
@@ -93,82 +99,84 @@ class MenuRenderer : Disposable {
         // Animated particles
         particles.forEach { p ->
             ui.shapes.color = UITheme.withAlpha(UITheme.primary, p.alpha * enterAnimProgress)
-            ui.shapes.circle(p.x * sw, p.y * sh, p.size)
+            ui.shapes.circle(p.x * sw, p.y * sh, p.size * scale)
         }
 
-        // Decorative EUC wheel silhouette
-        val wheelX = centerX - 200 * enterAnimProgress
-        val wheelY = centerY - 50
-        val wheelRadius = 100f * enterAnimProgress
-        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.3f)
-        ui.shapes.circle(wheelX, wheelY, wheelRadius)
-        ui.shapes.color = UITheme.background
-        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.7f)
+        // Decorative EUC wheel silhouette (left side)
+        val wheelX = centerX - 280 * scale * enterAnimProgress
+        val wheelY = centerY + 20 * scale
+        val wheelRadius = 140f * scale * enterAnimProgress
 
-        // Spokes
+        // Outer wheel rim
+        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.25f)
+        ui.shapes.circle(wheelX, wheelY, wheelRadius)
+        // Inner wheel
+        ui.shapes.color = UITheme.background
+        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.75f)
+        // Hub
+        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.3f)
+        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.2f)
+
+        // Animated spokes
         ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.2f)
-        val spokeTime = UITheme.Anim.time() * 0.5f
+        val spokeTime = UITheme.Anim.time() * 0.4f
         for (i in 0 until 8) {
-            val angle = (i * 45f + spokeTime * 30f) * MathUtils.degreesToRadians
-            val innerR = wheelRadius * 0.25f
-            val outerR = wheelRadius * 0.65f
+            val angle = (i * 45f + spokeTime * 25f) * MathUtils.degreesToRadians
+            val innerR = wheelRadius * 0.22f
+            val outerR = wheelRadius * 0.72f
             ui.shapes.rectLine(
                 wheelX + innerR * MathUtils.cos(angle),
                 wheelY + innerR * MathUtils.sin(angle),
                 wheelX + outerR * MathUtils.cos(angle),
                 wheelY + outerR * MathUtils.sin(angle),
-                3f
+                4f * scale
             )
         }
 
         // === Buttons ===
-        val scale = UITheme.Dimensions.scale()
-        val buttonWidth = 420f * scale
+        val buttonWidth = 480f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeight
-        val smallButtonWidth = 200f * scale
+        val smallButtonWidth = 230f * scale
         val smallButtonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 20f * scale
+        val buttonSpacing = 24f * scale
 
-        val buttonsStartY = centerY + 30f * scale
+        val buttonsStartY = centerY + 80f * scale
         playButton.set(centerX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
         calibrateButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
 
         // Settings and Exit buttons side by side
-        val smallButtonsY = buttonsStartY - buttonHeight * 2 - buttonSpacing * 2.5f
-        val smallButtonSpacing = 20f * scale
+        val smallButtonsY = buttonsStartY - buttonHeight * 2 - buttonSpacing * 3
+        val smallButtonSpacing = 24f * scale
         settingsButton.set(centerX - smallButtonWidth - smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
         exitButton.set(centerX + smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
 
         // Apply enter animation
-        val playY = playButton.y - (1 - enterAnimProgress) * 100
-        val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 150
-        val settingsY = settingsButton.y - (1 - enterAnimProgress) * 200
-        val exitY = exitButton.y - (1 - enterAnimProgress) * 200
+        val playY = playButton.y - (1 - enterAnimProgress) * 120
+        val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 180
+        val settingsY = settingsButton.y - (1 - enterAnimProgress) * 240
+        val exitY = exitButton.y - (1 - enterAnimProgress) * 240
 
-        // Play button with glow
+        // Draw buttons with modern style
         val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
-        ui.button(playRect, UITheme.primary, pressedOffset = 0f, glowIntensity = playButtonHover * 0.8f)
+        ui.button(playRect, UITheme.primary, pressedOffset = 0f, glowIntensity = playButtonHover * 0.9f)
 
-        // Calibrate button
         val calibrateRect = Rectangle(calibrateButton.x, calibrateY, calibrateButton.width, calibrateButton.height)
-        ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.5f)
+        ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.6f)
 
-        // Settings button
         val settingsRect = Rectangle(settingsButton.x, settingsY, settingsButton.width, settingsButton.height)
-        ui.button(settingsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = settingsButtonHover * 0.3f)
+        ui.button(settingsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = settingsButtonHover * 0.4f)
 
-        // Exit button
         val exitRect = Rectangle(exitButton.x, exitY, exitButton.width, exitButton.height)
-        ui.button(exitRect, UITheme.danger, pressedOffset = 0f, glowIntensity = exitButtonHover * 0.5f)
+        ui.button(exitRect, UITheme.danger, pressedOffset = 0f, glowIntensity = exitButtonHover * 0.6f)
 
         // Stats panel at bottom
-        val statsHeight = 90f * scale
+        val statsHeight = 110f * scale
         ui.panel(0f, 0f, sw, statsHeight, radius = 0f, shadowOffset = 0f,
             backgroundColor = UITheme.withAlpha(UITheme.surface, 0.95f))
 
-        // Accent line
+        // Accent line at top of stats panel
         ui.shapes.color = UITheme.primary
-        ui.shapes.rect(0f, statsHeight - 3, sw, 3f)
+        ui.shapes.rect(0f, statsHeight - 4f, sw, 4f)
 
         ui.endShapes()
 
@@ -176,26 +184,26 @@ class MenuRenderer : Disposable {
         ui.beginBatch()
 
         // Title "EUC" with subtle animation
-        val titleY = sh - 60 + (1 - enterAnimProgress) * 50
+        val titleY = sh - 80f * scale + (1 - enterAnimProgress) * 60
         val titleScale = titlePulse
         UIFonts.display.data.setScale(UIFonts.display.data.scaleX * titleScale)
         ui.textCentered("EUC", centerX, titleY, UIFonts.display, UITheme.textPrimary)
         UIFonts.display.data.setScale(UIFonts.display.data.scaleX / titleScale)
 
         // Subtitle with glow effect
-        val subtitleY = titleY - 75
+        val subtitleY = titleY - 90f * scale
         ui.textCentered("LEAN TOO MUCH", centerX, subtitleY, UIFonts.heading, UITheme.primary)
 
-        // Button labels
+        // Button labels with larger text
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
         ui.textCentered("CALIBRATE", calibrateRect.x + calibrateRect.width / 2, calibrateRect.y + calibrateRect.height / 2, UIFonts.button, UITheme.textPrimary)
         ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.body, UITheme.textPrimary)
         ui.textCentered("EXIT", exitRect.x + exitRect.width / 2, exitRect.y + exitRect.height / 2, UIFonts.body, UITheme.textPrimary)
 
-        // Stats
-        val statsLabelY = 80f * scale
-        val statsValueY = statsLabelY - 30f * scale
-        val sideMargin = 70f * scale  // Increased margin for rounded screen corners
+        // Stats with improved layout
+        val statsLabelY = 90f * scale
+        val statsValueY = statsLabelY - 35f * scale
+        val sideMargin = 80f * scale
 
         // High score (left)
         UIFonts.caption.color = UITheme.textSecondary
@@ -217,8 +225,7 @@ class MenuRenderer : Disposable {
         UIFonts.heading.draw(ui.batch, distValue, sw - ui.layout.width - sideMargin, statsValueY)
 
         // Center hint
-        UIFonts.caption.color = UITheme.textMuted
-        ui.textCentered("Tilt to control - Lean to accelerate", centerX, 50f * scale, UIFonts.caption, UITheme.textMuted)
+        ui.textCentered("Tilt to control - Lean to accelerate", centerX, 55f * scale, UIFonts.caption, UITheme.textMuted)
 
         ui.endBatch()
 
@@ -256,7 +263,7 @@ class MenuRenderer : Disposable {
 
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
-        enterAnimProgress = 0f // Reset animation on resize
+        enterAnimProgress = 0f
     }
 
     override fun dispose() {

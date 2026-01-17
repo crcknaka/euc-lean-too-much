@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.Disposable
 /**
  * Modern font system using FreeType for crisp rendering at any size.
  * Falls back to default BitmapFont if FreeType fails.
+ * Increased font sizes for better readability on modern displays.
  */
 object UIFonts : Disposable {
     private val fonts = mutableMapOf<FontStyle, BitmapFont>()
@@ -17,24 +18,24 @@ object UIFonts : Disposable {
     private var generator: FreeTypeFontGenerator? = null
 
     enum class FontStyle {
-        DISPLAY,     // 72px - Big titles
-        TITLE,       // 48px - Section titles
-        HEADING,     // 36px - Headings
-        BUTTON,      // 28px - Button text
-        BODY,        // 22px - Regular text
-        CAPTION,     // 18px - Small labels
-        TINY         // 14px - Very small text
+        DISPLAY,     // Extra large - Big titles, countdown
+        TITLE,       // Large - Screen titles
+        HEADING,     // Medium-large - Section headings, values
+        BUTTON,      // Medium - Button text
+        BODY,        // Regular - Body text, labels
+        CAPTION,     // Small - Hints, secondary info
+        TINY         // Extra small - Debug info
     }
 
-    // Base sizes for 1080p screen
+    // Increased base sizes for 1080p screen (larger for modern look)
     private val baseFontSizes = mapOf(
-        FontStyle.DISPLAY to 140,
-        FontStyle.TITLE to 100,
-        FontStyle.HEADING to 75,
-        FontStyle.BUTTON to 60,
-        FontStyle.BODY to 48,
-        FontStyle.CAPTION to 40,
-        FontStyle.TINY to 32
+        FontStyle.DISPLAY to 180,   // was 140
+        FontStyle.TITLE to 130,      // was 100
+        FontStyle.HEADING to 95,     // was 75
+        FontStyle.BUTTON to 72,      // was 60
+        FontStyle.BODY to 58,        // was 48
+        FontStyle.CAPTION to 48,     // was 40
+        FontStyle.TINY to 38         // was 32
     )
 
     // Characters to include in font

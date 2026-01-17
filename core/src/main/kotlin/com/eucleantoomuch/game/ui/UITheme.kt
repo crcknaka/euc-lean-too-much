@@ -46,6 +46,7 @@ object UITheme {
     val purple = Color(0xA855F7FF.toInt())         // Purple accent
 
     // === Dimensions (base values, multiply by scale()) ===
+    // Modern, larger UI elements for better touch targets and visibility
     object Dimensions {
         // Call scale() to get screen-relative size
         private var cachedScale = 1f
@@ -61,15 +62,29 @@ object UITheme {
             return cachedScale
         }
 
-        val buttonHeight: Float get() = 100f * scale()
-        val buttonHeightSmall: Float get() = 80f * scale()
-        val buttonRadius: Float get() = 18f * scale()
-        val panelRadius: Float get() = 22f * scale()
-        val padding: Float get() = 30f * scale()
-        val paddingSmall: Float get() = 20f * scale()
-        val paddingTiny: Float get() = 10f * scale()
-        val shadowOffset: Float get() = 5f * scale()
-        val borderWidth: Float get() = 2.5f * scale()
+        // Larger buttons for better touch targets (increased from 100/80)
+        val buttonHeight: Float get() = 120f * scale()
+        val buttonHeightSmall: Float get() = 100f * scale()
+        val buttonHeightMedium: Float get() = 110f * scale()
+
+        // More rounded corners for modern look (increased)
+        val buttonRadius: Float get() = 24f * scale()
+        val panelRadius: Float get() = 28f * scale()
+
+        // Generous padding (increased)
+        val padding: Float get() = 40f * scale()
+        val paddingSmall: Float get() = 28f * scale()
+        val paddingTiny: Float get() = 14f * scale()
+
+        // More pronounced shadows
+        val shadowOffset: Float get() = 8f * scale()
+        val borderWidth: Float get() = 3f * scale()
+
+        // New dimensions for consistent spacing
+        val iconSize: Float get() = 48f * scale()
+        val checkboxSize: Float get() = 52f * scale()
+        val arrowButtonSize: Float get() = 72f * scale()
+        val hudPanelPadding: Float get() = 20f * scale()
     }
 
     // === Animation Utilities ===
