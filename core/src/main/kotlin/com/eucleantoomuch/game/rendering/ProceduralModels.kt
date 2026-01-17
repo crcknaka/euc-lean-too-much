@@ -50,10 +50,22 @@ class ProceduralModels : Disposable {
     private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
     private val cloudColor = Color(1f, 1f, 1f, 0.9f)             // White cloud
 
-    // Background/silhouette colors (faded to look distant)
-    private val bgBuildingColor1 = Color(0.55f, 0.6f, 0.7f, 1f)   // Faded blue-gray (distant)
-    private val bgBuildingColor2 = Color(0.5f, 0.55f, 0.65f, 1f)  // Darker blue-gray
-    private val bgBuildingColor3 = Color(0.6f, 0.65f, 0.75f, 1f)  // Lighter blue-gray
+    // Background/silhouette colors (faded to look distant) - multiple layers
+    // Layer 1 - closest background (behind main buildings)
+    private val bgBuildingColor1 = Color(0.5f, 0.55f, 0.65f, 1f)   // Blue-gray
+    private val bgBuildingColor2 = Color(0.45f, 0.5f, 0.6f, 1f)    // Darker blue-gray
+    private val bgBuildingColor3 = Color(0.55f, 0.6f, 0.7f, 1f)    // Lighter blue-gray
+
+    // Layer 2 - mid-distance (more faded)
+    private val bgBuildingMidColor1 = Color(0.55f, 0.62f, 0.75f, 1f)  // More faded
+    private val bgBuildingMidColor2 = Color(0.52f, 0.6f, 0.72f, 1f)
+
+    // Layer 3 - far distance (almost sky color - heavy fog)
+    private val bgBuildingFarColor1 = Color(0.48f, 0.65f, 0.82f, 1f)  // Very faded, close to sky
+    private val bgBuildingFarColor2 = Color(0.46f, 0.63f, 0.8f, 1f)
+
+    // Fog wall color (matches sky for seamless blend)
+    private val fogWallColor = Color(0.5f, 0.7f, 0.9f, 1f)  // Same as sky
 
     // Building detail colors
     private val windowColor = Color(0.6f, 0.75f, 0.9f, 1f)       // Light blue glass
@@ -764,13 +776,17 @@ class ProceduralModels : Disposable {
     /**
      * Create a simple background building silhouette for distant horizon
      * These are simple boxes with faded colors to simulate depth/fog
+     * @param fogLevel 0 = closest (less fog), 1 = mid, 2 = far (heavy fog)
      */
-    fun createBackgroundBuildingModel(height: Float): Model {
+    fun createBackgroundBuildingModel(height: Float, fogLevel: Int = 0): Model {
         modelBuilder.begin()
 
-        // Pick a faded blue-gray color to simulate distance/fog
-        val colors = listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3)
-        val color = colors.random()
+        // Pick color based on fog level - further = more faded
+        val color = when (fogLevel) {
+            0 -> listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).random()
+            1 -> listOf(bgBuildingMidColor1, bgBuildingMidColor2).random()
+            else -> listOf(bgBuildingFarColor1, bgBuildingFarColor2).random()
+        }
         val material = Material(ColorAttribute.createDiffuse(color))
 
         // Wide, simple box - no details
@@ -780,6 +796,27 @@ class ProceduralModels : Disposable {
         val body = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, material)
         body.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height / 2, 0f))
         body.box(width, height, depth)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a fog wall - large plane that blends with sky to hide world edges
+     */
+    fun createFogWallModel(width: Float, height: Float): Model {
+        modelBuilder.begin()
+
+        val material = Material(ColorAttribute.createDiffuse(fogWallColor))
+
+        // Vertical plane facing the camera
+        val wall = modelBuilder.part("fog_wall", GL20.GL_TRIANGLES, attributes, material)
+        wall.rect(
+            -width / 2, 0f, 0f,
+            width / 2, 0f, 0f,
+            width / 2, height, 0f,
+            -width / 2, height, 0f,
+            0f, 0f, -1f  // Normal facing back towards camera
+        )
 
         return modelBuilder.end().also { models.add(it) }
     }

@@ -55,8 +55,13 @@ class WorldGenerator(
     // Zebra crossing model
     private var zebraCrossingModel: ModelInstance
 
-    // Background building models (silhouettes on horizon)
-    private val backgroundBuildingModels = mutableListOf<ModelInstance>()
+    // Background building models (silhouettes on horizon) - multiple fog layers
+    private val backgroundBuildingModelsNear = mutableListOf<ModelInstance>()  // Less fog
+    private val backgroundBuildingModelsMid = mutableListOf<ModelInstance>()   // Medium fog
+    private val backgroundBuildingModelsFar = mutableListOf<ModelInstance>()   // Heavy fog
+
+    // Fog wall model for front boundary
+    private var fogWallModel: ModelInstance
 
     // Track which chunks have zebra crossings
     private var lastZebraCrossingChunk = -10  // Start with no recent crossing
@@ -123,11 +128,25 @@ class WorldGenerator(
             cloudModels.add(ModelInstance(models.createCloudModel(scaleX, scaleZ)))
         }
 
-        // Create background building variants (different heights for horizon silhouette)
-        for (i in 0..7) {
-            val height = MathUtils.random(30f, 80f)
-            backgroundBuildingModels.add(ModelInstance(models.createBackgroundBuildingModel(height)))
+        // Create background building variants for each fog layer
+        // Near layer (less fog)
+        for (i in 0..5) {
+            val height = MathUtils.random(25f, 60f)
+            backgroundBuildingModelsNear.add(ModelInstance(models.createBackgroundBuildingModel(height, 0)))
         }
+        // Mid layer (medium fog)
+        for (i in 0..5) {
+            val height = MathUtils.random(35f, 80f)
+            backgroundBuildingModelsMid.add(ModelInstance(models.createBackgroundBuildingModel(height, 1)))
+        }
+        // Far layer (heavy fog)
+        for (i in 0..5) {
+            val height = MathUtils.random(40f, 100f)
+            backgroundBuildingModelsFar.add(ModelInstance(models.createBackgroundBuildingModel(height, 2)))
+        }
+
+        // Create fog wall for front boundary
+        fogWallModel = ModelInstance(models.createFogWallModel(300f, 120f))
     }
 
     fun setRenderDistance(distance: Float) {
@@ -722,40 +741,56 @@ class WorldGenerator(
     private fun generateBackgroundBuildings(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
         val entities = mutableListOf<Entity>()
 
-        // Background buildings are placed far from the road to fill horizon gaps
-        // They are positioned behind the main buildings
-        val backgroundDistanceX = 40f  // Distance from road center (behind main buildings at ~14m)
-        val backgroundSpacing = 18f    // Spacing between background buildings
+        // Multiple layers of background buildings for depth effect
+        // Layer 1 (near): 25-45m from road center
+        // Layer 2 (mid): 50-70m from road center
+        // Layer 3 (far): 75-100m from road center
+
+        val layer1DistanceX = 30f
+        val layer2DistanceX = 55f
+        val layer3DistanceX = 80f
 
         var z = chunkStartZ
         while (z < chunkStartZ + Constants.CHUNK_LENGTH) {
-            // Left side background buildings (at varying distances)
-            val leftX = -backgroundDistanceX - MathUtils.random(0f, 20f)
-            entities.add(createBackgroundBuildingEntity(leftX, z + MathUtils.random(-5f, 5f), chunkIndex))
+            // === LAYER 1 (near, less fog) ===
+            // Left side
+            val leftX1 = -layer1DistanceX - MathUtils.random(0f, 15f)
+            entities.add(createBackgroundBuildingEntity(leftX1, z + MathUtils.random(-5f, 5f), chunkIndex, 0))
 
-            // Sometimes add an extra building in the gap
-            if (MathUtils.random() < 0.5f) {
-                val extraLeftX = -backgroundDistanceX - MathUtils.random(5f, 35f)
-                entities.add(createBackgroundBuildingEntity(extraLeftX, z + MathUtils.random(5f, 12f), chunkIndex))
+            // Right side
+            val rightX1 = layer1DistanceX + MathUtils.random(0f, 15f)
+            entities.add(createBackgroundBuildingEntity(rightX1, z + MathUtils.random(-5f, 5f), chunkIndex, 0))
+
+            // === LAYER 2 (mid, medium fog) ===
+            if (MathUtils.random() < 0.7f) {
+                val leftX2 = -layer2DistanceX - MathUtils.random(0f, 15f)
+                entities.add(createBackgroundBuildingEntity(leftX2, z + MathUtils.random(-3f, 8f), chunkIndex, 1))
+            }
+            if (MathUtils.random() < 0.7f) {
+                val rightX2 = layer2DistanceX + MathUtils.random(0f, 15f)
+                entities.add(createBackgroundBuildingEntity(rightX2, z + MathUtils.random(-3f, 8f), chunkIndex, 1))
             }
 
-            // Right side background buildings
-            val rightX = backgroundDistanceX + MathUtils.random(0f, 20f)
-            entities.add(createBackgroundBuildingEntity(rightX, z + MathUtils.random(-5f, 5f), chunkIndex))
-
-            // Sometimes add an extra building on right side
+            // === LAYER 3 (far, heavy fog) ===
             if (MathUtils.random() < 0.5f) {
-                val extraRightX = backgroundDistanceX + MathUtils.random(5f, 35f)
-                entities.add(createBackgroundBuildingEntity(extraRightX, z + MathUtils.random(5f, 12f), chunkIndex))
+                val leftX3 = -layer3DistanceX - MathUtils.random(0f, 20f)
+                entities.add(createBackgroundBuildingEntity(leftX3, z + MathUtils.random(0f, 10f), chunkIndex, 2))
+            }
+            if (MathUtils.random() < 0.5f) {
+                val rightX3 = layer3DistanceX + MathUtils.random(0f, 20f)
+                entities.add(createBackgroundBuildingEntity(rightX3, z + MathUtils.random(0f, 10f), chunkIndex, 2))
             }
 
-            z += backgroundSpacing + MathUtils.random(-3f, 3f)
+            z += 15f + MathUtils.random(-2f, 2f)
         }
+
+        // Add fog wall at front of chunk (only for chunks far ahead)
+        entities.add(createFogWallEntity(chunkStartZ + Constants.CHUNK_LENGTH, chunkIndex))
 
         return entities
     }
 
-    private fun createBackgroundBuildingEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+    private fun createBackgroundBuildingEntity(x: Float, z: Float, chunkIndex: Int, fogLevel: Int): Entity {
         val entity = engine.createEntity()
 
         entity.add(TransformComponent().apply {
@@ -765,8 +800,15 @@ class WorldGenerator(
             updateRotationFromYaw()
         })
 
+        // Select model based on fog level
+        val modelList = when (fogLevel) {
+            0 -> backgroundBuildingModelsNear
+            1 -> backgroundBuildingModelsMid
+            else -> backgroundBuildingModelsFar
+        }
+
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(backgroundBuildingModels.random().model)
+            modelInstance = ModelInstance(modelList.random().model)
         })
 
         entity.add(GroundComponent().apply {
@@ -775,6 +817,26 @@ class WorldGenerator(
         })
 
         // No collider - these are just visual background elements
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createFogWallEntity(z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(0f, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(fogWallModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
 
         engine.addEntity(entity)
         return entity
