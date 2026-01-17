@@ -118,7 +118,7 @@ class GameOverRenderer : Disposable {
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
         val buttonSpacing = 32f * scale
         val totalWidth = buttonWidth * 2 + buttonSpacing
-        val buttonsY = panelY + 75f * scale  // More bottom padding
+        val buttonsY = panelY + 40f * scale  // Lower position for buttons
 
         retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
