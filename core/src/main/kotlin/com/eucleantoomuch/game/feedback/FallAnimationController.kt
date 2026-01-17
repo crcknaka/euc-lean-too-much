@@ -156,7 +156,7 @@ class FallAnimationController(
 
             // Rider continues tumbling forward and starts falling
             riderPitch = 25f * speedFactor + easeInQuad(tumbleT) * 55f * speedFactor
-            riderYOffset = easeInQuad(tumbleT) * -0.5f * speedFactor  // Falls down
+            riderYOffset = easeInQuad(tumbleT) * -1.8f  // Falls down toward ground (rider center ~2m high)
             riderForwardOffset = easeOutQuad(tumbleT) * 1.5f * speedFactor  // Thrown forward
 
             // Rider gains some roll as they tumble
@@ -172,8 +172,8 @@ class FallAnimationController(
             eucForwardOffset = easeOutQuad(tumbleT) * 2f * speedFactor  // Rolls forward
             eucSideOffset = easeOutQuad(tumbleT) * 0.8f * sign(eucRoll)
 
-            // Camera starts dropping
-            cameraDropOffset = easeInQuad(tumbleT) * -0.3f
+            // Camera drops to follow rider
+            cameraDropOffset = easeInQuad(tumbleT) * -0.8f
 
         // === PHASE 3: Settle (0.4 - 1.0s) ===
         } else {
@@ -188,9 +188,9 @@ class FallAnimationController(
             // FOV settles
             fovPunch = 0f
 
-            // Rider on ground
+            // Rider on ground - fully fallen
             riderPitch = 80f * speedFactor + settleT * 10f  // Almost face down
-            riderYOffset = -0.5f * speedFactor - easeOutQuad(settleT) * 0.2f  // Fully down
+            riderYOffset = -1.8f - easeOutQuad(settleT) * 0.2f  // Lying on ground
             riderForwardOffset = 1.5f * speedFactor + settleT * 0.3f
 
             // Roll settles
@@ -206,8 +206,8 @@ class FallAnimationController(
             eucForwardOffset = 2f * speedFactor + easeOutQuad(settleT) * 0.5f
             eucSideOffset = 0.8f * sign(eucRoll) + easeOutQuad(settleT) * 0.3f * sign(eucRoll)
 
-            // Camera settles at low position
-            cameraDropOffset = -0.3f - easeOutQuad(settleT) * 0.15f
+            // Camera settles at low position looking at fallen rider
+            cameraDropOffset = -0.8f - easeOutQuad(settleT) * 0.4f
         }
     }
 
