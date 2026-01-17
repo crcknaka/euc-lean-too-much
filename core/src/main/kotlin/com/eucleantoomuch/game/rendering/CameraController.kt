@@ -31,6 +31,7 @@ class CameraController(private val camera: PerspectiveCamera) {
     private var fovPunch = 0f
     private var dropOffset = 0f
     private var forwardOffset = 0f  // Moves camera forward (toward player)
+    private var rollAngle = 0f      // Camera tilt/roll effect
 
     fun initialize(playerPosition: Vector3) {
         currentPosition.set(playerPosition).add(offset)
@@ -102,7 +103,15 @@ class CameraController(private val camera: PerspectiveCamera) {
         }
 
         camera.lookAt(currentLookAt)
-        camera.up.set(Vector3.Y)
+
+        // Apply roll (tilt) effect - rotate the up vector
+        if (rollAngle != 0f) {
+            val rollRad = rollAngle * MathUtils.degreesToRadians
+            camera.up.set(MathUtils.sin(rollRad), MathUtils.cos(rollRad), 0f)
+        } else {
+            camera.up.set(Vector3.Y)
+        }
+
         camera.update()
     }
 
@@ -128,5 +137,9 @@ class CameraController(private val camera: PerspectiveCamera) {
 
     fun setForwardOffset(offset: Float) {
         forwardOffset = offset
+    }
+
+    fun setRoll(angle: Float) {
+        rollAngle = angle
     }
 }

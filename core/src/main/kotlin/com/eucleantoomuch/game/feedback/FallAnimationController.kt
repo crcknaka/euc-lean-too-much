@@ -56,8 +56,13 @@ class FallAnimationController(
         private set
     var cameraForwardOffset = 0f // Camera moves forward (zoom in)
         private set
+    var cameraRoll = 0f         // Camera tilt/roll angle in degrees
+        private set
     var fovPunch = 0f           // FOV spike on impact
         private set
+
+    // Random roll direction for this fall (set on start)
+    private var rollDirection = 1f
 
     // Animation progress (0 to 1)
     val progress: Float
@@ -84,6 +89,9 @@ class FallAnimationController(
         initialSideLean = sideLean
         initialYaw = yaw
 
+        // Random roll direction for camera
+        rollDirection = if (MathUtils.randomBoolean()) 1f else -1f
+
         // Reset all animation values
         riderPitch = 0f
         riderRoll = 0f
@@ -95,6 +103,7 @@ class FallAnimationController(
         eucSideOffset = 0f
         cameraShake = 0f
         cameraDropOffset = 0f
+        cameraRoll = 0f
         fovPunch = 0f
     }
 
@@ -111,7 +120,11 @@ class FallAnimationController(
         // Speed factor affects intensity of fall (faster = more dramatic)
         val speedFactor = (initialSpeed / 15f).coerceIn(0.3f, 1.5f)
 
-        // === PHASE 1: Impact (0 - 0.15s) ===
+        // Camera bounce effect - simulates camera hitting ground and bouncing
+        // Bounce formula: multiple damped impacts
+        val bounceOffset = calculateBounce(t, speedFactor)
+
+        // === PHASE 1: Impact (0 - 0.1s) ===
         if (t < 0.1f) {
             val impactT = t / 0.1f  // 0-1 during impact phase
 
@@ -124,8 +137,11 @@ class FallAnimationController(
             // Camera shake peaks at impact
             cameraShake = impactT * speedFactor * 2f
 
-            // No forward offset for now
-            cameraForwardOffset = 0f
+            // Camera drops fast + bounce
+            cameraDropOffset = easeInQuad(impactT) * -1.5f + bounceOffset
+
+            // Camera roll - starts tilting on impact
+            cameraRoll = easeOutQuad(impactT) * 15f * rollDirection * speedFactor
 
             // FOV punch (quick zoom in/out)
             fovPunch = MathUtils.sin(impactT * MathUtils.PI) * 8f * speedFactor
@@ -137,43 +153,41 @@ class FallAnimationController(
             armSpread = easeOutQuad(impactT) * 0.8f
 
             // EUC starts tipping based on initial lean direction
-            val rollDirection = if (initialSideLean != 0f) sign(initialSideLean) else
-                (if (MathUtils.randomBoolean()) 1f else -1f)
-            eucRoll = easeOutQuad(impactT) * 15f * rollDirection
+            val eucRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
+            eucRoll = easeOutQuad(impactT) * 15f * eucRollDir
 
-        // === PHASE 2: Tumble (0.1 - 0.6s) ===
+        // === PHASE 2: Tumble (0.1 - 0.4s) ===
         } else if (t < 0.4f) {
             val tumbleT = (t - 0.1f) / 0.3f  // 0-1 during tumble phase
 
             // Camera shake decreases
             cameraShake = (1f - tumbleT * 0.7f) * speedFactor * 1.5f
 
-            // No forward offset
-            cameraForwardOffset = 0f
+            // Camera continues dropping + bounce effect
+            cameraDropOffset = -1.5f + easeInQuad(tumbleT) * -0.3f + bounceOffset
+
+            // Camera roll oscillates and settles
+            cameraRoll = 15f * rollDirection * speedFactor * (1f - tumbleT * 0.5f)
 
             // FOV returns to normal
             fovPunch = (1f - tumbleT) * 4f * speedFactor
 
             // Rider continues tumbling forward and starts falling
             riderPitch = 25f * speedFactor + easeInQuad(tumbleT) * 55f * speedFactor
-            riderYOffset = easeInQuad(tumbleT) * -1.8f  // Falls down toward ground (rider center ~2m high)
+            riderYOffset = easeInQuad(tumbleT) * -1.8f  // Falls down toward ground
             riderForwardOffset = easeOutQuad(tumbleT) * 1.5f * speedFactor  // Thrown forward
 
             // Rider gains some roll as they tumble
-            val rollDirection = if (initialSideLean != 0f) sign(initialSideLean) else
-                (if (MathUtils.randomBoolean()) 1f else -1f)
-            riderRoll = easeInOutQuad(tumbleT) * 20f * rollDirection
+            val riderRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
+            riderRoll = easeInOutQuad(tumbleT) * 20f * riderRollDir
 
             // Arms fully spread
             armSpread = 0.8f + tumbleT * 0.2f
 
             // EUC continues rolling and moves away
             eucRoll = 15f + easeInQuad(tumbleT) * 60f * (if (initialSideLean >= 0) 1f else -1f)
-            eucForwardOffset = easeOutQuad(tumbleT) * 2f * speedFactor  // Rolls forward
+            eucForwardOffset = easeOutQuad(tumbleT) * 2f * speedFactor
             eucSideOffset = easeOutQuad(tumbleT) * 0.8f * sign(eucRoll)
-
-            // Camera drops to follow rider
-            cameraDropOffset = easeInQuad(tumbleT) * -0.8f
 
         // === PHASE 3: Settle (0.4 - 1.0s) ===
         } else {
@@ -182,20 +196,23 @@ class FallAnimationController(
             // Camera shake fades out
             cameraShake = (1f - settleT) * 0.4f * speedFactor
 
-            // No forward offset
-            cameraForwardOffset = 0f
+            // Camera at low position + residual bounce
+            cameraDropOffset = -1.8f + bounceOffset
+
+            // Camera roll settles back to normal
+            cameraRoll = 15f * rollDirection * speedFactor * 0.5f * (1f - easeOutQuad(settleT))
 
             // FOV settles
             fovPunch = 0f
 
             // Rider on ground - fully fallen
-            riderPitch = 80f * speedFactor + settleT * 10f  // Almost face down
-            riderYOffset = -1.8f - easeOutQuad(settleT) * 0.2f  // Lying on ground
+            riderPitch = 80f * speedFactor + settleT * 10f
+            riderYOffset = -1.8f - easeOutQuad(settleT) * 0.2f
             riderForwardOffset = 1.5f * speedFactor + settleT * 0.3f
 
             // Roll settles
-            val rollDirection = if (initialSideLean >= 0) 1f else -1f
-            riderRoll = 20f * rollDirection + easeInOutQuad(settleT) * 5f * rollDirection
+            val riderRollDir = if (initialSideLean >= 0) 1f else -1f
+            riderRoll = 20f * riderRollDir + easeInOutQuad(settleT) * 5f * riderRollDir
 
             // Arms relax slightly
             armSpread = 1f - settleT * 0.1f
@@ -205,9 +222,44 @@ class FallAnimationController(
             eucRoll = 75f * sign(eucRollTarget) + easeOutQuad(settleT) * 10f * sign(eucRollTarget)
             eucForwardOffset = 2f * speedFactor + easeOutQuad(settleT) * 0.5f
             eucSideOffset = 0.8f * sign(eucRoll) + easeOutQuad(settleT) * 0.3f * sign(eucRoll)
+        }
+    }
 
-            // Camera settles at low position looking at fallen rider
-            cameraDropOffset = -0.8f - easeOutQuad(settleT) * 0.4f
+    /**
+     * Calculate camera bounce effect - damped bounces like dropping phone/camera.
+     * Returns vertical offset (positive = up from current drop position).
+     */
+    private fun calculateBounce(t: Float, speedFactor: Float): Float {
+        // Bounce timing: first bounce at ~0.1s, second at ~0.25s, third at ~0.4s
+        val bounce1Time = 0.1f
+        val bounce2Time = 0.28f
+        val bounce3Time = 0.45f
+
+        val bounce1Height = 0.4f * speedFactor  // First bounce height
+        val bounce2Height = 0.15f * speedFactor // Second bounce (smaller)
+        val bounce3Height = 0.05f * speedFactor // Third bounce (tiny)
+
+        val bounce1Duration = 0.15f
+        val bounce2Duration = 0.12f
+        val bounce3Duration = 0.08f
+
+        return when {
+            // First bounce
+            t in bounce1Time..(bounce1Time + bounce1Duration) -> {
+                val bt = (t - bounce1Time) / bounce1Duration
+                MathUtils.sin(bt * MathUtils.PI) * bounce1Height
+            }
+            // Second bounce
+            t in bounce2Time..(bounce2Time + bounce2Duration) -> {
+                val bt = (t - bounce2Time) / bounce2Duration
+                MathUtils.sin(bt * MathUtils.PI) * bounce2Height
+            }
+            // Third bounce
+            t in bounce3Time..(bounce3Time + bounce3Duration) -> {
+                val bt = (t - bounce3Time) / bounce3Duration
+                MathUtils.sin(bt * MathUtils.PI) * bounce3Height
+            }
+            else -> 0f
         }
     }
 
@@ -239,6 +291,7 @@ class FallAnimationController(
         cameraShake = 0f
         cameraDropOffset = 0f
         cameraForwardOffset = 0f
+        cameraRoll = 0f
         fovPunch = 0f
     }
 

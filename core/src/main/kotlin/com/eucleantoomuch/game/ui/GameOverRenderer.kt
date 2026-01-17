@@ -24,6 +24,35 @@ class GameOverRenderer : Disposable {
     private var newHighScoreAnim = 0f
     private var retryHover = 0f
     private var menuHover = 0f
+    private var safetyTipAnim = 0f  // Animation timer for safety tip
+
+    // Current safety tip (randomized on reset)
+    private var currentSafetyTip = ""
+
+    companion object {
+        private val safetyTips = listOf(
+            "Wear your gear. Always.",
+            "Helmet on, worries off.",
+            "Slow down, stay safe.",
+            "Know your limits.",
+            "Protect your head.",
+            "Ride within your skill.",
+            "Gear up before you roll.",
+            "Safety first, tricks later.",
+            "One fall can change everything.",
+            "Your brain is irreplaceable.",
+            "Pads today, ride tomorrow.",
+            "Respect the wheel.",
+            "Stay alert, stay alive.",
+            "Don't push too hard.",
+            "Learn to fall safely.",
+            "Check your gear regularly.",
+            "Watch for obstacles.",
+            "Balance is everything.",
+            "Practice makes perfect.",
+            "Ride smart, ride long."
+        )
+    }
 
     enum class ButtonClicked {
         NONE, RETRY, MENU
@@ -60,9 +89,9 @@ class GameOverRenderer : Disposable {
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
         ui.shapes.rect(0f, 0f, sw, sh)
 
-        // Panel dimensions with scale animation
-        val panelWidth = 560f * scale * panelScale
-        val panelHeight = 580f * scale * panelScale  // Increased height for bottom padding
+        // Panel dimensions with scale animation - wider panel
+        val panelWidth = 640f * scale * panelScale
+        val panelHeight = 650f * scale * panelScale  // Taller for more spacing
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
@@ -84,12 +113,12 @@ class GameOverRenderer : Disposable {
             backgroundColor = UITheme.surface,
             borderColor = if (isNewHighScore) UITheme.accent else UITheme.surfaceBorder)
 
-        // Button layout - side by side at bottom (lower position)
-        val buttonWidth = 220f * scale
+        // Button layout - side by side at bottom with more padding
+        val buttonWidth = 240f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 28f * scale
+        val buttonSpacing = 32f * scale
         val totalWidth = buttonWidth * 2 + buttonSpacing
-        val buttonsY = panelY + 55f * scale  // With bottom padding
+        val buttonsY = panelY + 75f * scale  // More bottom padding
 
         retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
@@ -113,8 +142,33 @@ class GameOverRenderer : Disposable {
             }
             ui.textCentered("GAME OVER", centerX, titleY, UIFonts.title, titleColor)
 
+            // Safety tip under title - large with pulsing attention animation
+            var statsStartY = titleY - 75f * scale  // More space between GAME OVER and tip
+            if (currentSafetyTip.isNotEmpty()) {
+                safetyTipAnim += Gdx.graphics.deltaTime
+
+                // Pulsing glow effect - stronger at start, then settles
+                val glowIntensity = if (safetyTipAnim < 2f) {
+                    // First 2 seconds: strong pulsing to grab attention
+                    UITheme.Anim.pulse(3f, 0.6f, 1f)
+                } else {
+                    // After: gentle pulse
+                    UITheme.Anim.pulse(2f, 0.85f, 1f)
+                }
+
+                // Color shifts between warning yellow and white for attention
+                val tipColor = if (safetyTipAnim < 2f) {
+                    UITheme.lerp(UITheme.warning, UITheme.textPrimary, UITheme.Anim.pulse(4f, 0f, 1f))
+                } else {
+                    UITheme.lerp(UITheme.warning, UITheme.textSecondary, 0.3f)
+                }
+
+                val finalColor = UITheme.withAlpha(tipColor, glowIntensity)
+                ui.textCentered(currentSafetyTip, centerX, statsStartY, UIFonts.heading, finalColor)
+                statsStartY -= 60f * scale
+            }
+
             // New high score badge
-            var statsStartY = titleY - 85f * scale
             if (isNewHighScore) {
                 val badgePulse = UITheme.Anim.pulse(4f, 0.8f, 1f)
                 val badgeColor = UITheme.lerp(UITheme.accent, UITheme.accentBright, badgePulse)
@@ -176,6 +230,9 @@ class GameOverRenderer : Disposable {
         panelScale = 0f
         statsReveal = 0f
         newHighScoreAnim = 0f
+        safetyTipAnim = 0f
+        // Pick a random safety tip
+        currentSafetyTip = safetyTips.random()
     }
 
     fun resize(width: Int, height: Int) {

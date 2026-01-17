@@ -606,6 +606,7 @@ class EucGame(
             renderer.cameraController.setFovPunch(fallAnimationController.fovPunch)
             renderer.cameraController.setDropOffset(fallAnimationController.cameraDropOffset)
             renderer.cameraController.setForwardOffset(fallAnimationController.cameraForwardOffset)
+            renderer.cameraController.setRoll(fallAnimationController.cameraRoll)
 
             // Update rider position with fall animation offsets
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
@@ -648,6 +649,7 @@ class EucGame(
             renderer.cameraController.setFovPunch(0f)
             renderer.cameraController.setDropOffset(0f)
             renderer.cameraController.setForwardOffset(0f)
+            renderer.cameraController.setRoll(0f)
 
             // Reset fall animation
             fallAnimationController.reset()
