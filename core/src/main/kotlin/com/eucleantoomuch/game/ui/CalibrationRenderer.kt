@@ -16,8 +16,8 @@ class CalibrationRenderer : Disposable {
 
     // Animation states
     private var enterAnim = 0f
-    private var dotTrailX = FloatArray(10) { 0f }
-    private var dotTrailY = FloatArray(10) { 0f }
+    private var dotTrailX = FloatArray(10)
+    private var dotTrailY = FloatArray(10)
     private var trailIndex = 0
     private var trailTimer = 0f
     private var calibrateHover = 0f
@@ -81,16 +81,15 @@ class CalibrationRenderer : Disposable {
 
         // Tilt indicator
         val indicatorSize = 180f * enterAnim
-        val indicatorCenterX = centerX
         val indicatorCenterY = centerY + 40
 
         // Indicator shadow
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.3f)
-        ui.shapes.circle(indicatorCenterX + 3, indicatorCenterY - 3, indicatorSize / 2 + 3)
+        ui.shapes.circle(centerX + 3, indicatorCenterY - 3, indicatorSize / 2 + 3)
 
         // Indicator background
         ui.shapes.color = UITheme.surfaceLight
-        ui.shapes.circle(indicatorCenterX, indicatorCenterY, indicatorSize / 2)
+        ui.shapes.circle(centerX, indicatorCenterY, indicatorSize / 2)
 
         // Grid circles
         ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.15f)
@@ -102,9 +101,9 @@ class CalibrationRenderer : Disposable {
                 val angle1 = (i.toFloat() / segments) * MathUtils.PI2
                 val angle2 = ((i + 1).toFloat() / segments) * MathUtils.PI2
                 ui.shapes.rectLine(
-                    indicatorCenterX + radius * MathUtils.cos(angle1),
+                    centerX + radius * MathUtils.cos(angle1),
                     indicatorCenterY + radius * MathUtils.sin(angle1),
-                    indicatorCenterX + radius * MathUtils.cos(angle2),
+                    centerX + radius * MathUtils.cos(angle2),
                     indicatorCenterY + radius * MathUtils.sin(angle2),
                     1f
                 )
@@ -113,23 +112,23 @@ class CalibrationRenderer : Disposable {
 
         // Crosshair
         ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.3f)
-        ui.shapes.rectLine(indicatorCenterX - indicatorSize / 2 + 10, indicatorCenterY,
-            indicatorCenterX + indicatorSize / 2 - 10, indicatorCenterY, 1.5f)
-        ui.shapes.rectLine(indicatorCenterX, indicatorCenterY - indicatorSize / 2 + 10,
-            indicatorCenterX, indicatorCenterY + indicatorSize / 2 - 10, 1.5f)
+        ui.shapes.rectLine(centerX - indicatorSize / 2 + 10, indicatorCenterY,
+            centerX + indicatorSize / 2 - 10, indicatorCenterY, 1.5f)
+        ui.shapes.rectLine(centerX, indicatorCenterY - indicatorSize / 2 + 10,
+            centerX, indicatorCenterY + indicatorSize / 2 - 10, 1.5f)
 
         // Target zone (center)
         val targetPulse = UITheme.Anim.pulse(2f, 0.4f, 0.6f)
         ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.4f)
-        ui.shapes.circle(indicatorCenterX, indicatorCenterY, 30f)
+        ui.shapes.circle(centerX, indicatorCenterY, 30f)
         ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.7f)
-        ui.shapes.circle(indicatorCenterX, indicatorCenterY, 15f)
+        ui.shapes.circle(centerX, indicatorCenterY, 15f)
 
         // Dot trail
         for (i in dotTrailX.indices) {
             val idx = (trailIndex - i + dotTrailX.size) % dotTrailX.size
             val alpha = (1f - i.toFloat() / dotTrailX.size) * 0.3f
-            val trailDotX = indicatorCenterX + dotTrailX[idx] * indicatorSize / 2 * 0.8f
+            val trailDotX = centerX + dotTrailX[idx] * indicatorSize / 2 * 0.8f
             val trailDotY = indicatorCenterY + dotTrailY[idx] * indicatorSize / 2 * 0.8f
             ui.shapes.color = UITheme.withAlpha(UITheme.cyan, alpha)
             ui.shapes.circle(trailDotX, trailDotY, 4f - i * 0.3f)
@@ -139,11 +138,11 @@ class CalibrationRenderer : Disposable {
         val maxTilt = 10f
         val normalizedX = (rawX / maxTilt).coerceIn(-1f, 1f)
         val normalizedY = (rawY / maxTilt).coerceIn(-1f, 1f)
-        val dotX = indicatorCenterX + normalizedY * indicatorSize / 2 * 0.8f
+        val dotX = centerX + normalizedY * indicatorSize / 2 * 0.8f
         val dotY = indicatorCenterY - normalizedX * indicatorSize / 2 * 0.8f
 
         // Is centered?
-        val distFromCenter = Vector2.dst(dotX, dotY, indicatorCenterX, indicatorCenterY)
+        val distFromCenter = Vector2.dst(dotX, dotY, centerX, indicatorCenterY)
         val isCentered = distFromCenter < 25f
 
         // Dot shadow
@@ -209,7 +208,7 @@ class CalibrationRenderer : Disposable {
         // Accelerometer values
         val valuesY = indicatorCenterY - indicatorSize / 2 - 25
         UIFonts.tiny.color = UITheme.textMuted
-        val valuesText = "X: ${String.format("%.1f", rawX)}  Y: ${String.format("%.1f", rawY)}"
+        val valuesText = "X: ${String.format(java.util.Locale.US, "%.1f", rawX)}  Y: ${String.format(java.util.Locale.US, "%.1f", rawY)}"
         ui.textCentered(valuesText, centerX, valuesY, UIFonts.tiny, UITheme.textMuted)
 
         // Button labels

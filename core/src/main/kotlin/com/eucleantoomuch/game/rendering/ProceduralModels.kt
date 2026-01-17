@@ -1,19 +1,22 @@
 package com.eucleantoomuch.game.rendering
 
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
-import com.badlogic.gdx.graphics.g3d.utils.MeshPartBuilder
+import com.badlogic.gdx.graphics.g3d.loader.G3dModelLoader
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.utils.Disposable
+import com.badlogic.gdx.utils.UBJsonReader
 import com.eucleantoomuch.game.util.Constants
 
 class ProceduralModels : Disposable {
     private val modelBuilder = ModelBuilder()
     private val models = mutableListOf<Model>()
+    private val modelLoader = G3dModelLoader(UBJsonReader())
 
     private val attributes = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
 
@@ -34,7 +37,38 @@ class ProceduralModels : Disposable {
     private val carColor1 = Color(0.8f, 0.2f, 0.2f, 1f)          // Red
     private val carColor2 = Color(0.2f, 0.4f, 0.8f, 1f)          // Blue
 
+    // Scale for external model (adjust based on your model's size)
+    var eucModelScale = 1f
+        private set
+
+    // Rotation offset for external model (to fix orientation)
+    var eucModelRotationX = 0f
+        private set
+    var eucModelRotationY = 0f
+        private set
+
     fun createEucModel(): Model {
+        // Try to load external model, fallback to procedural
+        return try {
+            val modelFile = Gdx.files.internal("monowheel.g3db")
+            if (modelFile.exists()) {
+                // External model loaded - apply scale and rotation
+                eucModelScale = 0.003f  // Even smaller scale
+                eucModelRotationX = 180f  // Flip vertically
+                eucModelRotationY = 0f    // No horizontal flip (was facing backwards)
+                modelLoader.loadModel(modelFile).also { models.add(it) }
+            } else {
+                eucModelScale = 1f
+                createProceduralEucModel()
+            }
+        } catch (e: Exception) {
+            Gdx.app.error("ProceduralModels", "Failed to load monowheel.g3db: ${e.message}")
+            eucModelScale = 1f
+            createProceduralEucModel()
+        }
+    }
+
+    private fun createProceduralEucModel(): Model {
         modelBuilder.begin()
 
         // Wheel (cylinder lying on its side)
@@ -59,11 +93,17 @@ class ProceduralModels : Disposable {
     fun createRiderModel(): Model {
         modelBuilder.begin()
 
-        // Legs
         val pantsMaterial = Material(ColorAttribute.createDiffuse(riderPantsColor))
-        val legsPart = modelBuilder.part("legs", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        legsPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.5f, 0f))
-        legsPart.box(0.25f, 0.5f, 0.15f)
+
+        // Left leg
+        val leftLegPart = modelBuilder.part("left_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.08f, 0.5f, 0f))
+        leftLegPart.box(0.1f, 0.5f, 0.12f)
+
+        // Right leg
+        val rightLegPart = modelBuilder.part("right_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.08f, 0.5f, 0f))
+        rightLegPart.box(0.1f, 0.5f, 0.12f)
 
         // Body/torso
         val bodyMaterial = Material(ColorAttribute.createDiffuse(riderBodyColor))
@@ -76,6 +116,18 @@ class ProceduralModels : Disposable {
         val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, skinMaterial)
         headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.4f, 0f))
         headPart.sphere(0.2f, 0.25f, 0.2f, 8, 8)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createArmModel(): Model {
+        modelBuilder.begin()
+
+        val bodyMaterial = Material(ColorAttribute.createDiffuse(riderBodyColor))
+        val armPart = modelBuilder.part("arm", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        // Arm is a box, pivot point at shoulder (top of arm)
+        armPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -0.2f, 0f))
+        armPart.box(0.08f, 0.4f, 0.08f)
 
         return modelBuilder.end().also { models.add(it) }
     }

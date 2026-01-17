@@ -8,6 +8,7 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.eucleantoomuch.game.ecs.EntityFactory
 import com.eucleantoomuch.game.ecs.Families
+import com.eucleantoomuch.game.ecs.components.ArmComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
@@ -48,6 +49,8 @@ class EucGame : ApplicationAdapter() {
     private var session = GameSession()
     private var playerEntity: Entity? = null
     private var riderEntity: Entity? = null
+    private var leftArmEntity: Entity? = null
+    private var rightArmEntity: Entity? = null
     private var countdownTimer = 3f
     private var isNewHighScore = false
 
@@ -85,7 +88,7 @@ class EucGame : ApplicationAdapter() {
         models = ProceduralModels()
 
         // Initialize renderer
-        renderer = GameRenderer(engine)
+        renderer = GameRenderer(engine, models)
 
         // Initialize entity factory
         entityFactory = EntityFactory(engine, models)
@@ -229,7 +232,7 @@ class EucGame : ApplicationAdapter() {
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
-                riderTransform.position.y += 0.2f
+                riderTransform.position.y += 0.25f  // Stand on top of EUC
                 riderTransform.yaw = playerTransform.yaw
                 riderTransform.updateRotationFromYaw()
             }
@@ -239,6 +242,17 @@ class EucGame : ApplicationAdapter() {
                 riderEuc.visualForwardLean = eucComponent.visualForwardLean
                 riderEuc.visualSideLean = eucComponent.visualSideLean
             }
+
+            // Update arms position and angle based on speed
+            // Speed is in m/s, 15 km/h = 4.17 m/s
+            val speed = eucComponent.speed
+            val targetArmAngle = when {
+                speed <= 4.2f -> 80f  // Arms spread at low/medium speed (<=15 km/h)
+                else -> 0f            // Arms down at high speed (>15 km/h)
+            }
+
+            updateArm(leftArmEntity, playerTransform, eucComponent, targetArmAngle, isLeft = true, delta)
+            updateArm(rightArmEntity, playerTransform, eucComponent, targetArmAngle, isLeft = false, delta)
 
             // Update world generation
             worldGenerator.update(playerTransform.position.z, session.distanceTraveled)
@@ -289,12 +303,50 @@ class EucGame : ApplicationAdapter() {
         }
     }
 
+    private fun updateArm(
+        armEntity: Entity?,
+        playerTransform: TransformComponent,
+        eucComponent: EucComponent,
+        targetAngle: Float,
+        isLeft: Boolean,
+        delta: Float
+    ) {
+        armEntity ?: return
+
+        val armTransform = armEntity.getComponent(TransformComponent::class.java) ?: return
+        val armComponent = armEntity.getComponent(ArmComponent::class.java) ?: return
+        val armEuc = armEntity.getComponent(EucComponent::class.java) ?: return
+
+        // Smoothly interpolate arm angle
+        armComponent.targetArmAngle = targetAngle
+        val lerpSpeed = 5f
+        armComponent.armAngle += (targetAngle - armComponent.armAngle) * lerpSpeed * delta
+
+        // Position arm at shoulder level relative to rider
+        val shoulderOffsetX = if (isLeft) -0.18f else 0.18f
+        val shoulderOffsetY = 0.25f + 1.1f  // rider offset + shoulder height on rider
+
+        armTransform.position.set(playerTransform.position)
+        armTransform.position.y += shoulderOffsetY
+        armTransform.position.x += shoulderOffsetX
+        armTransform.yaw = playerTransform.yaw
+        armTransform.updateRotationFromYaw()
+
+        // Copy lean values
+        armEuc.forwardLean = eucComponent.forwardLean
+        armEuc.sideLean = eucComponent.sideLean
+        armEuc.visualForwardLean = eucComponent.visualForwardLean
+        armEuc.visualSideLean = eucComponent.visualSideLean
+    }
+
     private fun startGame() {
         resetGame()
 
         // Create player
         playerEntity = entityFactory.createPlayer()
         riderEntity = entityFactory.createRiderModel()
+        leftArmEntity = entityFactory.createArm(isLeft = true)
+        rightArmEntity = entityFactory.createArm(isLeft = false)
 
         // Initialize camera
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
@@ -327,6 +379,8 @@ class EucGame : ApplicationAdapter() {
         worldGenerator.reset()
         playerEntity = null
         riderEntity = null
+        leftArmEntity = null
+        rightArmEntity = null
     }
 
     private fun handlePlayerFall() {

@@ -13,13 +13,21 @@ class EntityFactory(
 ) {
     private val eucModel by lazy { models.createEucModel() }
     private val riderModel by lazy { models.createRiderModel() }
+    private val armModel by lazy { models.createArmModel() }
 
     fun createPlayer(): Entity {
         val entity = engine.createEntity()
 
-        // Transform - start at origin
+        // Create model instance first - this triggers lazy init and sets eucModelScale
+        val eucModelInstance = ModelInstance(eucModel)
+
+        // Now read the scale (after lazy init has set it)
+        val modelScale = models.eucModelScale
+
+        // Transform - start at origin with model scale
         entity.add(TransformComponent().apply {
             position.set(0f, 0f, 0f)
+            scale.set(modelScale, modelScale, modelScale)
         })
 
         // Velocity
@@ -34,7 +42,7 @@ class EntityFactory(
 
         // Model (EUC + Rider combined conceptually, we'll render separately)
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(eucModel)
+            modelInstance = eucModelInstance
         })
 
         // Player marker
@@ -60,6 +68,26 @@ class EntityFactory(
         })
 
         // Add EUC component so rider leans with EUC
+        entity.add(EucComponent())
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    fun createArm(isLeft: Boolean): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent())
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(armModel)
+        })
+
+        entity.add(ArmComponent().apply {
+            isLeftArm = isLeft
+        })
+
+        // Add EUC component so arm leans with rider
         entity.add(EucComponent())
 
         engine.addEntity(entity)
