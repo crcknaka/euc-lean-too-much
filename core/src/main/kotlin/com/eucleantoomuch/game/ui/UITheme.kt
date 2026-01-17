@@ -19,8 +19,8 @@ object UITheme {
     val secondaryDark = Color(0x2563EBFF.toInt())  // Darker blue
 
     // === Accent Colors ===
-    val accent = Color(0xF59E0BFF.toInt())         // Amber/Gold
-    val accentBright = Color(0xFBBF24FF.toInt())   // Bright gold
+    val accent = Color(0xFF6B00FF.toInt())         // Orange (#ff6b00)
+    val accentBright = Color(0xFF8C33FF.toInt())   // Bright orange
 
     // === Danger/Warning Colors ===
     val danger = Color(0xEF4444FF.toInt())         // Red

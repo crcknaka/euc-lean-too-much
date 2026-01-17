@@ -5,39 +5,55 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Background circle for the wheel -->
+    <!-- EUC Wheel - outer rim -->
     <path
         android:fillColor="#333333"
-        android:pathData="M54,54m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0"/>
+        android:pathData="M54,68m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0"/>
 
-    <!-- Inner wheel circle -->
+    <!-- Inner wheel -->
     <path
         android:fillColor="#1A1A1A"
-        android:pathData="M54,54m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0"/>
+        android:pathData="M54,68m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0"/>
 
     <!-- Wheel highlight -->
     <path
         android:fillColor="#4A4A4A"
-        android:pathData="M54,54m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0"/>
+        android:pathData="M54,68m-11,0a11,11 0,1 1,22 0a11,22 0,1 1,-22 0"/>
+
+    <!-- Orange accent ring -->
+    <path
+        android:fillColor="#FF6B00"
+        android:pathData="M54,68m-12,0a12,12 0,1 1,24 0a12,12 0,1 1,-24 0
+                          M54,68m-10,0a10,10 0,1 0,20 0a10,10 0,1 0,-20 0"/>
 
     <!-- Center hub -->
     <path
         android:fillColor="#666666"
-        android:pathData="M54,54m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+        android:pathData="M54,68m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
 
-    <!-- Rider silhouette - body -->
+    <!-- Hub accent -->
+    <path
+        android:fillColor="#FF6B00"
+        android:pathData="M54,68m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0"/>
+
+    <!-- Rider body -->
     <path
         android:fillColor="#4A90D9"
-        android:pathData="M48,20 L60,20 L58,38 L50,38 Z"/>
+        android:pathData="M48,24 L60,24 L58,44 L50,44 Z"/>
 
-    <!-- Rider silhouette - head -->
+    <!-- Rider head -->
     <path
         android:fillColor="#E8C4A0"
-        android:pathData="M54,14m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+        android:pathData="M54,18m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+
+    <!-- Helmet visor (orange accent) -->
+    <path
+        android:fillColor="#FF6B00"
+        android:pathData="M49,16 L59,16 L59,18 L49,18 Z"/>
 
     <!-- Rider legs -->
     <path
         android:fillColor="#2D2D2D"
-        android:pathData="M50,38 L48,52 L56,52 L58,38 Z"/>
+        android:pathData="M50,44 L48,56 L56,56 L58,44 Z"/>
 
 </vector>
