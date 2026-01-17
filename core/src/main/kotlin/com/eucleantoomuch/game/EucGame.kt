@@ -293,7 +293,7 @@ class EucGame : ApplicationAdapter() {
         armTransform.position.set(playerTransform.position)
         armTransform.position.x += riderOffsetX + shoulderOffsetX
         armTransform.position.z += riderOffsetZ
-        armTransform.position.y += 1.5f  // Shoulder height on ground-standing rider
+        armTransform.position.y += 1.75f  // Shoulder height on ground-standing rider
         armTransform.yaw = playerTransform.yaw
         armTransform.updateRotationFromYaw()
     }
@@ -423,7 +423,7 @@ class EucGame : ApplicationAdapter() {
 
         // Position arm at shoulder level relative to rider (scaled 1.4x)
         val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
-        val shoulderOffsetY = 0.7f + 1.5f  // rider offset + shoulder height on scaled rider
+        val shoulderOffsetY = 0.7f + 1.75f  // rider offset + shoulder height on scaled rider
 
         armTransform.position.set(playerTransform.position)
         armTransform.position.y += shoulderOffsetY

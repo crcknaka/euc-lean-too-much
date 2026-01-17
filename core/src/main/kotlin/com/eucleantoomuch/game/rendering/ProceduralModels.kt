@@ -37,6 +37,17 @@ class ProceduralModels : Disposable {
     private val carColor1 = Color(0.8f, 0.2f, 0.2f, 1f)          // Red
     private val carColor2 = Color(0.2f, 0.4f, 0.8f, 1f)          // Blue
 
+    // Environment colors
+    private val grassColor = Color(0.35f, 0.55f, 0.25f, 1f)      // Green grass
+    private val dirtColor = Color(0.4f, 0.3f, 0.2f, 1f)          // Brown dirt
+    private val treeTrunkColor = Color(0.4f, 0.28f, 0.18f, 1f)   // Brown trunk
+    private val treeLeavesColor = Color(0.2f, 0.45f, 0.2f, 1f)   // Green leaves
+    private val lampPostColor = Color(0.25f, 0.25f, 0.25f, 1f)   // Dark gray metal
+    private val benchWoodColor = Color(0.5f, 0.35f, 0.2f, 1f)    // Wood brown
+    private val benchMetalColor = Color(0.2f, 0.2f, 0.2f, 1f)    // Dark metal
+    private val trashCanColor = Color(0.15f, 0.25f, 0.15f, 1f)   // Dark green
+    private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
+
     // Scale for external model (adjust based on your model's size)
     var eucModelScale = 1f
         private set
@@ -294,6 +305,209 @@ class ProceduralModels : Disposable {
     fun getRandomCarColor(): Color {
         val colors = listOf(carColor1, carColor2, Color.WHITE, Color.BLACK, Color(0.3f, 0.3f, 0.3f, 1f))
         return colors.random()
+    }
+
+    // ============ Environment Models ============
+
+    fun createGrassAreaModel(chunkLength: Float): Model {
+        modelBuilder.begin()
+
+        val grassMaterial = Material(ColorAttribute.createDiffuse(grassColor))
+        val grassWidth = 15f  // Wide grass area on each side
+
+        // Left grass area (beyond sidewalk)
+        val leftGrass = modelBuilder.part("grass_left", GL20.GL_TRIANGLES, attributes, grassMaterial)
+        val leftStart = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH - grassWidth
+        val leftEnd = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH
+        leftGrass.rect(
+            leftStart, 0.02f, 0f,
+            leftStart, 0.02f, chunkLength,
+            leftEnd, 0.02f, chunkLength,
+            leftEnd, 0.02f, 0f,
+            0f, 1f, 0f
+        )
+
+        // Right grass area (beyond sidewalk)
+        val rightGrass = modelBuilder.part("grass_right", GL20.GL_TRIANGLES, attributes, grassMaterial)
+        val rightStart = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH
+        val rightEnd = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + grassWidth
+        rightGrass.rect(
+            rightStart, 0.02f, 0f,
+            rightStart, 0.02f, chunkLength,
+            rightEnd, 0.02f, chunkLength,
+            rightEnd, 0.02f, 0f,
+            0f, 1f, 0f
+        )
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createTreeModel(height: Float = 4f): Model {
+        modelBuilder.begin()
+
+        val trunkMaterial = Material(ColorAttribute.createDiffuse(treeTrunkColor))
+        val leavesMaterial = Material(ColorAttribute.createDiffuse(treeLeavesColor))
+
+        val trunkHeight = height * 0.4f
+        val trunkRadius = 0.15f
+        val crownHeight = height * 0.7f
+        val crownRadius = height * 0.35f
+
+        // Trunk (cylinder)
+        val trunkPart = modelBuilder.part("trunk", GL20.GL_TRIANGLES, attributes, trunkMaterial)
+        trunkPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight / 2, 0f))
+        trunkPart.cylinder(trunkRadius * 2, trunkHeight, trunkRadius * 2, 8)
+
+        // Crown (cone/sphere hybrid - using cone for simplicity)
+        val crownPart = modelBuilder.part("crown", GL20.GL_TRIANGLES, attributes, leavesMaterial)
+        crownPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight + crownHeight / 2, 0f))
+        crownPart.cone(crownRadius * 2, crownHeight, crownRadius * 2, 8)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createRoundTreeModel(height: Float = 3.5f): Model {
+        modelBuilder.begin()
+
+        val trunkMaterial = Material(ColorAttribute.createDiffuse(treeTrunkColor))
+        val leavesMaterial = Material(ColorAttribute.createDiffuse(treeLeavesColor))
+
+        val trunkHeight = height * 0.35f
+        val trunkRadius = 0.12f
+        val crownRadius = height * 0.3f
+
+        // Trunk
+        val trunkPart = modelBuilder.part("trunk", GL20.GL_TRIANGLES, attributes, trunkMaterial)
+        trunkPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight / 2, 0f))
+        trunkPart.cylinder(trunkRadius * 2, trunkHeight, trunkRadius * 2, 8)
+
+        // Round crown (sphere)
+        val crownPart = modelBuilder.part("crown", GL20.GL_TRIANGLES, attributes, leavesMaterial)
+        crownPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight + crownRadius, 0f))
+        crownPart.sphere(crownRadius * 2, crownRadius * 2, crownRadius * 2, 10, 10)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createLampPostModel(): Model {
+        modelBuilder.begin()
+
+        val postMaterial = Material(ColorAttribute.createDiffuse(lampPostColor))
+
+        val scale = 1.6f  // 60% bigger
+        val postHeight = 3.5f * scale
+        val postRadius = 0.07f * scale
+
+        // Main post
+        val postPart = modelBuilder.part("post", GL20.GL_TRIANGLES, attributes, postMaterial)
+        postPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, postHeight / 2, 0f))
+        postPart.cylinder(postRadius * 2, postHeight, postRadius * 2, 8)
+
+        // Arm extending towards road (along Z axis, not X - so it points towards road when rotated)
+        val armPart = modelBuilder.part("arm", GL20.GL_TRIANGLES, attributes, postMaterial)
+        armPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, postHeight - 0.1f * scale, 0.4f * scale))
+        armPart.box(0.08f * scale, 0.08f * scale, 0.8f * scale)
+
+        // Lamp head (box) - at end of arm
+        val lampPart = modelBuilder.part("lamp", GL20.GL_TRIANGLES, attributes, postMaterial)
+        lampPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, postHeight - 0.3f * scale, 0.7f * scale))
+        lampPart.box(0.2f * scale, 0.25f * scale, 0.3f * scale)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createBenchModel(): Model {
+        modelBuilder.begin()
+
+        val scale = 1.6f  // 60% bigger
+        val woodMaterial = Material(ColorAttribute.createDiffuse(benchWoodColor))
+        val metalMaterial = Material(ColorAttribute.createDiffuse(benchMetalColor))
+
+        // Seat
+        val seatPart = modelBuilder.part("seat", GL20.GL_TRIANGLES, attributes, woodMaterial)
+        seatPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.45f * scale, 0f))
+        seatPart.box(1.2f * scale, 0.08f * scale, 0.4f * scale)
+
+        // Backrest
+        val backPart = modelBuilder.part("back", GL20.GL_TRIANGLES, attributes, woodMaterial)
+        backPart.setVertexTransform(com.badlogic.gdx.math.Matrix4()
+            .translate(0f, 0.7f * scale, -0.15f * scale)
+            .rotate(1f, 0f, 0f, -15f))
+        backPart.box(1.2f * scale, 0.4f * scale, 0.06f * scale)
+
+        // Left leg
+        val leftLegPart = modelBuilder.part("leg_left", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.5f * scale, 0.22f * scale, 0f))
+        leftLegPart.box(0.06f * scale, 0.44f * scale, 0.35f * scale)
+
+        // Right leg
+        val rightLegPart = modelBuilder.part("leg_right", GL20.GL_TRIANGLES, attributes, metalMaterial)
+        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.5f * scale, 0.22f * scale, 0f))
+        rightLegPart.box(0.06f * scale, 0.44f * scale, 0.35f * scale)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createTrashCanModel(): Model {
+        modelBuilder.begin()
+
+        val scale = 1.6f  // 60% bigger
+        val canMaterial = Material(ColorAttribute.createDiffuse(trashCanColor))
+
+        // Main body (cylinder)
+        val bodyPart = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, canMaterial)
+        bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.4f * scale, 0f))
+        bodyPart.cylinder(0.4f * scale, 0.8f * scale, 0.4f * scale, 10)
+
+        // Rim at top
+        val rimPart = modelBuilder.part("rim", GL20.GL_TRIANGLES, attributes, canMaterial)
+        rimPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.82f * scale, 0f))
+        rimPart.cylinder(0.45f * scale, 0.06f * scale, 0.45f * scale, 10)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createBushModel(): Model {
+        modelBuilder.begin()
+
+        val bushMaterial = Material(ColorAttribute.createDiffuse(bushColor))
+
+        // Main bush body (flattened sphere)
+        val bushPart = modelBuilder.part("bush", GL20.GL_TRIANGLES, attributes, bushMaterial)
+        bushPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.35f, 0f))
+        bushPart.sphere(0.8f, 0.7f, 0.8f, 8, 8)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun createFlowerBedModel(): Model {
+        modelBuilder.begin()
+
+        val dirtMaterial = Material(ColorAttribute.createDiffuse(dirtColor))
+
+        // Dirt bed
+        val bedPart = modelBuilder.part("bed", GL20.GL_TRIANGLES, attributes, dirtMaterial)
+        bedPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.05f, 0f))
+        bedPart.box(1.5f, 0.1f, 0.8f)
+
+        // Some simple flowers (small colored spheres)
+        val flowerColors = listOf(
+            Color(0.9f, 0.3f, 0.3f, 1f),  // Red
+            Color(0.9f, 0.9f, 0.3f, 1f),  // Yellow
+            Color(0.9f, 0.5f, 0.8f, 1f),  // Pink
+        )
+        var flowerIndex = 0
+        for (x in listOf(-0.4f, 0f, 0.4f)) {
+            for (z in listOf(-0.2f, 0.2f)) {
+                val flowerMaterial = Material(ColorAttribute.createDiffuse(flowerColors[flowerIndex % flowerColors.size]))
+                val flowerPart = modelBuilder.part("flower_$flowerIndex", GL20.GL_TRIANGLES, attributes, flowerMaterial)
+                flowerPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x, 0.2f, z))
+                flowerPart.sphere(0.12f, 0.12f, 0.12f, 6, 6)
+                flowerIndex++
+            }
+        }
+
+        return modelBuilder.end().also { models.add(it) }
     }
 
     override fun dispose() {

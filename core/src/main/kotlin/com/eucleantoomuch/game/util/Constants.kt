@@ -52,23 +52,23 @@ object Constants {
     const val CAMERA_SMOOTHNESS = 5f
 
     // Building generation
-    const val BUILDING_MIN_HEIGHT = 5f
-    const val BUILDING_MAX_HEIGHT = 20f
+    const val BUILDING_MIN_HEIGHT = 12f
+    const val BUILDING_MAX_HEIGHT = 35f
     const val BUILDING_WIDTH = 6f
     const val BUILDING_DEPTH = 8f
-    const val BUILDING_OFFSET_X = 10f       // Distance from road center
+    const val BUILDING_OFFSET_X = 14f       // Distance from road center (leaves room for grass)
 
     // Obstacle dimensions
-    const val MANHOLE_RADIUS = 0.4f
+    const val MANHOLE_RADIUS = 0.7f
     const val PUDDLE_WIDTH = 1.5f
     const val PUDDLE_LENGTH = 2f
     const val CURB_HEIGHT = 0.15f
     const val POTHOLE_RADIUS = 0.5f
     const val PEDESTRIAN_HEIGHT = 1.7f
     const val PEDESTRIAN_WIDTH = 0.5f
-    const val CAR_LENGTH = 4f
-    const val CAR_WIDTH = 1.8f
-    const val CAR_HEIGHT = 1.5f
+    const val CAR_LENGTH = 5.5f
+    const val CAR_WIDTH = 2.2f
+    const val CAR_HEIGHT = 1.8f
 
     // AI speeds
     const val PEDESTRIAN_MIN_SPEED = 1f     // m/s

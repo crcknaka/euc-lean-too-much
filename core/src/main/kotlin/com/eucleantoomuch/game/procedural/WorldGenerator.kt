@@ -21,6 +21,7 @@ class WorldGenerator(
     private var renderDistance = Constants.RENDER_DISTANCE
 
     private var groundModel = models.createGroundChunkModel(Constants.CHUNK_LENGTH)
+    private var grassModel = models.createGrassAreaModel(Constants.CHUNK_LENGTH)
     private var manholeModel = models.createManholeModel()
     private var puddleModel = models.createPuddleModel()
     private var curbModel = models.createCurbModel()
@@ -30,6 +31,14 @@ class WorldGenerator(
     // Pre-create some building models with different heights
     private val buildingModels = mutableListOf<Pair<Float, ModelInstance>>()
     private val carModels = mutableListOf<ModelInstance>()
+
+    // Scenery models
+    private val treeModels = mutableListOf<ModelInstance>()
+    private var lampPostModel: ModelInstance
+    private var benchModel: ModelInstance
+    private var trashCanModel: ModelInstance
+    private var bushModel: ModelInstance
+    private var flowerBedModel: ModelInstance
 
     init {
         // Create variety of buildings
@@ -44,6 +53,23 @@ class WorldGenerator(
             val model = models.createCarModel(models.getRandomCarColor())
             carModels.add(ModelInstance(model))
         }
+
+        // Create tree variants
+        for (i in 0..2) {
+            val height = MathUtils.random(3.5f, 5f)
+            treeModels.add(ModelInstance(models.createTreeModel(height)))
+        }
+        for (i in 0..2) {
+            val height = MathUtils.random(3f, 4f)
+            treeModels.add(ModelInstance(models.createRoundTreeModel(height)))
+        }
+
+        // Create other scenery models
+        lampPostModel = ModelInstance(models.createLampPostModel())
+        benchModel = ModelInstance(models.createBenchModel())
+        trashCanModel = ModelInstance(models.createTrashCanModel())
+        bushModel = ModelInstance(models.createBushModel())
+        flowerBedModel = ModelInstance(models.createFlowerBedModel())
     }
 
     fun setRenderDistance(distance: Float) {
@@ -75,11 +101,17 @@ class WorldGenerator(
         val entities = mutableListOf<Entity>()
         val chunkStartZ = chunkIndex * Constants.CHUNK_LENGTH
 
-        // Ground segment
+        // Ground segment (road + sidewalks)
         entities.add(createGroundEntity(chunkIndex, chunkStartZ))
+
+        // Grass areas on both sides
+        entities.add(createGrassEntity(chunkIndex, chunkStartZ))
 
         // Buildings on both sides
         entities.addAll(generateBuildings(chunkIndex, chunkStartZ))
+
+        // Scenery between buildings (trees, benches, etc.)
+        entities.addAll(generateScenery(chunkIndex, chunkStartZ))
 
         // Skip obstacles in the very first chunk (give player time to start)
         if (chunkIndex > 0) {
@@ -108,6 +140,26 @@ class WorldGenerator(
             this.chunkIndex = chunkIndex
         }
         entity.add(ground)
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createGrassEntity(chunkIndex: Int, startZ: Float): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(0f, 0f, startZ)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(grassModel)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD  // Just for chunk tracking
+            this.chunkIndex = chunkIndex
+        })
 
         engine.addEntity(entity)
         return entity
@@ -163,6 +215,246 @@ class WorldGenerator(
             this.chunkIndex = chunkIndex
         }
         entity.add(ground)
+
+        // Add collider for building
+        entity.add(ColliderComponent().apply {
+            setSize(Constants.BUILDING_WIDTH, height, Constants.BUILDING_DEPTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.CURB  // Reuse type for buildings
+            causesGameOver = true
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun generateScenery(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Grass zone: from sidewalk edge to building edge
+        // Road edge: ROAD_WIDTH/2 = 4f
+        // Sidewalk edge: ROAD_WIDTH/2 + SIDEWALK_WIDTH = 4 + 3 = 7f
+        // Buildings at: BUILDING_OFFSET_X = 14f, with width 6f, so near edge at 14 - 3 = 11f
+        // Grass area: from 7f to 11f (4m wide)
+        val grassStartX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 1f  // 1m into grass (at 8f)
+        val grassEndX = Constants.BUILDING_OFFSET_X - Constants.BUILDING_WIDTH / 2 - 1.5f  // 1.5m from buildings (at 9.5f)
+
+        var z = chunkStartZ + 2f
+        while (z < chunkStartZ + Constants.CHUNK_LENGTH - 2f) {
+            // Left side scenery - only on grass
+            if (MathUtils.random() < 0.6f) {
+                val xOffset = MathUtils.random(grassStartX, grassEndX)
+                entities.add(createSceneryItem(-xOffset, z, chunkIndex, isLeftSide = true))
+            }
+
+            // Right side scenery - only on grass
+            if (MathUtils.random() < 0.6f) {
+                val xOffset = MathUtils.random(grassStartX, grassEndX)
+                entities.add(createSceneryItem(xOffset, z, chunkIndex, isLeftSide = false))
+            }
+
+            z += MathUtils.random(5f, 10f)
+        }
+
+        // Add lamp posts at regular intervals - closer to road (on sidewalk near road edge)
+        z = chunkStartZ + 5f
+        while (z < chunkStartZ + Constants.CHUNK_LENGTH - 5f) {
+            val lampOffsetX = Constants.ROAD_WIDTH / 2 + 0.5f  // Just 0.5m from road edge, on sidewalk
+
+            // Left side lamp - arm should point towards road (positive Z direction = towards road)
+            entities.add(createLampPostEntity(-lampOffsetX, z, chunkIndex, isLeftSide = true))
+
+            // Right side lamp
+            entities.add(createLampPostEntity(lampOffsetX, z, chunkIndex, isLeftSide = false))
+
+            z += 25f
+        }
+
+        return entities
+    }
+
+    private fun createSceneryItem(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
+        val roll = MathUtils.random()
+
+        return when {
+            roll < 0.35f -> createTreeEntity(x, z, chunkIndex, isLeftSide)
+            roll < 0.50f -> createBushEntity(x, z, chunkIndex)
+            roll < 0.65f -> createBenchEntity(x, z, chunkIndex, isLeftSide)
+            roll < 0.80f -> createTrashCanEntity(x, z, chunkIndex)
+            else -> createFlowerBedEntity(x, z, chunkIndex)
+        }
+    }
+
+    private fun createTreeEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(treeModels.random().model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // Add collider - tree trunk
+        entity.add(ColliderComponent().apply {
+            setSize(0.4f, 4f, 0.4f)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.CURB  // Reuse type for scenery
+            causesGameOver = true
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createBushEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(bushModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createBenchEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            // Rotate bench to face the road
+            yaw = if (isLeftSide) 90f else -90f
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(benchModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // Add collider - bench (scaled 1.6x)
+        entity.add(ColliderComponent().apply {
+            setSize(1.2f * 1.6f, 1f * 1.6f, 0.5f * 1.6f)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.CURB
+            causesGameOver = true
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createTrashCanEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(trashCanModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // Add collider - trash can (scaled 1.6x)
+        entity.add(ColliderComponent().apply {
+            setSize(0.5f * 1.6f, 1f * 1.6f, 0.5f * 1.6f)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.CURB
+            causesGameOver = true
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createFlowerBedEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(flowerBedModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
+    private fun createLampPostEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            // Lamp arm extends along +Z in model space
+            // For left side lamp: rotate so arm points towards road center (+X direction)
+            // For right side lamp: rotate so arm points towards road center (-X direction)
+            yaw = if (isLeftSide) 90f else -90f
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(lampPostModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // Add collider - lamp post
+        entity.add(ColliderComponent().apply {
+            setSize(0.3f, 5.5f, 0.3f)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.CURB
+            causesGameOver = true
+        })
 
         engine.addEntity(entity)
         return entity
