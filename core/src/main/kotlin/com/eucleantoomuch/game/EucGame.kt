@@ -31,6 +31,7 @@ import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
 import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
+import com.eucleantoomuch.game.ui.PauseRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
 
 class EucGame(
@@ -51,6 +52,7 @@ class EucGame(
     private lateinit var hud: Hud
     private lateinit var menuRenderer: MenuRenderer
     private lateinit var gameOverRenderer: GameOverRenderer
+    private lateinit var pauseRenderer: PauseRenderer
     private lateinit var calibrationRenderer: CalibrationRenderer
     private lateinit var settingsRenderer: SettingsRenderer
 
@@ -131,6 +133,7 @@ class EucGame(
         hud = Hud(settingsManager)
         menuRenderer = MenuRenderer()
         gameOverRenderer = GameOverRenderer()
+        pauseRenderer = PauseRenderer()
         calibrationRenderer = CalibrationRenderer()
         settingsRenderer = SettingsRenderer(settingsManager)
 
@@ -174,18 +177,16 @@ class EucGame(
             is GameState.GameOver -> renderGameOver()
         }
 
-        // Check for pause (Android back button)
-        if (Gdx.input.isKeyJustPressed(Input.Keys.BACK) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
-            when (stateManager.current()) {
-                is GameState.Playing -> {
-                    val playingState = stateManager.current() as GameState.Playing
-                    stateManager.transition(GameState.Paused(playingState.session))
-                }
-                is GameState.Paused -> {
-                    val pausedState = stateManager.current() as GameState.Paused
-                    stateManager.transition(GameState.Playing(pausedState.session))
-                }
-                else -> {}
+        // Check for pause - keyboard or two-finger tap (only when playing)
+        if (stateManager.current() is GameState.Playing) {
+            val shouldPause = Gdx.input.isKeyJustPressed(Input.Keys.BACK) ||
+                Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) ||
+                (Gdx.input.justTouched() && Gdx.input.isTouched(1))  // Two fingers touched
+
+            if (shouldPause) {
+                val playingState = stateManager.current() as GameState.Playing
+                pauseRenderer.reset()
+                stateManager.transition(GameState.Paused(playingState.session))
             }
         }
     }
@@ -380,7 +381,22 @@ class EucGame(
         // Render frozen game state
         renderer.render()
 
-        // TODO: Add pause overlay
+        // Render pause UI
+        when (pauseRenderer.render()) {
+            PauseRenderer.ButtonClicked.RESUME -> {
+                val pausedState = stateManager.current() as GameState.Paused
+                stateManager.transition(GameState.Playing(pausedState.session))
+            }
+            PauseRenderer.ButtonClicked.RESTART -> {
+                resetGame()
+                startGame()
+            }
+            PauseRenderer.ButtonClicked.MENU -> {
+                resetGame()
+                stateManager.transition(GameState.Menu)
+            }
+            PauseRenderer.ButtonClicked.NONE -> {}
+        }
     }
 
     private fun renderGameOver() {
@@ -531,6 +547,7 @@ class EucGame(
         hud.resize(width, height)
         menuRenderer.resize(width, height)
         gameOverRenderer.resize(width, height)
+        pauseRenderer.resize(width, height)
         calibrationRenderer.resize(width, height)
         settingsRenderer.resize(width, height)
     }
@@ -541,6 +558,7 @@ class EucGame(
         hud.dispose()
         menuRenderer.dispose()
         gameOverRenderer.dispose()
+        pauseRenderer.dispose()
         calibrationRenderer.dispose()
         settingsRenderer.dispose()
     }
