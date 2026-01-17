@@ -51,6 +51,11 @@ class GameRenderer(
         camera.update()
     }
 
+    fun setCameraFar(distance: Float) {
+        camera.far = distance + 50f  // Add buffer beyond render distance
+        camera.update()
+    }
+
     fun render() {
         // Clear screen with sky color
         Gdx.gl.glClearColor(skyR, skyG, skyB, 1f)

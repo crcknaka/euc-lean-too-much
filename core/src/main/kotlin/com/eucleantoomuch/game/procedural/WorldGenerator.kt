@@ -17,6 +17,9 @@ class WorldGenerator(
     private val difficultyScaler = DifficultyScaler()
     private val activeChunks = mutableMapOf<Int, MutableList<Entity>>()
 
+    // Configurable render distance
+    private var renderDistance = Constants.RENDER_DISTANCE
+
     private var groundModel = models.createGroundChunkModel(Constants.CHUNK_LENGTH)
     private var manholeModel = models.createManholeModel()
     private var puddleModel = models.createPuddleModel()
@@ -43,11 +46,15 @@ class WorldGenerator(
         }
     }
 
+    fun setRenderDistance(distance: Float) {
+        renderDistance = distance
+    }
+
     fun update(playerZ: Float, totalDistance: Float) {
         val currentChunk = (playerZ / Constants.CHUNK_LENGTH).toInt()
         // Start from behind the camera (which is at -8 from player), add extra buffer
         val startChunk = ((playerZ - 50f) / Constants.CHUNK_LENGTH).toInt()
-        val endChunk = ((playerZ + Constants.RENDER_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
+        val endChunk = ((playerZ + renderDistance) / Constants.CHUNK_LENGTH).toInt()
 
         // Generate new chunks
         for (chunkIndex in startChunk..endChunk) {

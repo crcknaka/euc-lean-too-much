@@ -23,10 +23,12 @@ import com.eucleantoomuch.game.state.GameSession
 import com.eucleantoomuch.game.state.GameState
 import com.eucleantoomuch.game.state.GameStateManager
 import com.eucleantoomuch.game.state.HighScoreManager
+import com.eucleantoomuch.game.state.SettingsManager
 import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
 import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
+import com.eucleantoomuch.game.ui.SettingsRenderer
 
 class EucGame : ApplicationAdapter() {
     private lateinit var engine: Engine
@@ -38,12 +40,14 @@ class EucGame : ApplicationAdapter() {
     private lateinit var entityFactory: EntityFactory
     private lateinit var stateManager: GameStateManager
     private lateinit var highScoreManager: HighScoreManager
+    private lateinit var settingsManager: SettingsManager
 
     // UI Renderers
     private lateinit var hud: Hud
     private lateinit var menuRenderer: MenuRenderer
     private lateinit var gameOverRenderer: GameOverRenderer
     private lateinit var calibrationRenderer: CalibrationRenderer
+    private lateinit var settingsRenderer: SettingsRenderer
 
     // Game state
     private var session = GameSession()
@@ -64,6 +68,7 @@ class EucGame : ApplicationAdapter() {
         // Initialize state manager
         stateManager = GameStateManager()
         highScoreManager = HighScoreManager()
+        settingsManager = SettingsManager()
 
         // Initialize input based on platform
         accelerometerInput = AccelerometerInput()
@@ -119,9 +124,19 @@ class EucGame : ApplicationAdapter() {
         menuRenderer = MenuRenderer()
         gameOverRenderer = GameOverRenderer()
         calibrationRenderer = CalibrationRenderer()
+        settingsRenderer = SettingsRenderer(settingsManager)
+
+        // Apply saved render distance setting
+        applyRenderDistance()
 
         // Start at menu
         stateManager.transition(GameState.Menu)
+    }
+
+    private fun applyRenderDistance() {
+        val distance = settingsManager.renderDistance
+        worldGenerator.setRenderDistance(distance)
+        renderer.setCameraFar(distance)
     }
 
     override fun render() {
@@ -133,6 +148,7 @@ class EucGame : ApplicationAdapter() {
         when (val state = stateManager.current()) {
             is GameState.Loading -> renderLoading()
             is GameState.Menu -> renderMenu()
+            is GameState.Settings -> renderSettings()
             is GameState.Calibrating -> renderCalibration()
             is GameState.Countdown -> renderCountdown(delta)
             is GameState.Playing -> renderPlaying(delta)
@@ -176,7 +192,27 @@ class EucGame : ApplicationAdapter() {
             MenuRenderer.ButtonClicked.CALIBRATE -> {
                 stateManager.transition(GameState.Calibrating)
             }
+            MenuRenderer.ButtonClicked.SETTINGS -> {
+                stateManager.transition(GameState.Settings)
+            }
+            MenuRenderer.ButtonClicked.EXIT -> {
+                Gdx.app.exit()
+            }
             MenuRenderer.ButtonClicked.NONE -> {}
+        }
+    }
+
+    private fun renderSettings() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        when (settingsRenderer.render()) {
+            SettingsRenderer.Action.BACK -> {
+                // Apply render distance to world generator and camera
+                applyRenderDistance()
+                stateManager.transition(GameState.Menu)
+            }
+            SettingsRenderer.Action.NONE -> {}
         }
     }
 
@@ -419,6 +455,7 @@ class EucGame : ApplicationAdapter() {
         menuRenderer.resize(width, height)
         gameOverRenderer.resize(width, height)
         calibrationRenderer.resize(width, height)
+        settingsRenderer.resize(width, height)
     }
 
     override fun dispose() {
@@ -428,5 +465,6 @@ class EucGame : ApplicationAdapter() {
         menuRenderer.dispose()
         gameOverRenderer.dispose()
         calibrationRenderer.dispose()
+        settingsRenderer.dispose()
     }
 }

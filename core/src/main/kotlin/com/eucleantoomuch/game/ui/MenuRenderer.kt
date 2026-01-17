@@ -13,10 +13,14 @@ class MenuRenderer : Disposable {
 
     private val playButton = Rectangle()
     private val calibrateButton = Rectangle()
+    private val settingsButton = Rectangle()
+    private val exitButton = Rectangle()
 
     // Animation states
     private var playButtonHover = 0f
     private var calibrateButtonHover = 0f
+    private var settingsButtonHover = 0f
+    private var exitButtonHover = 0f
     private var titlePulse = 0f
     private var enterAnimProgress = 0f
 
@@ -40,7 +44,7 @@ class MenuRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, PLAY, CALIBRATE
+        NONE, PLAY, CALIBRATE, SETTINGS, EXIT
     }
 
     fun render(highScore: Int, maxDistance: Float): ButtonClicked {
@@ -64,9 +68,13 @@ class MenuRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         val playHovered = playButton.contains(touchX, touchY)
         val calibrateHovered = calibrateButton.contains(touchX, touchY)
+        val settingsHovered = settingsButton.contains(touchX, touchY)
+        val exitHovered = exitButton.contains(touchX, touchY)
 
         playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 8f)
         calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 8f)
+        settingsButtonHover = UITheme.Anim.ease(settingsButtonHover, if (settingsHovered) 1f else 0f, 8f)
+        exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 8f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -117,15 +125,25 @@ class MenuRenderer : Disposable {
         val scale = UITheme.Dimensions.scale()
         val buttonWidth = 420f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeight
-        val buttonSpacing = 24f * scale
+        val smallButtonWidth = 200f * scale
+        val smallButtonHeight = UITheme.Dimensions.buttonHeightSmall
+        val buttonSpacing = 20f * scale
 
-        val buttonsStartY = centerY
+        val buttonsStartY = centerY + 30f * scale
         playButton.set(centerX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
         calibrateButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
+
+        // Settings and Exit buttons side by side
+        val smallButtonsY = buttonsStartY - buttonHeight * 2 - buttonSpacing * 2.5f
+        val smallButtonSpacing = 20f * scale
+        settingsButton.set(centerX - smallButtonWidth - smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        exitButton.set(centerX + smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
 
         // Apply enter animation
         val playY = playButton.y - (1 - enterAnimProgress) * 100
         val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 150
+        val settingsY = settingsButton.y - (1 - enterAnimProgress) * 200
+        val exitY = exitButton.y - (1 - enterAnimProgress) * 200
 
         // Play button with glow
         val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
@@ -134,6 +152,14 @@ class MenuRenderer : Disposable {
         // Calibrate button
         val calibrateRect = Rectangle(calibrateButton.x, calibrateY, calibrateButton.width, calibrateButton.height)
         ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.5f)
+
+        // Settings button
+        val settingsRect = Rectangle(settingsButton.x, settingsY, settingsButton.width, settingsButton.height)
+        ui.button(settingsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = settingsButtonHover * 0.3f)
+
+        // Exit button
+        val exitRect = Rectangle(exitButton.x, exitY, exitButton.width, exitButton.height)
+        ui.button(exitRect, UITheme.danger, pressedOffset = 0f, glowIntensity = exitButtonHover * 0.5f)
 
         // Stats panel at bottom
         val statsHeight = 90f * scale
@@ -163,6 +189,8 @@ class MenuRenderer : Disposable {
         // Button labels
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
         ui.textCentered("CALIBRATE", calibrateRect.x + calibrateRect.width / 2, calibrateRect.y + calibrateRect.height / 2, UIFonts.button, UITheme.textPrimary)
+        ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.body, UITheme.textPrimary)
+        ui.textCentered("EXIT", exitRect.x + exitRect.width / 2, exitRect.y + exitRect.height / 2, UIFonts.body, UITheme.textPrimary)
 
         // Stats
         val statsLabelY = 80f * scale
@@ -202,6 +230,12 @@ class MenuRenderer : Disposable {
             if (calibrateButton.contains(touchX, touchY)) {
                 return ButtonClicked.CALIBRATE
             }
+            if (settingsButton.contains(touchX, touchY)) {
+                return ButtonClicked.SETTINGS
+            }
+            if (exitButton.contains(touchX, touchY)) {
+                return ButtonClicked.EXIT
+            }
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
@@ -209,6 +243,12 @@ class MenuRenderer : Disposable {
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.C)) {
             return ButtonClicked.CALIBRATE
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+            return ButtonClicked.SETTINGS
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            return ButtonClicked.EXIT
         }
 
         return ButtonClicked.NONE
