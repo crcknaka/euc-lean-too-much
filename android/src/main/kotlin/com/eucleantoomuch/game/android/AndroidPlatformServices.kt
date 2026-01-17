@@ -10,7 +10,11 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import com.eucleantoomuch.game.platform.PlatformServices
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 /**
  * Android implementation of platform services for vibration and beep sounds.
@@ -28,6 +32,17 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     // Audio track for beep generation
     private var audioTrack: AudioTrack? = null
     private val sampleRate = 44100
+
+    // === Motor Sound Synthesis ===
+    private var motorSoundThread: Thread? = null
+    private var motorAudioTrack: AudioTrack? = null
+    private val isMotorPlaying = AtomicBoolean(false)
+
+    // Motor sound parameters (updated from game thread, read by audio thread)
+    @Volatile private var motorSpeed: Float = 0f      // m/s
+    @Volatile private var motorPwm: Float = 0f        // 0-1.5
+    @Volatile private var motorAccel: Float = 0f      // m/s²
+    @Volatile private var avasMode: Int = 1           // 1 = electric, 2 = motorcycle
 
     override fun vibrate(durationMs: Long, amplitude: Int) {
         if (!hasVibrator()) return
@@ -125,5 +140,265 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
     override fun cancelVibration() {
         vibrator.cancel()
+    }
+
+    // === Motor/Tire Sound Implementation ===
+
+    override fun startMotorSound(mode: Int) {
+        if (isMotorPlaying.get()) return
+        if (mode == 0) return  // AVAS off
+
+        avasMode = mode
+        isMotorPlaying.set(true)
+        motorSoundThread = Thread {
+            runMotorSoundLoop()
+        }.apply {
+            priority = Thread.MAX_PRIORITY
+            start()
+        }
+    }
+
+    override fun stopMotorSound() {
+        isMotorPlaying.set(false)
+        motorSoundThread?.join(500)
+        motorSoundThread = null
+    }
+
+    override fun updateMotorSound(speed: Float, pwm: Float, acceleration: Float) {
+        motorSpeed = speed
+        motorPwm = pwm
+        motorAccel = acceleration
+    }
+
+    override fun isMotorSoundPlaying(): Boolean = isMotorPlaying.get()
+
+    /**
+     * Main audio synthesis loop running on dedicated thread.
+     * Generates real-time motor + tire sound based on current parameters.
+     */
+    private fun runMotorSoundLoop() {
+        try {
+            val bufferSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+            // Use larger buffer for smoother playback
+            val actualBufferSize = maxOf(bufferSize, sampleRate / 10) // At least 100ms buffer
+
+            val track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(actualBufferSize * 2)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                AudioTrack(
+                    AudioManager.STREAM_MUSIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    actualBufferSize * 2,
+                    AudioTrack.MODE_STREAM
+                )
+            }
+
+            motorAudioTrack = track
+            track.play()
+
+            // Audio generation state
+            var motorPhase = 0.0
+            var motor2Phase = 0.0
+            var motor3Phase = 0.0
+            var tirePhase = 0.0
+            var lastFilteredNoise = 0f
+
+            // Generate audio in chunks
+            val chunkSize = sampleRate / 60  // ~16ms chunks (60 FPS equivalent)
+            val samples = ShortArray(chunkSize)
+
+            while (isMotorPlaying.get()) {
+                // Snapshot current parameters
+                val speed = motorSpeed
+                val pwm = motorPwm
+                val mode = avasMode
+
+                // Calculate sound parameters from physics
+                val speedNorm = (speed / 24f).coerceIn(0f, 1f)  // Normalize to 0-1
+
+                // Mode-dependent parameters
+                val isElectric = (mode == 1)
+                val isV8 = (mode == 3)
+
+                // === BASE FREQUENCY ===
+                val motorBaseFreq = when {
+                    isElectric -> {
+                        // Electric: 120 Hz at idle, up to 600 Hz at max speed (higher pitch whine)
+                        120.0 + speedNorm * 480.0
+                    }
+                    isV8 -> {
+                        // V8: Lower rumble, 35 Hz idle (idle burble), up to 180 Hz at max
+                        // V8 fires 4 times per revolution, so lower fundamental
+                        35.0 + speedNorm * 145.0
+                    }
+                    else -> {
+                        // Motorcycle: 80 Hz at idle, up to 400 Hz at max speed
+                        80.0 + speedNorm * 320.0
+                    }
+                }
+
+                // === VOLUME ===
+                val baseVolume = when {
+                    isElectric -> 0.08f
+                    isV8 -> 0.2f  // V8 is loud
+                    else -> 0.15f
+                }
+                val speedVolume = when {
+                    isElectric -> 0.25f
+                    isV8 -> 0.35f
+                    else -> 0.4f
+                }
+                val pwmVolume = when {
+                    isElectric -> 0.1f
+                    isV8 -> 0.15f
+                    else -> 0.2f
+                }
+                val motorVolume = (baseVolume + speedNorm * speedVolume + pwm * pwmVolume).coerceIn(0f, 0.8f)
+
+                // === HARMONICS ===
+                val harmonic2Freq = motorBaseFreq * 2.0
+                val harmonic3Freq = motorBaseFreq * 3.0
+                val harmonic4Freq = motorBaseFreq * 4.0  // Extra for V8
+                val harmonic5Freq = motorBaseFreq * 5.0  // Extra for V8
+
+                val harmonic2Vol = when {
+                    isElectric -> motorVolume * 0.1f
+                    isV8 -> motorVolume * 0.5f  // V8 has strong 2nd harmonic
+                    else -> motorVolume * 0.3f
+                }
+                val harmonic3Vol = when {
+                    isElectric -> motorVolume * 0.05f * (0.5f + pwm * 0.3f)
+                    isV8 -> motorVolume * 0.35f  // V8 rich harmonics
+                    else -> motorVolume * 0.15f * (0.5f + pwm * 0.5f)
+                }
+                // V8 specific harmonics for that characteristic growl
+                val harmonic4Vol = if (isV8) motorVolume * 0.25f else 0f
+                val harmonic5Vol = if (isV8) motorVolume * 0.15f else 0f
+
+                // === PWM STRAIN / ACCELERATION SOUND ===
+                val strainVol = when {
+                    isElectric -> (pwm - 0.6f).coerceIn(0f, 0.4f) * 0.15f
+                    isV8 -> (pwm - 0.4f).coerceIn(0f, 0.6f) * 0.2f  // V8 growls under load
+                    else -> (pwm - 0.5f).coerceIn(0f, 0.5f) * 0.4f
+                }
+
+                // === TIRE/EXHAUST NOISE ===
+                val tireVolume = when {
+                    isElectric -> 0f  // No tire noise for electric
+                    isV8 -> speedNorm * 0.25f + 0.1f  // V8 exhaust rumble always present
+                    else -> speedNorm * 0.35f
+                }
+                val tireFreq = if (isV8) {
+                    20.0 + speedNorm * 40.0  // Lower frequency exhaust rumble for V8
+                } else {
+                    30.0 + speedNorm * 70.0  // 30-100 Hz rumble
+                }
+
+                // Generate samples
+                for (i in 0 until chunkSize) {
+                    // Motor fundamental
+                    val motor1 = sin(motorPhase) * motorVolume
+
+                    // Harmonics
+                    val motor2 = sin(motor2Phase) * harmonic2Vol
+                    val motor3 = sin(motor3Phase) * harmonic3Vol
+
+                    // V8 extra harmonics for rich sound
+                    val motor4 = if (isV8) sin(motorPhase * 4.0) * harmonic4Vol else 0.0
+                    val motor5 = if (isV8) sin(motorPhase * 5.0) * harmonic5Vol else 0.0
+
+                    // PWM strain / V8 growl
+                    val strain = if (strainVol > 0.01f) {
+                        if (isV8) {
+                            // V8 growl: lower frequency modulation
+                            sin(motorPhase * 0.5 + pwm) * strainVol + sin(motorPhase * 1.5) * strainVol * 0.5
+                        } else {
+                            sin(motorPhase * 1.5 + pwm) * strainVol
+                        }
+                    } else 0.0
+
+                    // Tire/exhaust noise
+                    val rawNoise = Random.nextFloat() * 2f - 1f
+                    lastFilteredNoise = lastFilteredNoise * 0.85f + rawNoise * 0.15f
+                    val tireNoise = lastFilteredNoise * tireVolume
+                    val tireMod = sin(tirePhase) * 0.3 + 0.7
+                    val tire = tireNoise * tireMod
+
+                    // Mix all components
+                    val mixed = (motor1 + motor2 + motor3 + motor4 + motor5 + strain + tire).toFloat()
+
+                    // Soft clip to prevent harsh distortion
+                    val clipped = softClip(mixed)
+
+                    // Convert to 16-bit PCM
+                    val masterVolume = when {
+                        isElectric -> 0.5f
+                        isV8 -> 0.7f  // V8 is louder
+                        else -> 0.6f
+                    }
+                    samples[i] = (clipped * Short.MAX_VALUE * masterVolume).toInt().coerceIn(-32768, 32767).toShort()
+
+                    // Advance phases
+                    val phaseStep = 2.0 * Math.PI / sampleRate
+                    motorPhase += motorBaseFreq * phaseStep
+                    motor2Phase += harmonic2Freq * phaseStep
+                    motor3Phase += harmonic3Freq * phaseStep
+                    tirePhase += tireFreq * phaseStep
+
+                    // Keep phases in range to prevent precision loss
+                    if (motorPhase > 2.0 * Math.PI) motorPhase -= 2.0 * Math.PI
+                    if (motor2Phase > 2.0 * Math.PI) motor2Phase -= 2.0 * Math.PI
+                    if (motor3Phase > 2.0 * Math.PI) motor3Phase -= 2.0 * Math.PI
+                    if (tirePhase > 2.0 * Math.PI) tirePhase -= 2.0 * Math.PI
+                }
+
+                // Write to audio track (blocking call)
+                track.write(samples, 0, chunkSize)
+            }
+
+            // Cleanup
+            track.stop()
+            track.release()
+            motorAudioTrack = null
+
+        } catch (e: Exception) {
+            // Audio errors are not critical
+            isMotorPlaying.set(false)
+        }
+    }
+
+    /**
+     * Soft clipping function to prevent harsh digital distortion.
+     * Uses tanh-like curve for smooth saturation.
+     */
+    private fun softClip(x: Float): Float {
+        return when {
+            x > 1f -> 1f - 1f / (1f + x)
+            x < -1f -> -1f + 1f / (1f - x)
+            else -> x
+        }
     }
 }

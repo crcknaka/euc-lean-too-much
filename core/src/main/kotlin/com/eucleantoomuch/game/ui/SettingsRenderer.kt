@@ -18,6 +18,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val renderDistanceRightButton = Rectangle()
     private val fpsCheckbox = Rectangle()
     private val beepsCheckbox = Rectangle()
+    private val avasLeftButton = Rectangle()
+    private val avasRightButton = Rectangle()
     private val pwmWarningLeftButton = Rectangle()
     private val pwmWarningRightButton = Rectangle()
 
@@ -26,6 +28,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private var rightButtonHover = 0f
     private var fpsCheckboxHover = 0f
     private var beepsCheckboxHover = 0f
+    private var avasLeftButtonHover = 0f
+    private var avasRightButtonHover = 0f
     private var pwmLeftButtonHover = 0f
     private var pwmRightButtonHover = 0f
     private var enterAnimProgress = 0f
@@ -55,6 +59,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val rightHovered = renderDistanceRightButton.contains(touchX, touchY)
         val fpsHovered = fpsCheckbox.contains(touchX, touchY)
         val beepsHovered = beepsCheckbox.contains(touchX, touchY)
+        val avasLeftHovered = avasLeftButton.contains(touchX, touchY)
+        val avasRightHovered = avasRightButton.contains(touchX, touchY)
         val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
         val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
 
@@ -63,6 +69,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 10f)
         fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 10f)
         beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
+        avasLeftButtonHover = UITheme.Anim.ease(avasLeftButtonHover, if (avasLeftHovered) 1f else 0f, 10f)
+        avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
         pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 10f)
         pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
 
@@ -82,7 +90,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Main settings panel
         val panelWidth = 780f * scale * enterAnimProgress
-        val panelHeight = 650f * scale * enterAnimProgress
+        val panelHeight = 730f * scale * enterAnimProgress  // Increased for motor sound checkbox
         val panelX = centerX - panelWidth / 2
         val panelY = sh / 2 - panelHeight / 2 + 40f * scale
 
@@ -156,8 +164,38 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             shadowOffset = 0f
         )
 
+        // === AVAS Setting (selector with arrows) ===
+        val avasSettingY = pwmSettingY - 130f * scale
+
+        avasLeftButton.set(
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
+            avasSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(avasLeftButton, UITheme.secondary, glowIntensity = avasLeftButtonHover * 0.6f)
+
+        avasRightButton.set(
+            centerX + valueBoxWidth / 2 + 16f * scale,
+            avasSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(avasRightButton, UITheme.secondary, glowIntensity = avasRightButtonHover * 0.6f)
+
+        // AVAS Value box
+        ui.panel(
+            centerX - valueBoxWidth / 2,
+            avasSettingY - 40f * scale,
+            valueBoxWidth,
+            80f * scale,
+            radius = 14f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
+        )
+
         // === Beeps Checkbox ===
-        val beepsSettingY = pwmSettingY - 110f * scale
+        val beepsSettingY = avasSettingY - 100f * scale
         val checkboxX = centerX - 160f * scale
 
         beepsCheckbox.set(checkboxX, beepsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
@@ -184,7 +222,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         }
 
         // === FPS Checkbox ===
-        val fpsSettingY = beepsSettingY - 80f * scale
+        val fpsSettingY = beepsSettingY - 100f * scale
 
         fpsCheckbox.set(checkboxX, fpsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
 
@@ -264,6 +302,25 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val pwmCurrentName = settingsManager.getPwmWarningName()
         ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, UITheme.accent)
 
+        // AVAS label
+        val avasLabelY = avasSettingY + 70f * scale
+        ui.textCentered("AVAS", centerX, avasLabelY, UIFonts.body, UITheme.textSecondary)
+
+        // AVAS Arrow symbols
+        ui.textCentered("<",
+            avasLeftButton.x + avasLeftButton.width / 2,
+            avasLeftButton.y + avasLeftButton.height / 2,
+            UIFonts.heading, UITheme.textPrimary)
+
+        ui.textCentered(">",
+            avasRightButton.x + avasRightButton.width / 2,
+            avasRightButton.y + avasRightButton.height / 2,
+            UIFonts.heading, UITheme.textPrimary)
+
+        // AVAS Current value
+        val avasCurrentName = settingsManager.getAvasModeName()
+        ui.textCentered(avasCurrentName, centerX, avasSettingY, UIFonts.body, UITheme.accent)
+
         // Beeps Checkbox label
         UIFonts.body.color = UITheme.textPrimary
         UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + beepsCheckbox.width + 24f * scale,
@@ -303,6 +360,15 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             }
             if (beepsCheckbox.contains(touchX, touchY)) {
                 settingsManager.beepsEnabled = !settingsManager.beepsEnabled
+            }
+            val avasCurrentIndex = settingsManager.getAvasModeIndex()
+            if (avasLeftButton.contains(touchX, touchY)) {
+                val newIndex = (avasCurrentIndex - 1).coerceAtLeast(0)
+                settingsManager.setAvasModeByIndex(newIndex)
+            }
+            if (avasRightButton.contains(touchX, touchY)) {
+                val newIndex = (avasCurrentIndex + 1).coerceAtMost(SettingsManager.AVAS_OPTIONS.size - 1)
+                settingsManager.setAvasModeByIndex(newIndex)
             }
             if (pwmWarningLeftButton.contains(touchX, touchY)) {
                 val newIndex = (pwmCurrentIndex - 1).coerceAtLeast(0)

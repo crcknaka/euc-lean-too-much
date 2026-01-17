@@ -28,6 +28,33 @@ interface PlatformServices {
      * Stop any ongoing vibration.
      */
     fun cancelVibration()
+
+    // === Motor/Tire Sound Synthesis (AVAS) ===
+
+    /**
+     * Start continuous motor and tire sound synthesis.
+     * Call updateMotorSound() each frame to modulate parameters.
+     * @param mode AVAS mode: 0 = off, 1 = electric (quiet), 2 = motorcycle (loud)
+     */
+    fun startMotorSound(mode: Int)
+
+    /**
+     * Stop motor and tire sounds.
+     */
+    fun stopMotorSound()
+
+    /**
+     * Update motor sound parameters based on current physics state.
+     * @param speed current speed in m/s (0 to ~24)
+     * @param pwm motor load 0-1.5 (higher = more strain sound)
+     * @param acceleration rate of speed change (for motor strain)
+     */
+    fun updateMotorSound(speed: Float, pwm: Float, acceleration: Float)
+
+    /**
+     * Check if motor sound is currently playing.
+     */
+    fun isMotorSoundPlaying(): Boolean
 }
 
 /**
@@ -47,4 +74,18 @@ class DefaultPlatformServices : PlatformServices {
     override fun cancelVibration() {
         // No-op
     }
+
+    override fun startMotorSound(mode: Int) {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun stopMotorSound() {
+        // No-op
+    }
+
+    override fun updateMotorSound(speed: Float, pwm: Float, acceleration: Float) {
+        // No-op
+    }
+
+    override fun isMotorSoundPlaying(): Boolean = false
 }

@@ -13,6 +13,7 @@ import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
+import com.eucleantoomuch.game.feedback.MotorSoundManager
 import com.eucleantoomuch.game.feedback.SpeedWarningManager
 import com.eucleantoomuch.game.input.AccelerometerInput
 import com.eucleantoomuch.game.input.GameInput
@@ -71,6 +72,9 @@ class EucGame(
 
     // Speed warning system (beeps and vibration at high speed)
     private lateinit var speedWarningManager: SpeedWarningManager
+
+    // Motor sound synthesis
+    private lateinit var motorSoundManager: MotorSoundManager
 
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
@@ -144,6 +148,10 @@ class EucGame(
         speedWarningManager = SpeedWarningManager(platformServices)
         applyPwmWarningThreshold()
 
+        // Initialize motor sound manager
+        motorSoundManager = MotorSoundManager(platformServices)
+        applyAvasSetting()
+
         // Start at menu
         stateManager.transition(GameState.Menu)
     }
@@ -158,6 +166,10 @@ class EucGame(
         // Convert percentage (0, 60, 70, 80, 90) to float (0, 0.6, 0.7, 0.8, 0.9)
         speedWarningManager.pwmWarningThreshold = settingsManager.pwmWarning / 100f
         speedWarningManager.beepsEnabled = settingsManager.beepsEnabled
+    }
+
+    private fun applyAvasSetting() {
+        motorSoundManager.avasMode = settingsManager.avasMode
     }
 
     override fun render() {
@@ -230,6 +242,7 @@ class EucGame(
                 // Apply settings
                 applyRenderDistance()
                 applyPwmWarningThreshold()
+                applyAvasSetting()
                 // Return to previous state (Menu or Paused)
                 val settingsState = stateManager.current() as GameState.Settings
                 stateManager.transition(settingsState.returnTo)
@@ -293,6 +306,8 @@ class EucGame(
 
         countdownTimer -= delta
         if (countdownTimer <= 0) {
+            // Start motor sound when gameplay begins
+            motorSoundManager.start()
             stateManager.transition(GameState.Playing(session))
         }
     }
@@ -365,6 +380,9 @@ class EucGame(
 
             // Update PWM warning system (beeps when PWM exceeds threshold)
             speedWarningManager.update(eucComponent.pwm, delta)
+
+            // Update motor sound (pitch/volume based on speed and PWM)
+            motorSoundManager.update(eucComponent.speed, eucComponent.pwm, delta)
         }
 
         // Render
@@ -379,6 +397,8 @@ class EucGame(
     private fun renderPaused() {
         // Stop speed warnings when paused
         speedWarningManager.stop()
+        // Stop motor sound when paused
+        motorSoundManager.stop()
 
         // Render frozen game state
         renderer.render()
@@ -387,6 +407,8 @@ class EucGame(
         when (pauseRenderer.render()) {
             PauseRenderer.ButtonClicked.RESUME -> {
                 val pausedState = stateManager.current() as GameState.Paused
+                // Resume motor sound
+                motorSoundManager.start()
                 stateManager.transition(GameState.Playing(pausedState.session))
             }
             PauseRenderer.ButtonClicked.RESTART -> {
@@ -538,6 +560,8 @@ class EucGame(
     private fun handlePlayerFall() {
         // Stop speed warnings
         speedWarningManager.stop()
+        // Stop motor sound
+        motorSoundManager.stop()
 
         // Record score
         isNewHighScore = highScoreManager.recordGame(session)
