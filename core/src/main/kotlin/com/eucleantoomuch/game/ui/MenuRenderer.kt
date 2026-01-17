@@ -98,7 +98,7 @@ class MenuRenderer : Disposable {
 
         // Animated particles
         particles.forEach { p ->
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, p.alpha * enterAnimProgress)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, p.alpha * enterAnimProgress)
             ui.shapes.circle(p.x * sw, p.y * sh, p.size * scale)
         }
 
@@ -158,7 +158,7 @@ class MenuRenderer : Disposable {
 
         // Draw buttons with modern style
         val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
-        ui.button(playRect, UITheme.primary, pressedOffset = 0f, glowIntensity = playButtonHover * 0.9f)
+        ui.button(playRect, UITheme.accent, pressedOffset = 0f, glowIntensity = playButtonHover * 0.9f)
 
         val calibrateRect = Rectangle(calibrateButton.x, calibrateY, calibrateButton.width, calibrateButton.height)
         ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.6f)
@@ -175,7 +175,7 @@ class MenuRenderer : Disposable {
             backgroundColor = UITheme.withAlpha(UITheme.surface, 0.95f))
 
         // Accent line at top of stats panel
-        ui.shapes.color = UITheme.primary
+        ui.shapes.color = UITheme.accent
         ui.shapes.rect(0f, statsHeight - 4f, sw, 4f)
 
         ui.endShapes()
@@ -192,7 +192,7 @@ class MenuRenderer : Disposable {
 
         // Subtitle with glow effect
         val subtitleY = titleY - 90f * scale
-        ui.textCentered("LEAN TOO MUCH", centerX, subtitleY, UIFonts.heading, UITheme.primary)
+        ui.textCentered("LEAN TOO MUCH", centerX, subtitleY, UIFonts.heading, UITheme.accent)
 
         // Button labels with larger text
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)

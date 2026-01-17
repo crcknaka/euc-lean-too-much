@@ -82,7 +82,7 @@ class GameOverRenderer : Disposable {
         // Main panel
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             backgroundColor = UITheme.surface,
-            borderColor = if (isNewHighScore) UITheme.accent else UITheme.primary)
+            borderColor = if (isNewHighScore) UITheme.accent else UITheme.surfaceBorder)
 
         // Button layout - side by side at bottom (lower position)
         val buttonWidth = 220f * scale
@@ -95,7 +95,7 @@ class GameOverRenderer : Disposable {
         menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
 
         // Buttons with modern style
-        ui.button(retryButton, UITheme.primary, glowIntensity = retryHover * 0.7f)
+        ui.button(retryButton, UITheme.accent, glowIntensity = retryHover * 0.7f)
         ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)
 
         ui.endShapes()

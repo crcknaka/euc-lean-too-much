@@ -202,12 +202,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Checkbox background with glow on hover
         if (beepsCheckboxHover > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, beepsCheckboxHover * 0.25f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, beepsCheckboxHover * 0.25f)
             ui.roundedRect(beepsCheckbox.x - 5f, beepsCheckbox.y - 5f,
                 beepsCheckbox.width + 10f, beepsCheckbox.height + 10f, 14f * scale, ui.shapes.color)
         }
 
-        val beepsCheckboxColor = if (settingsManager.beepsEnabled) UITheme.primary else UITheme.surfaceLight
+        val beepsCheckboxColor = if (settingsManager.beepsEnabled) UITheme.accent else UITheme.surfaceLight
         ui.roundedRect(beepsCheckbox.x, beepsCheckbox.y, beepsCheckbox.width, beepsCheckbox.height,
             12f * scale, beepsCheckboxColor)
 
@@ -228,12 +228,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Checkbox background with glow on hover
         if (fpsCheckboxHover > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, fpsCheckboxHover * 0.25f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, fpsCheckboxHover * 0.25f)
             ui.roundedRect(fpsCheckbox.x - 5f, fpsCheckbox.y - 5f,
                 fpsCheckbox.width + 10f, fpsCheckbox.height + 10f, 14f * scale, ui.shapes.color)
         }
 
-        val fpsCheckboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
+        val fpsCheckboxColor = if (settingsManager.showFps) UITheme.accent else UITheme.surfaceLight
         ui.roundedRect(fpsCheckbox.x, fpsCheckbox.y, fpsCheckbox.width, fpsCheckbox.height,
             12f * scale, fpsCheckboxColor)
 
@@ -251,7 +251,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val buttonWidth = 340f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
         backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 36f * scale, buttonWidth, buttonHeight)
-        ui.button(backButton, UITheme.primary, glowIntensity = backButtonHover * 0.8f)
+        ui.button(backButton, UITheme.accent, glowIntensity = backButtonHover * 0.8f)
 
         ui.endShapes()
 

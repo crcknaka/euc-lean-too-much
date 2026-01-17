@@ -64,10 +64,10 @@ class PauseRenderer : Disposable {
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
-        // Main panel with primary color accent border
+        // Main panel with accent color border
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             backgroundColor = UITheme.surface,
-            borderColor = UITheme.primary)
+            borderColor = UITheme.accent)
 
         // Button layout - vertical stack with generous spacing
         val buttonWidth = 340f * scale
@@ -84,7 +84,7 @@ class PauseRenderer : Disposable {
         menuButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 3, buttonWidth, buttonHeight)
 
         // Buttons with modern styling
-        ui.button(resumeButton, UITheme.primary, glowIntensity = resumeHover * 0.7f)
+        ui.button(resumeButton, UITheme.accent, glowIntensity = resumeHover * 0.7f)
         ui.button(restartButton, UITheme.secondary, glowIntensity = restartHover * 0.6f)
         ui.button(settingsButton, UITheme.surfaceLight, glowIntensity = settingsHover * 0.4f)
         ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)

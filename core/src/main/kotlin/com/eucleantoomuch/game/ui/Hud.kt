@@ -131,7 +131,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         if (settingsManager.showFps) {
             val fps = Gdx.graphics.framesPerSecond
             val fpsColor = when {
-                fps >= 55 -> UITheme.primary
+                fps >= 55 -> UITheme.accent
                 fps >= 30 -> UITheme.warning
                 else -> UITheme.danger
             }
@@ -278,8 +278,8 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.18f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.72f)
 
-        // Safe zone (green center)
-        ui.shapes.color = UITheme.withAlpha(UITheme.primary, 0.22f)
+        // Safe zone (accent center)
+        ui.shapes.color = UITheme.withAlpha(UITheme.accent, 0.22f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.45f)
 
         // Grid lines
@@ -322,9 +322,50 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     }
 
     private fun drawWarningBadge(text: String, color: Color, y: Float) {
-        val pulse = UITheme.Anim.pulse(4f, 0.8f, 1f)
+        val scale = UITheme.Dimensions.scale()
+        val centerX = ui.screenWidth / 2
+        val pulse = UITheme.Anim.pulse(4f, 0.85f, 1f)
+        val glowPulse = UITheme.Anim.pulse(3f, 0.4f, 0.8f)
+
+        // Measure text width for badge sizing
+        ui.layout.setText(UIFonts.heading, text)
+        val textWidth = ui.layout.width
+        val textHeight = ui.layout.height
+
+        val badgeWidth = textWidth + 60f * scale
+        val badgeHeight = textHeight + 30f * scale
+        val badgeX = centerX - badgeWidth / 2
+        val badgeY = y - badgeHeight / 2
+
+        // End batch temporarily for shapes
+        ui.endBatch()
+        ui.beginShapes()
+
+        // Outer glow
+        for (i in 3 downTo 1) {
+            ui.shapes.color = UITheme.withAlpha(color, glowPulse * 0.1f * i)
+            ui.roundedRect(badgeX - i * 6f, badgeY - i * 6f,
+                badgeWidth + i * 12f, badgeHeight + i * 12f, 20f * scale, ui.shapes.color)
+        }
+
+        // Badge background
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.92f)
+        ui.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 16f * scale, ui.shapes.color)
+
+        // Accent border
+        val borderThickness = 3f * scale
+        ui.shapes.color = UITheme.withAlpha(color, pulse)
+        // Top border
+        ui.shapes.rect(badgeX + 16f * scale, badgeY + badgeHeight - borderThickness, badgeWidth - 32f * scale, borderThickness)
+        // Bottom border
+        ui.shapes.rect(badgeX + 16f * scale, badgeY, badgeWidth - 32f * scale, borderThickness)
+
+        ui.endShapes()
+        ui.beginBatch()
+
+        // Warning text with pulse
         UIFonts.heading.color = UITheme.withAlpha(color, pulse)
-        ui.textCentered(text, ui.screenWidth / 2, y, UIFonts.heading, UIFonts.heading.color)
+        ui.textCentered(text, centerX, y, UIFonts.heading, UIFonts.heading.color)
     }
 
     fun renderCountdown(seconds: Int) {
@@ -334,24 +375,78 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val sw = ui.screenWidth
         val sh = ui.screenHeight
         val scale = UITheme.Dimensions.scale()
+        val centerX = sw / 2
+        val centerY = sh / 2
+
+        // Pulsing animation
+        val pulse = UITheme.Anim.pulse(3f, 0.85f, 1f)
+        val glowPulse = UITheme.Anim.pulse(4f, 0.3f, 0.7f)
 
         ui.beginShapes()
 
-        // Dark circle background - larger
-        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.92f)
-        ui.shapes.circle(sw / 2, sh / 2, 100f * scale)
+        // Outer glow ring
+        val mainColor = if (seconds > 0) UITheme.accent else UITheme.accent
+        for (i in 4 downTo 1) {
+            ui.shapes.color = UITheme.withAlpha(mainColor, glowPulse * 0.08f * i)
+            ui.shapes.circle(centerX, centerY, (110f + i * 8f) * scale)
+        }
 
-        // Ring
-        val ringColor = if (seconds > 0) UITheme.warning else UITheme.primary
-        ui.gauge(sw / 2, sh / 2, 85f * scale, 1f, UITheme.surfaceLight, ringColor, 8f * scale)
+        // Dark circle background
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.95f)
+        ui.shapes.circle(centerX, centerY, 110f * scale)
+
+        // Accent ring - thicker and more prominent
+        ui.shapes.color = mainColor
+        val ringRadius = 95f * scale
+        val ringThickness = 10f * scale
+        val segments = 48
+        for (i in 0 until segments) {
+            val angle1 = (i.toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
+            val angle2 = ((i + 1).toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
+            val innerR = ringRadius - ringThickness / 2
+            val outerR = ringRadius + ringThickness / 2
+            ui.shapes.rectLine(
+                centerX + innerR * com.badlogic.gdx.math.MathUtils.cos(angle1),
+                centerY + innerR * com.badlogic.gdx.math.MathUtils.sin(angle1),
+                centerX + innerR * com.badlogic.gdx.math.MathUtils.cos(angle2),
+                centerY + innerR * com.badlogic.gdx.math.MathUtils.sin(angle2),
+                ringThickness
+            )
+        }
+
+        // Inner decorative ring
+        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.5f)
+        val innerRingRadius = 70f * scale
+        for (i in 0 until segments) {
+            val angle1 = (i.toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
+            val angle2 = ((i + 1).toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
+            ui.shapes.rectLine(
+                centerX + innerRingRadius * com.badlogic.gdx.math.MathUtils.cos(angle1),
+                centerY + innerRingRadius * com.badlogic.gdx.math.MathUtils.sin(angle1),
+                centerX + innerRingRadius * com.badlogic.gdx.math.MathUtils.cos(angle2),
+                centerY + innerRingRadius * com.badlogic.gdx.math.MathUtils.sin(angle2),
+                3f * scale
+            )
+        }
 
         ui.endShapes()
 
         ui.beginBatch()
 
+        // Countdown number or GO!
         val text = if (seconds > 0) seconds.toString() else "GO!"
-        val textColor = if (seconds > 0) UITheme.warning else UITheme.primary
-        ui.textCentered(text, sw / 2, sh / 2, UIFonts.display, textColor)
+        val textColor = mainColor
+
+        // Scale text with pulse for emphasis
+        val textScale = if (seconds > 0) pulse else 1.1f
+        UIFonts.display.data.setScale(UIFonts.display.data.scaleX * textScale)
+        ui.textCentered(text, centerX, centerY, UIFonts.display, textColor)
+        UIFonts.display.data.setScale(UIFonts.display.data.scaleX / textScale)
+
+        // "GET READY" label above countdown - larger and more visible
+        if (seconds > 0) {
+            ui.textCentered("GET READY", centerX, centerY + 160f * scale, UIFonts.heading, UITheme.textPrimary)
+        }
 
         ui.endBatch()
     }

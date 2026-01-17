@@ -122,9 +122,9 @@ class CalibrationRenderer : Disposable {
 
         // Target zone (center) with pulsing effect
         val targetPulse = UITheme.Anim.pulse(2f, 0.4f, 0.65f)
-        ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.35f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.accent, targetPulse * 0.35f)
         ui.shapes.circle(centerX, indicatorCenterY, 38f * scale)
-        ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.6f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.accent, targetPulse * 0.6f)
         ui.shapes.circle(centerX, indicatorCenterY, 20f * scale)
 
         // Dot trail with larger dots
@@ -155,12 +155,12 @@ class CalibrationRenderer : Disposable {
         // Dot glow when centered
         if (isCentered) {
             val glowPulse = UITheme.Anim.pulse(4f, 0.35f, 0.7f)
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, glowPulse)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, glowPulse)
             ui.shapes.circle(dotX, dotY, 26f * scale)
         }
 
         // Main dot - larger for visibility
-        val dotColor = if (isCentered) UITheme.primary else UITheme.cyan
+        val dotColor = if (isCentered) UITheme.accent else UITheme.cyan
         ui.shapes.color = dotColor
         ui.shapes.circle(dotX, dotY, 14f * scale)
 
@@ -170,7 +170,7 @@ class CalibrationRenderer : Disposable {
 
         // Success flash
         if (successFlash > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.primary, successFlash * 0.35f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, successFlash * 0.35f)
             ui.shapes.rect(0f, 0f, sw, sh)
         }
 
@@ -184,7 +184,7 @@ class CalibrationRenderer : Disposable {
         calibrateButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         skipButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
 
-        ui.button(calibrateButton, UITheme.primary, glowIntensity = calibrateHover * 0.7f + (if (isCentered) 0.35f else 0f))
+        ui.button(calibrateButton, UITheme.accent, glowIntensity = calibrateHover * 0.7f + (if (isCentered) 0.35f else 0f))
         ui.button(skipButton, UITheme.surfaceLight, glowIntensity = skipHover * 0.4f)
 
         ui.endShapes()
@@ -201,7 +201,7 @@ class CalibrationRenderer : Disposable {
         ui.textCentered("Hold device in playing position", centerX, instrY, UIFonts.body, UITheme.textSecondary)
 
         val instrY2 = instrY - 40f * scale
-        val hintColor = if (isCentered) UITheme.primary else UITheme.textMuted
+        val hintColor = if (isCentered) UITheme.accent else UITheme.textMuted
         val hintText = if (isCentered) "Centered! Tap CALIBRATE" else "Center the dot, then tap CALIBRATE"
         ui.textCentered(hintText, centerX, instrY2, UIFonts.caption, hintColor)
 
