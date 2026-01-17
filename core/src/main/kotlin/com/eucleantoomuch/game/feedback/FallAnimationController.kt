@@ -147,7 +147,7 @@ class FallAnimationController(
             fovPunch = MathUtils.sin(impactT * MathUtils.PI) * 8f * speedFactor
 
             // Rider starts pitching forward immediately
-            riderPitch = easeOutQuad(impactT) * 25f * speedFactor
+            riderPitch = easeOutQuad(impactT) * 45f  // Start tilting toward ground
 
             // Arms start spreading outward (protective reflex)
             armSpread = easeOutQuad(impactT) * 0.8f
@@ -172,9 +172,9 @@ class FallAnimationController(
             // FOV returns to normal
             fovPunch = (1f - tumbleT) * 4f * speedFactor
 
-            // Rider continues tumbling forward and starts falling
-            riderPitch = 25f * speedFactor + easeInQuad(tumbleT) * 55f * speedFactor
-            riderYOffset = easeInQuad(tumbleT) * -1.8f  // Falls down toward ground
+            // Rider continues tumbling forward and starts falling - pitch beyond 90 degrees (face down)
+            riderPitch = 45f + easeInQuad(tumbleT) * 75f  // 45 -> 120 degrees (past horizontal)
+            riderYOffset = easeInQuad(tumbleT) * -1.5f  // Falls much lower to hit the ground
             riderForwardOffset = easeOutQuad(tumbleT) * 1.5f * speedFactor  // Thrown forward
 
             // Rider gains some roll as they tumble
@@ -205,9 +205,9 @@ class FallAnimationController(
             // FOV settles
             fovPunch = 0f
 
-            // Rider on ground - fully fallen
-            riderPitch = 80f * speedFactor + settleT * 10f
-            riderYOffset = -1.8f - easeOutQuad(settleT) * 0.2f
+            // Rider on ground - fully fallen (face down on ground)
+            riderPitch = 120f  // Past horizontal - face down
+            riderYOffset = -1.5f  // On the ground
             riderForwardOffset = 1.5f * speedFactor + settleT * 0.3f
 
             // Roll settles
