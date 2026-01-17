@@ -390,14 +390,14 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createTreeModel(height: Float = 4f): Model {
+    fun createTreeModel(height: Float = 14f): Model {
         modelBuilder.begin()
 
         val trunkMaterial = Material(ColorAttribute.createDiffuse(treeTrunkColor))
         val leavesMaterial = Material(ColorAttribute.createDiffuse(treeLeavesColor))
 
         val trunkHeight = height * 0.4f
-        val trunkRadius = 0.15f
+        val trunkRadius = 0.4f
         val crownHeight = height * 0.7f
         val crownRadius = height * 0.35f
 
@@ -414,14 +414,14 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createRoundTreeModel(height: Float = 3.5f): Model {
+    fun createRoundTreeModel(height: Float = 12f): Model {
         modelBuilder.begin()
 
         val trunkMaterial = Material(ColorAttribute.createDiffuse(treeTrunkColor))
         val leavesMaterial = Material(ColorAttribute.createDiffuse(treeLeavesColor))
 
         val trunkHeight = height * 0.35f
-        val trunkRadius = 0.12f
+        val trunkRadius = 0.3f
         val crownRadius = height * 0.3f
 
         // Trunk

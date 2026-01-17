@@ -74,13 +74,13 @@ class WorldGenerator(
             carModels.add(ModelInstance(model))
         }
 
-        // Create tree variants
-        for (i in 0..2) {
-            val height = MathUtils.random(3.5f, 5f)
+        // Create tree variants with height variation
+        for (i in 0..4) {
+            val height = MathUtils.random(6f, 10f)
             treeModels.add(ModelInstance(models.createTreeModel(height)))
         }
-        for (i in 0..2) {
-            val height = MathUtils.random(3f, 4f)
+        for (i in 0..4) {
+            val height = MathUtils.random(5f, 8f)
             treeModels.add(ModelInstance(models.createRoundTreeModel(height)))
         }
 
@@ -581,10 +581,11 @@ class WorldGenerator(
         // Grass zone: from sidewalk edge to building edge
         // Road edge: ROAD_WIDTH/2 = 4f
         // Sidewalk edge: ROAD_WIDTH/2 + SIDEWALK_WIDTH = 4 + 3 = 7f
-        // Buildings at: BUILDING_OFFSET_X = 14f, with width 6f, so near edge at 14 - 3 = 11f
-        // Grass area: from 7f to 11f (4m wide)
-        val grassStartX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 1f  // 1m into grass (at 8f)
-        val grassEndX = Constants.BUILDING_OFFSET_X - Constants.BUILDING_WIDTH / 2 - 1.5f  // 1.5m from buildings (at 9.5f)
+        // Buildings at: BUILDING_OFFSET_X = 14f (but can be offset by -2 to +3)
+        // Minimum building X = 14 - 2 = 12f, near edge = 12 - 3 = 9f
+        // Grass area: from 7.5f to 8.5f (safe zone that never overlaps with buildings)
+        val grassStartX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 0.5f  // 0.5m into grass (at 7.5f)
+        val grassEndX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 1.5f    // 1.5m into grass (at 8.5f)
 
         var z = chunkStartZ + 2f
         while (z < chunkStartZ + Constants.CHUNK_LENGTH - 2f) {
