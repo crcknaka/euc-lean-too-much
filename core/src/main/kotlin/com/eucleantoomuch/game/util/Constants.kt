@@ -46,9 +46,9 @@ object Constants {
     const val MAX_OBSTACLE_SPACING = 8f
 
     // Camera
-    const val CAMERA_OFFSET_Y = 3f          // Above player
-    const val CAMERA_OFFSET_Z = -8f         // Behind player
-    const val CAMERA_LOOK_AHEAD = 10f       // Look ahead distance
+    const val CAMERA_OFFSET_Y = 2.2f        // Above player (closer)
+    const val CAMERA_OFFSET_Z = -4.5f       // Behind player (closer)
+    const val CAMERA_LOOK_AHEAD = 8f        // Look ahead distance
     const val CAMERA_SMOOTHNESS = 5f
 
     // Building generation

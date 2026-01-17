@@ -356,6 +356,15 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.endBatch()
     }
 
+    fun reset() {
+        scorePopScale = 1f
+        lastScore = 0
+        warningFlash = 0f
+        speedBarSmooth = 0f
+        pwmWarningFlash = 0f
+        pwmSmooth = 0f
+    }
+
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
     }

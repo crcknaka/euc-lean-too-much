@@ -506,6 +506,7 @@ class EucGame(
         // Start countdown
         countdownTimer = 3f
         session.reset()
+        hud.reset()
         isNewHighScore = false
         stateManager.transition(GameState.Countdown(3))
     }

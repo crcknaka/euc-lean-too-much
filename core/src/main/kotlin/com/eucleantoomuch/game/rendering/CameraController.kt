@@ -15,12 +15,16 @@ class CameraController(private val camera: PerspectiveCamera) {
     private val offset = Vector3(0f, Constants.CAMERA_OFFSET_Y, Constants.CAMERA_OFFSET_Z)
     private val lookAheadOffset = Vector3(0f, 1f, Constants.CAMERA_LOOK_AHEAD)
 
-    // FOV settings
-    private val baseFov = 67f
-    private val maxFov = 85f
-    private val maxSpeed = 15f  // Speed at which FOV reaches max (m/s, ~54 km/h)
+    // FOV settings - very dramatic effect for intense speed sensation
+    private val baseFov = 60f
+    private val maxFov = 110f     // Very wide FOV for extreme speed sensation
+    private val maxSpeed = 15f    // Speed at which FOV reaches max (m/s, ~54 km/h)
     private var currentFov = baseFov
     private var currentSpeed = 0f
+
+    // Camera distance compensation - move much closer as FOV increases to keep player same size
+    private val baseOffsetZ = Constants.CAMERA_OFFSET_Z
+    private val minOffsetZ = Constants.CAMERA_OFFSET_Z + 3.5f  // Move 3.5m closer at max speed
 
     fun initialize(playerPosition: Vector3) {
         currentPosition.set(playerPosition).add(offset)
@@ -67,6 +71,10 @@ class CameraController(private val camera: PerspectiveCamera) {
         val targetFov = MathUtils.lerp(baseFov, maxFov, speedRatio)
         currentFov = MathUtils.lerp(currentFov, targetFov, deltaTime * 5f)  // Smooth FOV transition
         camera.fieldOfView = currentFov
+
+        // Compensate camera distance - move closer as FOV increases to keep player same size
+        val targetOffsetZ = MathUtils.lerp(baseOffsetZ, minOffsetZ, speedRatio)
+        offset.z = MathUtils.lerp(offset.z, targetOffsetZ, deltaTime * 5f)
 
         // Apply to camera
         camera.position.set(currentPosition)
