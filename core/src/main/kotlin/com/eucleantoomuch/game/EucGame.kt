@@ -268,7 +268,7 @@ class EucGame : ApplicationAdapter() {
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
-                riderTransform.position.y += 0.5f  // Stand on top of EUC (adjusted for bigger model)
+                riderTransform.position.y += 0.7f  // Stand on top of EUC
                 riderTransform.yaw = playerTransform.yaw
                 riderTransform.updateRotationFromYaw()
             }
@@ -379,7 +379,7 @@ class EucGame : ApplicationAdapter() {
 
         // Position arm at shoulder level relative to rider (scaled 1.4x)
         val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
-        val shoulderOffsetY = 0.5f + 1.5f  // rider offset + shoulder height on scaled rider
+        val shoulderOffsetY = 0.7f + 1.5f  // rider offset + shoulder height on scaled rider
 
         armTransform.position.set(playerTransform.position)
         armTransform.position.y += shoulderOffsetY
