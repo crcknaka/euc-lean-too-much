@@ -212,7 +212,7 @@ class EucGame(
                 stateManager.transition(GameState.Calibrating)
             }
             MenuRenderer.ButtonClicked.SETTINGS -> {
-                stateManager.transition(GameState.Settings)
+                stateManager.transition(GameState.Settings(returnTo = GameState.Menu))
             }
             MenuRenderer.ButtonClicked.EXIT -> {
                 Gdx.app.exit()
@@ -230,7 +230,9 @@ class EucGame(
                 // Apply settings
                 applyRenderDistance()
                 applyPwmWarningThreshold()
-                stateManager.transition(GameState.Menu)
+                // Return to previous state (Menu or Paused)
+                val settingsState = stateManager.current() as GameState.Settings
+                stateManager.transition(settingsState.returnTo)
             }
             SettingsRenderer.Action.NONE -> {}
         }
@@ -390,6 +392,10 @@ class EucGame(
             PauseRenderer.ButtonClicked.RESTART -> {
                 resetGame()
                 startGame()
+            }
+            PauseRenderer.ButtonClicked.SETTINGS -> {
+                val pausedState = stateManager.current() as GameState.Paused
+                stateManager.transition(GameState.Settings(returnTo = pausedState))
             }
             PauseRenderer.ButtonClicked.MENU -> {
                 resetGame()

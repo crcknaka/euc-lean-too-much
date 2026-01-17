@@ -15,6 +15,7 @@ class PauseRenderer : Disposable {
 
     private val resumeButton = Rectangle()
     private val restartButton = Rectangle()
+    private val settingsButton = Rectangle()
     private val menuButton = Rectangle()
 
     // Animation states
@@ -22,10 +23,11 @@ class PauseRenderer : Disposable {
     private var panelScale = 0f
     private var resumeHover = 0f
     private var restartHover = 0f
+    private var settingsHover = 0f
     private var menuHover = 0f
 
     enum class ButtonClicked {
-        NONE, RESUME, RESTART, MENU
+        NONE, RESUME, RESTART, SETTINGS, MENU
     }
 
     fun render(): ButtonClicked {
@@ -47,6 +49,7 @@ class PauseRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         resumeHover = UITheme.Anim.ease(resumeHover, if (resumeButton.contains(touchX, touchY)) 1f else 0f, 10f)
         restartHover = UITheme.Anim.ease(restartHover, if (restartButton.contains(touchX, touchY)) 1f else 0f, 10f)
+        settingsHover = UITheme.Anim.ease(settingsHover, if (settingsButton.contains(touchX, touchY)) 1f else 0f, 10f)
         menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 10f)
 
         ui.beginShapes()
@@ -55,9 +58,9 @@ class PauseRenderer : Disposable {
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
         ui.shapes.rect(0f, 0f, sw, sh)
 
-        // Panel dimensions with scale animation (taller for more padding around title)
+        // Panel dimensions with scale animation (taller for 4 buttons)
         val panelWidth = 480f * scale * panelScale
-        val panelHeight = 640f * scale * panelScale  // Increased height for bottom padding
+        val panelHeight = 720f * scale * panelScale  // Increased height for 4 buttons
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
@@ -77,11 +80,13 @@ class PauseRenderer : Disposable {
 
         resumeButton.set(buttonX, firstButtonY, buttonWidth, buttonHeight)
         restartButton.set(buttonX, firstButtonY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
-        menuButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight)
+        settingsButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight)
+        menuButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 3, buttonWidth, buttonHeight)
 
         // Buttons with modern styling
         ui.button(resumeButton, UITheme.primary, glowIntensity = resumeHover * 0.7f)
         ui.button(restartButton, UITheme.secondary, glowIntensity = restartHover * 0.6f)
+        ui.button(settingsButton, UITheme.surfaceLight, glowIntensity = settingsHover * 0.4f)
         ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)
 
         ui.endShapes()
@@ -99,6 +104,8 @@ class PauseRenderer : Disposable {
                 UIFonts.button, UITheme.textPrimary)
             ui.textCentered("RESTART", restartButton.x + restartButton.width / 2, restartButton.y + restartButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
+            ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2, settingsButton.y + settingsButton.height / 2,
+                UIFonts.button, UITheme.textPrimary)
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
         }
@@ -109,6 +116,7 @@ class PauseRenderer : Disposable {
         if (Gdx.input.justTouched()) {
             if (resumeButton.contains(touchX, touchY)) return ButtonClicked.RESUME
             if (restartButton.contains(touchX, touchY)) return ButtonClicked.RESTART
+            if (settingsButton.contains(touchX, touchY)) return ButtonClicked.SETTINGS
             if (menuButton.contains(touchX, touchY)) return ButtonClicked.MENU
         }
 
@@ -119,6 +127,9 @@ class PauseRenderer : Disposable {
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             return ButtonClicked.RESTART
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+            return ButtonClicked.SETTINGS
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
             return ButtonClicked.MENU

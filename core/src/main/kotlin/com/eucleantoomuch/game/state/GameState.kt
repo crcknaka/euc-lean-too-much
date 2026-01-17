@@ -3,7 +3,7 @@ package com.eucleantoomuch.game.state
 sealed class GameState {
     object Loading : GameState()
     object Menu : GameState()
-    object Settings : GameState()
+    data class Settings(val returnTo: GameState) : GameState()
     object Calibrating : GameState()
     data class Countdown(val secondsLeft: Int) : GameState()
     data class Playing(val session: GameSession) : GameState()
