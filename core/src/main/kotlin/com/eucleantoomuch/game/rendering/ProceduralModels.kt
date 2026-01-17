@@ -195,6 +195,30 @@ class ProceduralModels : Disposable {
             0f, 1f, 0f
         )
 
+        // Curbs along the road edges (fill the gap between road at 0f and sidewalk at 0.1f)
+        val curbMaterial = Material(ColorAttribute.createDiffuse(curbColor))
+        val curbHeight = 0.1f
+
+        // Left curb - vertical face (at x = -ROAD_WIDTH/2, facing right towards road center)
+        val leftCurb = modelBuilder.part("curb_left", GL20.GL_TRIANGLES, attributes, curbMaterial)
+        leftCurb.rect(
+            -Constants.ROAD_WIDTH / 2, curbHeight, 0f,
+            -Constants.ROAD_WIDTH / 2, curbHeight, chunkLength,
+            -Constants.ROAD_WIDTH / 2, 0f, chunkLength,
+            -Constants.ROAD_WIDTH / 2, 0f, 0f,
+            1f, 0f, 0f  // Normal pointing right (towards road center)
+        )
+
+        // Right curb - vertical face (at x = +ROAD_WIDTH/2, facing left towards road center)
+        val rightCurb = modelBuilder.part("curb_right", GL20.GL_TRIANGLES, attributes, curbMaterial)
+        rightCurb.rect(
+            Constants.ROAD_WIDTH / 2, 0f, 0f,
+            Constants.ROAD_WIDTH / 2, 0f, chunkLength,
+            Constants.ROAD_WIDTH / 2, curbHeight, chunkLength,
+            Constants.ROAD_WIDTH / 2, curbHeight, 0f,
+            -1f, 0f, 0f  // Normal pointing left (towards road center)
+        )
+
         return modelBuilder.end().also { models.add(it) }
     }
 

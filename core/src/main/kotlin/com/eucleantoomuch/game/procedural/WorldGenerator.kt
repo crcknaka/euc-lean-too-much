@@ -893,7 +893,12 @@ class WorldGenerator(
         val roll = MathUtils.random()
 
         return when {
-            roll < carProb -> createCarEntity(z, totalDistance)
+            roll < carProb -> {
+                // Cars are created but NOT returned - they are managed by CullingSystem
+                // not by chunk removal (so they don't disappear when chunk is removed)
+                createCarEntity(z, totalDistance)
+                null
+            }
             else -> {
                 // Static obstacle
                 val staticRoll = MathUtils.random()
@@ -1023,19 +1028,20 @@ class WorldGenerator(
         val entity = engine.createEntity()
 
         // Car in a lane, moving in same or opposite direction
-        val lane = if (MathUtils.randomBoolean()) -1 else 1
+        // 70% chance for same direction (right lane), 30% for oncoming (left lane)
+        val sameDirection = MathUtils.random() < 0.7f
+        val lane = if (sameDirection) 1 else -1
         val x = lane * 1.5f  // Lane position
         val direction = if (lane == 1) 1 else -1  // Right lane = same direction, left = opposite
 
-        // If same direction, start behind player; if opposite, start ahead
-        val startZ = if (direction == 1) z - 20f else z + 50f
+        // If same direction, start ahead of the obstacle position so player can catch up
+        // If opposite direction, start further ahead so player can see them coming
+        val startZ = if (direction == 1) z + 30f else z + 80f
 
         entity.add(TransformComponent().apply {
             position.set(x, 0f, startZ)
-            if (direction == -1) {
-                yaw = 180f
-                updateRotationFromYaw()
-            }
+            yaw = if (direction == -1) 180f else 0f
+            updateRotationFromYaw()
         })
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(carModels.random().model) })
         entity.add(VelocityComponent())

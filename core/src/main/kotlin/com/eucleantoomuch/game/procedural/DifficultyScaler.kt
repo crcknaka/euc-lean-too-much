@@ -32,7 +32,7 @@ class DifficultyScaler {
      * Get car spawn probability
      */
     fun getCarProbability(distance: Float): Float {
-        return lerp(0.05f, 0.25f, getDifficulty(distance))
+        return lerp(0.15f, 0.35f, getDifficulty(distance))
     }
 
     /**

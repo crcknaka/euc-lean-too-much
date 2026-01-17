@@ -17,9 +17,9 @@ class CarAISystem : IteratingSystem(Families.cars, 4) {
         val velocity = velocityMapper.get(entity)
         val car = carMapper.get(entity)
 
-        // Cars move in Z direction based on their direction
-        // direction = 1: same as player (positive Z)
-        // direction = -1: opposite (negative Z, but we handle this in world gen)
-        velocity.linear.set(0f, 0f, car.speed * car.direction)
+        // Cars always move forward in their local space (positive Z)
+        // The yaw rotation (0 or 180) determines world direction
+        // MovementSystem will rotate this by yaw to get world movement
+        velocity.linear.set(0f, 0f, car.speed)
     }
 }
