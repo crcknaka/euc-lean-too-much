@@ -45,7 +45,8 @@ class WorldGenerator(
 
     fun update(playerZ: Float, totalDistance: Float) {
         val currentChunk = (playerZ / Constants.CHUNK_LENGTH).toInt()
-        val startChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
+        // Start from behind the camera (which is at -8 from player), add extra buffer
+        val startChunk = ((playerZ - 50f) / Constants.CHUNK_LENGTH).toInt()
         val endChunk = ((playerZ + Constants.RENDER_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
 
         // Generate new chunks
@@ -55,8 +56,9 @@ class WorldGenerator(
             }
         }
 
-        // Remove old chunks
-        val chunksToRemove = activeChunks.keys.filter { it < startChunk - 1 }
+        // Remove old chunks (behind the camera)
+        val despawnChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
+        val chunksToRemove = activeChunks.keys.filter { it < despawnChunk - 1 }
         for (chunkIndex in chunksToRemove) {
             removeChunk(chunkIndex)
         }
