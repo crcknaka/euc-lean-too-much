@@ -101,8 +101,10 @@ class GameRenderer(
 
                 if (euc != null && isPlayer) {
                     // For EUC model: first apply yaw (turn left/right), then model fix rotation, then lean
-                    // Yaw rotation (turn left/right)
-                    tempMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                    // Yaw rotation (turn left/right) + visual turn based on side lean
+                    // Side lean causes visible wheel turn in the direction of lean
+                    val visualTurn = euc.visualSideLean * 8f  // Wheel turns slightly in lean direction
+                    tempMatrix.rotate(0f, 1f, 0f, transform.yaw + visualTurn)
 
                     // Model orientation fix (flip upside down model)
                     if (models.eucModelRotationX != 0f) {

@@ -57,7 +57,7 @@ class PauseRenderer : Disposable {
 
         // Panel dimensions with scale animation (taller for more padding around title)
         val panelWidth = 480f * scale * panelScale
-        val panelHeight = 580f * scale * panelScale  // Increased height for more spacing
+        val panelHeight = 640f * scale * panelScale  // Increased height for bottom padding
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
@@ -73,6 +73,7 @@ class PauseRenderer : Disposable {
         val buttonX = centerX - buttonWidth / 2
 
         // Calculate buttons from top to bottom (more space from title)
+        val bottomPadding = 60f * scale  // Space below the bottom button
         val firstButtonY = panelY + panelHeight - 220f * scale  // More space below title
 
         resumeButton.set(buttonX, firstButtonY, buttonWidth, buttonHeight)
