@@ -360,8 +360,8 @@ class EucGame(
             // Update world generation
             worldGenerator.update(playerTransform.position.z, session.distanceTraveled)
 
-            // Update camera
-            renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
+            // Update camera with speed for FOV effect
+            renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta, eucComponent.speed)
 
             // Update PWM warning system (beeps when PWM exceeds threshold)
             speedWarningManager.update(eucComponent.pwm, delta)

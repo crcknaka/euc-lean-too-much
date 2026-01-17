@@ -15,6 +15,13 @@ class CameraController(private val camera: PerspectiveCamera) {
     private val offset = Vector3(0f, Constants.CAMERA_OFFSET_Y, Constants.CAMERA_OFFSET_Z)
     private val lookAheadOffset = Vector3(0f, 1f, Constants.CAMERA_LOOK_AHEAD)
 
+    // FOV settings
+    private val baseFov = 67f
+    private val maxFov = 85f
+    private val maxSpeed = 15f  // Speed at which FOV reaches max (m/s, ~54 km/h)
+    private var currentFov = baseFov
+    private var currentSpeed = 0f
+
     fun initialize(playerPosition: Vector3) {
         currentPosition.set(playerPosition).add(offset)
         currentLookAt.set(playerPosition).add(lookAheadOffset)
@@ -24,7 +31,7 @@ class CameraController(private val camera: PerspectiveCamera) {
         camera.update()
     }
 
-    fun update(playerPosition: Vector3, playerYaw: Float, deltaTime: Float) {
+    fun update(playerPosition: Vector3, playerYaw: Float, deltaTime: Float, speed: Float = 0f) {
         // Calculate rotated offset based on player yaw
         val cos = MathUtils.cosDeg(playerYaw)
         val sin = MathUtils.sinDeg(playerYaw)
@@ -53,6 +60,13 @@ class CameraController(private val camera: PerspectiveCamera) {
         val smoothFactor = deltaTime * Constants.CAMERA_SMOOTHNESS
         currentPosition.lerp(targetPosition, smoothFactor)
         currentLookAt.lerp(targetLookAt, smoothFactor)
+
+        // Update FOV based on speed
+        currentSpeed = speed
+        val speedRatio = (currentSpeed / maxSpeed).coerceIn(0f, 1f)
+        val targetFov = MathUtils.lerp(baseFov, maxFov, speedRatio)
+        currentFov = MathUtils.lerp(currentFov, targetFov, deltaTime * 5f)  // Smooth FOV transition
+        camera.fieldOfView = currentFov
 
         // Apply to camera
         camera.position.set(currentPosition)
