@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.loader.G3dModelLoader
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.Disposable
 import com.badlogic.gdx.utils.UBJsonReader
 import com.eucleantoomuch.game.util.Constants
@@ -48,6 +49,11 @@ class ProceduralModels : Disposable {
     private val trashCanColor = Color(0.15f, 0.25f, 0.15f, 1f)   // Dark green
     private val bushColor = Color(0.25f, 0.4f, 0.2f, 1f)         // Dark green bush
     private val cloudColor = Color(1f, 1f, 1f, 0.9f)             // White cloud
+
+    // Background/silhouette colors (faded to look distant)
+    private val bgBuildingColor1 = Color(0.55f, 0.6f, 0.7f, 1f)   // Faded blue-gray (distant)
+    private val bgBuildingColor2 = Color(0.5f, 0.55f, 0.65f, 1f)  // Darker blue-gray
+    private val bgBuildingColor3 = Color(0.6f, 0.65f, 0.75f, 1f)  // Lighter blue-gray
 
     // Building detail colors
     private val windowColor = Color(0.6f, 0.75f, 0.9f, 1f)       // Light blue glass
@@ -335,6 +341,32 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
+    /**
+     * Simple building model for LOD (far away buildings) - just a box with roof ledge
+     */
+    fun createBuildingModelSimple(height: Float, color: Color): Model {
+        modelBuilder.begin()
+
+        val width = Constants.BUILDING_WIDTH
+        val depth = Constants.BUILDING_DEPTH
+        val wallMaterial = Material(ColorAttribute.createDiffuse(color))
+        val roofMat = Material(ColorAttribute.createDiffuse(roofColor))
+
+        // Main building body - single box
+        val body = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, wallMaterial)
+        body.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height / 2, 0f))
+        body.box(width, height, depth)
+
+        // Roof ledge
+        val ledgeHeight = 0.3f
+        val ledgeOverhang = 0.2f
+        val ledge = modelBuilder.part("ledge", GL20.GL_TRIANGLES, attributes, roofMat)
+        ledge.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height + ledgeHeight / 2, 0f))
+        ledge.box(width + ledgeOverhang * 2, ledgeHeight, depth + ledgeOverhang * 2)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
     fun createManholeModel(): Model {
         modelBuilder.begin()
         val material = Material(ColorAttribute.createDiffuse(manholeColor))
@@ -478,9 +510,9 @@ class ProceduralModels : Disposable {
         modelBuilder.begin()
 
         val grassMaterial = Material(ColorAttribute.createDiffuse(grassColor))
-        val grassWidth = 15f  // Wide grass area on each side
+        val grassWidth = 80f  // Extended grass area to cover horizon (was 15f)
 
-        // Left grass area (beyond sidewalk)
+        // Left grass area (beyond sidewalk) - extends far for background buildings
         val leftGrass = modelBuilder.part("grass_left", GL20.GL_TRIANGLES, attributes, grassMaterial)
         val leftStart = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH - grassWidth
         val leftEnd = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH
@@ -492,7 +524,7 @@ class ProceduralModels : Disposable {
             0f, 1f, 0f
         )
 
-        // Right grass area (beyond sidewalk)
+        // Right grass area (beyond sidewalk) - extends far for background buildings
         val rightGrass = modelBuilder.part("grass_right", GL20.GL_TRIANGLES, attributes, grassMaterial)
         val rightStart = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH
         val rightEnd = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + grassWidth
@@ -727,6 +759,33 @@ class ProceduralModels : Disposable {
         }
 
         return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a simple background building silhouette for distant horizon
+     * These are simple boxes with faded colors to simulate depth/fog
+     */
+    fun createBackgroundBuildingModel(height: Float): Model {
+        modelBuilder.begin()
+
+        // Pick a faded blue-gray color to simulate distance/fog
+        val colors = listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3)
+        val color = colors.random()
+        val material = Material(ColorAttribute.createDiffuse(color))
+
+        // Wide, simple box - no details
+        val width = MathUtils.random(8f, 15f)
+        val depth = MathUtils.random(8f, 12f)
+
+        val body = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, material)
+        body.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, height / 2, 0f))
+        body.box(width, height, depth)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    fun getRandomBackgroundBuildingColor(): Color {
+        return listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).random()
     }
 
     override fun dispose() {

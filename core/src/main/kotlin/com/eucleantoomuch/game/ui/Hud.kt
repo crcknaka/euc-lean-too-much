@@ -6,9 +6,10 @@ import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.state.GameSession
+import com.eucleantoomuch.game.state.SettingsManager
 import kotlin.math.sqrt
 
-class Hud : Disposable {
+class Hud(private val settingsManager: SettingsManager) : Disposable {
     private val ui = UIRenderer()
 
     // Animation states
@@ -98,6 +99,18 @@ class Hud : Disposable {
         if (euc.isAboutToFall()) {
             val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
             drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 30)
+        }
+
+        // FPS counter (top-left, small)
+        if (settingsManager.showFps) {
+            val fps = Gdx.graphics.framesPerSecond
+            val fpsColor = when {
+                fps >= 55 -> UITheme.primary
+                fps >= 30 -> UITheme.warning
+                else -> UITheme.danger
+            }
+            UIFonts.caption.color = fpsColor
+            UIFonts.caption.draw(ui.batch, "FPS: $fps", 10f * scale, sh - 10f * scale)
         }
 
         ui.endBatch()

@@ -120,7 +120,7 @@ class EucGame : ApplicationAdapter() {
         engine.addSystem(CullingSystem())
 
         // Initialize UI
-        hud = Hud()
+        hud = Hud(settingsManager)
         menuRenderer = MenuRenderer()
         gameOverRenderer = GameOverRenderer()
         calibrationRenderer = CalibrationRenderer()

@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.g3d.Environment
 import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Disposable
@@ -27,9 +28,14 @@ class GameRenderer(
     val camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     val cameraController = CameraController(camera)
 
+    // Fog color matches sky for seamless blend
+    private val fogColor = Color(0.5f, 0.7f, 0.9f, 1f)
+
     private val environment = Environment().apply {
         set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
         add(DirectionalLight().set(0.9f, 0.9f, 0.9f, -0.5f, -1f, -0.3f))
+        // Add fog that matches sky color - objects fade into sky at distance
+        set(ColorAttribute(ColorAttribute.Fog, fogColor))
     }
 
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
@@ -44,6 +50,10 @@ class GameRenderer(
     private val skyR = 0.5f
     private val skyG = 0.7f
     private val skyB = 0.9f
+
+    // LOD distance threshold - buildings further than this use simple model
+    private val lodDistance = 80f
+    private val lodDistanceSq = lodDistance * lodDistance
 
     init {
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
@@ -72,6 +82,16 @@ class GameRenderer(
             val transform = transformMapper.get(entity)
 
             if (model.visible && model.modelInstance != null) {
+                // Update LOD state based on distance to camera
+                if (model.modelInstanceLod != null) {
+                    val dx = transform.position.x - camera.position.x
+                    val dz = transform.position.z - camera.position.z
+                    val distSq = dx * dx + dz * dz
+                    model.useLod = distSq > lodDistanceSq
+                }
+
+                val activeModel = model.getActiveModel() ?: continue
+
                 // Build transform matrix
                 tempMatrix.idt()
                 tempMatrix.translate(transform.position)
@@ -131,8 +151,8 @@ class GameRenderer(
 
                 tempMatrix.scale(transform.scale.x, transform.scale.y, transform.scale.z)
 
-                model.modelInstance!!.transform.set(tempMatrix)
-                modelBatch.render(model.modelInstance, environment)
+                activeModel.transform.set(tempMatrix)
+                modelBatch.render(activeModel, environment)
             }
         }
 

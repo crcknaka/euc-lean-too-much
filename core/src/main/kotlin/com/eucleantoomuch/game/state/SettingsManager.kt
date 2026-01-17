@@ -10,6 +10,7 @@ class SettingsManager {
 
     companion object {
         private const val KEY_RENDER_DISTANCE = "renderDistance"
+        private const val KEY_SHOW_FPS = "showFps"
 
         // Render distance presets (in meters)
         const val RENDER_DISTANCE_LOW = 100f
@@ -29,6 +30,13 @@ class SettingsManager {
         get() = prefs.getFloat(KEY_RENDER_DISTANCE, RENDER_DISTANCE_MEDIUM)
         set(value) {
             prefs.putFloat(KEY_RENDER_DISTANCE, value)
+            prefs.flush()
+        }
+
+    var showFps: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_FPS, false)
+        set(value) {
+            prefs.putBoolean(KEY_SHOW_FPS, value)
             prefs.flush()
         }
 

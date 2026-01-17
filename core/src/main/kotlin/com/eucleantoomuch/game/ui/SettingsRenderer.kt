@@ -12,10 +12,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val backButton = Rectangle()
     private val renderDistanceLeftButton = Rectangle()
     private val renderDistanceRightButton = Rectangle()
+    private val fpsCheckbox = Rectangle()
 
     private var backButtonHover = 0f
     private var leftButtonHover = 0f
     private var rightButtonHover = 0f
+    private var fpsCheckboxHover = 0f
     private var enterAnimProgress = 0f
 
     enum class Action {
@@ -41,10 +43,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val backHovered = backButton.contains(touchX, touchY)
         val leftHovered = renderDistanceLeftButton.contains(touchX, touchY)
         val rightHovered = renderDistanceRightButton.contains(touchX, touchY)
+        val fpsHovered = fpsCheckbox.contains(touchX, touchY)
 
         backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 8f)
         leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 8f)
         rightButtonHover = UITheme.Anim.ease(rightButtonHover, if (rightHovered) 1f else 0f, 8f)
+        fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 8f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -62,7 +66,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Settings panel
         val panelWidth = 700f * scale
-        val panelHeight = 400f * scale
+        val panelHeight = 480f * scale
         val panelX = centerX - panelWidth / 2
         val panelY = sh / 2 - panelHeight / 2 + 50f * scale
 
@@ -72,6 +76,35 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // === Render Distance Setting ===
         val settingY = panelY + panelHeight - 120f * scale
+
+        // === FPS Counter Checkbox ===
+        val fpsSettingY = settingY - 120f * scale
+        val checkboxSize = 40f * scale
+        val checkboxX = centerX - 120f * scale
+
+        fpsCheckbox.set(checkboxX, fpsSettingY - checkboxSize / 2, checkboxSize, checkboxSize)
+
+        // Checkbox background
+        val checkboxColor = if (settingsManager.showFps) UITheme.primary else UITheme.surfaceLight
+        ui.roundedRect(fpsCheckbox.x, fpsCheckbox.y, fpsCheckbox.width, fpsCheckbox.height,
+            8f * scale, checkboxColor)
+
+        // Checkbox border/glow
+        if (fpsCheckboxHover > 0.1f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, fpsCheckboxHover * 0.3f)
+            ui.roundedRect(fpsCheckbox.x - 3f, fpsCheckbox.y - 3f,
+                fpsCheckbox.width + 6f, fpsCheckbox.height + 6f, 10f * scale, ui.shapes.color)
+        }
+
+        // Checkmark
+        if (settingsManager.showFps) {
+            ui.shapes.color = UITheme.textPrimary
+            val cx = fpsCheckbox.x + fpsCheckbox.width / 2
+            val cy = fpsCheckbox.y + fpsCheckbox.height / 2
+            // Draw checkmark as two lines
+            ui.shapes.rectLine(cx - 10f * scale, cy, cx - 2f * scale, cy - 10f * scale, 3f * scale)
+            ui.shapes.rectLine(cx - 2f * scale, cy - 10f * scale, cx + 12f * scale, cy + 8f * scale, 3f * scale)
+        }
         val arrowButtonSize = 60f * scale
         val valueBoxWidth = 200f * scale
 
@@ -139,6 +172,10 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val currentDistance = settingsManager.renderDistance.toInt()
         ui.textCentered("$currentName (${currentDistance}m)", centerX, settingY, UIFonts.body, UITheme.accent)
 
+        // FPS Checkbox label
+        UIFonts.body.draw(ui.batch, "Show FPS Counter", fpsCheckbox.x + fpsCheckbox.width + 20f * scale,
+            fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+
         // Back button text
         ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2, UIFonts.button, UITheme.textPrimary)
 
@@ -159,6 +196,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             if (renderDistanceRightButton.contains(touchX, touchY)) {
                 val newIndex = (currentIndex + 1).coerceAtMost(SettingsManager.RENDER_DISTANCE_OPTIONS.size - 1)
                 settingsManager.setRenderDistanceByIndex(newIndex)
+            }
+            if (fpsCheckbox.contains(touchX, touchY)) {
+                settingsManager.showFps = !settingsManager.showFps
             }
         }
 

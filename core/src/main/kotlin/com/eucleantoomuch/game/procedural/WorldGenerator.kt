@@ -32,8 +32,9 @@ class WorldGenerator(
     private val pedestrianModels = mutableListOf<Model>()
 
     // Pre-create some building models with different heights
-    private val buildingModels = mutableListOf<Pair<Float, ModelInstance>>()
-    private val skyscraperModels = mutableListOf<Pair<Float, ModelInstance>>()  // Rare tall buildings
+    // Triple: height, detailed model, simple model (LOD)
+    private val buildingModels = mutableListOf<Triple<Float, ModelInstance, ModelInstance>>()
+    private val skyscraperModels = mutableListOf<Triple<Float, ModelInstance, ModelInstance>>()  // Rare tall buildings
     private val carModels = mutableListOf<ModelInstance>()
 
     // Track skyscraper cluster state
@@ -54,6 +55,9 @@ class WorldGenerator(
     // Zebra crossing model
     private var zebraCrossingModel: ModelInstance
 
+    // Background building models (silhouettes on horizon)
+    private val backgroundBuildingModels = mutableListOf<ModelInstance>()
+
     // Track which chunks have zebra crossings
     private var lastZebraCrossingChunk = -10  // Start with no recent crossing
 
@@ -66,17 +70,21 @@ class WorldGenerator(
             pedestrianModels.add(models.createPedestrianModel(models.getRandomShirtColor()))
         }
 
-        // Create variety of buildings
+        // Create variety of buildings with LOD versions
         for (i in 0..5) {
             val height = MathUtils.random(Constants.BUILDING_MIN_HEIGHT, Constants.BUILDING_MAX_HEIGHT)
-            val model = models.createBuildingModel(height, models.getRandomBuildingColor())
-            buildingModels.add(Pair(height, ModelInstance(model)))
+            val color = models.getRandomBuildingColor()
+            val detailedModel = models.createBuildingModel(height, color)
+            val simpleModel = models.createBuildingModelSimple(height, color)
+            buildingModels.add(Triple(height, ModelInstance(detailedModel), ModelInstance(simpleModel)))
         }
         // Add rare tall skyscrapers (for skyscraper clusters)
         for (i in 0..2) {
             val height = MathUtils.random(70f, 100f)  // Very tall buildings
-            val model = models.createBuildingModel(height, models.getRandomBuildingColor())
-            skyscraperModels.add(Pair(height, ModelInstance(model)))
+            val color = models.getRandomBuildingColor()
+            val detailedModel = models.createBuildingModel(height, color)
+            val simpleModel = models.createBuildingModelSimple(height, color)
+            skyscraperModels.add(Triple(height, ModelInstance(detailedModel), ModelInstance(simpleModel)))
         }
 
         // Create variety of cars
@@ -113,6 +121,12 @@ class WorldGenerator(
             val scaleX = MathUtils.random(0.8f, 1.5f)
             val scaleZ = MathUtils.random(0.8f, 1.2f)
             cloudModels.add(ModelInstance(models.createCloudModel(scaleX, scaleZ)))
+        }
+
+        // Create background building variants (different heights for horizon silhouette)
+        for (i in 0..7) {
+            val height = MathUtils.random(30f, 80f)
+            backgroundBuildingModels.add(ModelInstance(models.createBackgroundBuildingModel(height)))
         }
     }
 
@@ -180,6 +194,9 @@ class WorldGenerator(
 
         // Clouds in the sky
         entities.addAll(generateClouds(chunkIndex, chunkStartZ))
+
+        // Background buildings on horizon (fill gaps between main buildings)
+        entities.addAll(generateBackgroundBuildings(chunkIndex, chunkStartZ))
 
         // Skip obstacles in the very first chunk (give player time to start)
         if (chunkIndex > 0) {
@@ -547,7 +564,7 @@ class WorldGenerator(
             val useSkyscraperRight = skyscraperClusterRemaining > 0 && !useSkyscraperLeft
 
             // Left side building
-            val (heightL, instanceL) = if (useSkyscraperLeft && skyscraperModels.isNotEmpty()) {
+            val (heightL, detailedL, simpleL) = if (useSkyscraperLeft && skyscraperModels.isNotEmpty()) {
                 skyscraperClusterRemaining--
                 skyscraperModels.random()
             } else {
@@ -557,12 +574,13 @@ class WorldGenerator(
                 -Constants.BUILDING_OFFSET_X - leftXOffset,
                 z + MathUtils.random(-2f, 2f),
                 heightL,
-                ModelInstance(instanceL.model),
+                ModelInstance(detailedL.model),
+                ModelInstance(simpleL.model),
                 chunkIndex
             ))
 
             // Right side building
-            val (heightR, instanceR) = if (useSkyscraperRight && skyscraperModels.isNotEmpty()) {
+            val (heightR, detailedR, simpleR) = if (useSkyscraperRight && skyscraperModels.isNotEmpty()) {
                 skyscraperClusterRemaining--
                 skyscraperModels.random()
             } else {
@@ -572,7 +590,8 @@ class WorldGenerator(
                 Constants.BUILDING_OFFSET_X + rightXOffset,
                 z + MathUtils.random(-2f, 2f),
                 heightR,
-                ModelInstance(instanceR.model),
+                ModelInstance(detailedR.model),
+                ModelInstance(simpleR.model),
                 chunkIndex
             ))
 
@@ -582,7 +601,14 @@ class WorldGenerator(
         return entities
     }
 
-    private fun createBuildingEntity(x: Float, z: Float, height: Float, modelInstance: ModelInstance, chunkIndex: Int): Entity {
+    private fun createBuildingEntity(
+        x: Float,
+        z: Float,
+        height: Float,
+        detailedModel: ModelInstance,
+        simpleModel: ModelInstance,
+        chunkIndex: Int
+    ): Entity {
         val entity = engine.createEntity()
 
         val transform = TransformComponent().apply {
@@ -591,7 +617,8 @@ class WorldGenerator(
         entity.add(transform)
 
         val model = ModelComponent().apply {
-            this.modelInstance = modelInstance
+            this.modelInstance = detailedModel
+            this.modelInstanceLod = simpleModel
         }
         entity.add(model)
 
@@ -690,6 +717,67 @@ class WorldGenerator(
         }
 
         return entities
+    }
+
+    private fun generateBackgroundBuildings(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Background buildings are placed far from the road to fill horizon gaps
+        // They are positioned behind the main buildings
+        val backgroundDistanceX = 40f  // Distance from road center (behind main buildings at ~14m)
+        val backgroundSpacing = 18f    // Spacing between background buildings
+
+        var z = chunkStartZ
+        while (z < chunkStartZ + Constants.CHUNK_LENGTH) {
+            // Left side background buildings (at varying distances)
+            val leftX = -backgroundDistanceX - MathUtils.random(0f, 20f)
+            entities.add(createBackgroundBuildingEntity(leftX, z + MathUtils.random(-5f, 5f), chunkIndex))
+
+            // Sometimes add an extra building in the gap
+            if (MathUtils.random() < 0.5f) {
+                val extraLeftX = -backgroundDistanceX - MathUtils.random(5f, 35f)
+                entities.add(createBackgroundBuildingEntity(extraLeftX, z + MathUtils.random(5f, 12f), chunkIndex))
+            }
+
+            // Right side background buildings
+            val rightX = backgroundDistanceX + MathUtils.random(0f, 20f)
+            entities.add(createBackgroundBuildingEntity(rightX, z + MathUtils.random(-5f, 5f), chunkIndex))
+
+            // Sometimes add an extra building on right side
+            if (MathUtils.random() < 0.5f) {
+                val extraRightX = backgroundDistanceX + MathUtils.random(5f, 35f)
+                entities.add(createBackgroundBuildingEntity(extraRightX, z + MathUtils.random(5f, 12f), chunkIndex))
+            }
+
+            z += backgroundSpacing + MathUtils.random(-3f, 3f)
+        }
+
+        return entities
+    }
+
+    private fun createBackgroundBuildingEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            // Random rotation for variety
+            yaw = MathUtils.random(0f, 360f)
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(backgroundBuildingModels.random().model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // No collider - these are just visual background elements
+
+        engine.addEntity(entity)
+        return entity
     }
 
     private fun createCloudEntity(x: Float, y: Float, z: Float, chunkIndex: Int): Entity {
