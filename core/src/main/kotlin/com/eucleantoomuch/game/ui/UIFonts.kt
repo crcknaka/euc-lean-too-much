@@ -27,15 +27,15 @@ object UIFonts : Disposable {
         TINY         // Extra small - Debug info
     }
 
-    // Increased base sizes for 1080p screen (larger for modern look)
+    // Base sizes for 1080p screen (in points, will be scaled for screen)
     private val baseFontSizes = mapOf(
-        FontStyle.DISPLAY to 180,   // was 140
-        FontStyle.TITLE to 130,      // was 100
-        FontStyle.HEADING to 95,     // was 75
-        FontStyle.BUTTON to 72,      // was 60
-        FontStyle.BODY to 58,        // was 48
-        FontStyle.CAPTION to 48,     // was 40
-        FontStyle.TINY to 38         // was 32
+        FontStyle.DISPLAY to 72,    // Big titles, countdown
+        FontStyle.TITLE to 48,      // Screen titles
+        FontStyle.HEADING to 36,    // Section headings, values
+        FontStyle.BUTTON to 28,     // Button text
+        FontStyle.BODY to 22,       // Body text, labels
+        FontStyle.CAPTION to 18,    // Hints, secondary info
+        FontStyle.TINY to 14        // Debug info
     )
 
     // Characters to include in font
@@ -50,12 +50,18 @@ object UIFonts : Disposable {
         // Scale based on screen height (base is 1080p)
         val screenScale = (Gdx.graphics.height / 1080f).coerceIn(0.5f, 2.5f)
 
-        // Try to use system fonts or fallback
+        // Try to use custom font file
         generator = try {
-            // Try loading a clean sans-serif font bundled with the app
-            // For now we'll use the default scaled bitmap font with better settings
-            null
+            // Load Roboto font (download from fonts.google.com and place in assets/)
+            val fontFile = Gdx.files.internal("Roboto-Medium.ttf")
+            if (fontFile.exists()) {
+                FreeTypeFontGenerator(fontFile)
+            } else {
+                Gdx.app.log("UIFonts", "Font file not found: Roboto-Medium.ttf - using default bitmap font")
+                null
+            }
         } catch (e: Exception) {
+            Gdx.app.log("UIFonts", "Failed to load font: ${e.message}")
             null
         }
 
@@ -67,13 +73,13 @@ object UIFonts : Disposable {
     }
 
     private fun createFont(baseSize: Int, density: Float, screenScale: Float): BitmapFont {
-        val scaledSize = (baseSize * density * screenScale * 0.5f).toInt().coerceAtLeast(12)
-
         return if (generator != null) {
+            // FreeType: scale based on screen size only (density is handled by screen resolution)
+            val scaledSize = (baseSize * screenScale).toInt().coerceAtLeast(10)
             createFreeTypeFont(scaledSize)
         } else {
-            // Scale factor for bitmap fonts, adjusted for screen size
-            createScaledBitmapFont(baseSize * screenScale * 0.04f)
+            // Fallback bitmap font: needs different scaling approach
+            createScaledBitmapFont(baseSize * screenScale * 0.06f)
         }
     }
 
