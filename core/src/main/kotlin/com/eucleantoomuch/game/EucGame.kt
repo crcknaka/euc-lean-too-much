@@ -13,9 +13,12 @@ import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
+import com.eucleantoomuch.game.feedback.SpeedWarningManager
 import com.eucleantoomuch.game.input.AccelerometerInput
 import com.eucleantoomuch.game.input.GameInput
 import com.eucleantoomuch.game.input.KeyboardInput
+import com.eucleantoomuch.game.platform.DefaultPlatformServices
+import com.eucleantoomuch.game.platform.PlatformServices
 import com.eucleantoomuch.game.procedural.WorldGenerator
 import com.eucleantoomuch.game.rendering.GameRenderer
 import com.eucleantoomuch.game.rendering.ProceduralModels
@@ -30,7 +33,9 @@ import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
 
-class EucGame : ApplicationAdapter() {
+class EucGame(
+    private val platformServices: PlatformServices = DefaultPlatformServices()
+) : ApplicationAdapter() {
     private lateinit var engine: Engine
     private lateinit var gameInput: GameInput
     private lateinit var accelerometerInput: AccelerometerInput
@@ -61,6 +66,9 @@ class EucGame : ApplicationAdapter() {
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
     private lateinit var collisionSystem: CollisionSystem
+
+    // Speed warning system (beeps and vibration at high speed)
+    private lateinit var speedWarningManager: SpeedWarningManager
 
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
@@ -128,6 +136,9 @@ class EucGame : ApplicationAdapter() {
 
         // Apply saved render distance setting
         applyRenderDistance()
+
+        // Initialize speed warning system
+        speedWarningManager = SpeedWarningManager(platformServices)
 
         // Start at menu
         stateManager.transition(GameState.Menu)
@@ -340,6 +351,9 @@ class EucGame : ApplicationAdapter() {
 
             // Update camera
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
+
+            // Update speed warning system (beeps at 55+ km/h, overpower on hard acceleration)
+            speedWarningManager.update(eucComponent.speed, delta, eucComponent.forwardLean)
         }
 
         // Render
@@ -347,11 +361,14 @@ class EucGame : ApplicationAdapter() {
 
         // Render HUD
         if (eucComponent != null) {
-            hud.render(session, eucComponent)
+            hud.render(session, eucComponent, speedWarningManager.isActive(), speedWarningManager.isOverpowerWarning())
         }
     }
 
     private fun renderPaused() {
+        // Stop speed warnings when paused
+        speedWarningManager.stop()
+
         // Render frozen game state
         renderer.render()
 
@@ -488,6 +505,9 @@ class EucGame : ApplicationAdapter() {
     }
 
     private fun handlePlayerFall() {
+        // Stop speed warnings
+        speedWarningManager.stop()
+
         // Record score
         isNewHighScore = highScoreManager.recordGame(session)
 

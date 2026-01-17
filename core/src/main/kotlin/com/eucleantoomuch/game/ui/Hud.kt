@@ -17,8 +17,10 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var lastScore = 0
     private var warningFlash = 0f
     private var speedBarSmooth = 0f
+    private var speedWarningFlash = 0f
+    private var overpowerFlash = 0f
 
-    fun render(session: GameSession, euc: EucComponent) {
+    fun render(session: GameSession, euc: EucComponent, speedWarningActive: Boolean = false, overpowerWarningActive: Boolean = false) {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
 
@@ -36,11 +38,25 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val targetSpeed = (euc.speed / 25f).coerceIn(0f, 1f)
         speedBarSmooth = UITheme.Anim.ease(speedBarSmooth, targetSpeed, 5f)
 
-        // Warning flash
+        // Warning flash (about to fall)
         if (euc.isAboutToFall()) {
             warningFlash += Gdx.graphics.deltaTime * 8f
         } else {
             warningFlash = UITheme.Anim.ease(warningFlash, 0f, 5f)
+        }
+
+        // Speed warning flash (55+ km/h)
+        if (speedWarningActive) {
+            speedWarningFlash += Gdx.graphics.deltaTime * 10f
+        } else {
+            speedWarningFlash = UITheme.Anim.ease(speedWarningFlash, 0f, 5f)
+        }
+
+        // Overpower flash (hard acceleration)
+        if (overpowerWarningActive) {
+            overpowerFlash = 1f  // Instant flash
+        } else {
+            overpowerFlash = UITheme.Anim.ease(overpowerFlash, 0f, 8f)  // Quick fade
         }
 
         val scale = UITheme.Dimensions.scale()
@@ -99,6 +115,20 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         if (euc.isAboutToFall()) {
             val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
             drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 30)
+        }
+
+        // Speed warning indicator (55+ km/h)
+        if (speedWarningFlash > 0.1f) {
+            val speedKmh = (euc.speed * 3.6f).toInt()
+            val warningPulse = MathUtils.sin(speedWarningFlash * 8f) * 0.5f + 0.5f
+            val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
+            drawWarningBadge("⚠ SPEED $speedKmh km/h", warningColor, sh / 2 + 80)
+        }
+
+        // Overpower warning indicator (hard acceleration)
+        if (overpowerFlash > 0.1f) {
+            val overpowerColor = UITheme.withAlpha(UITheme.danger, overpowerFlash)
+            drawWarningBadge("⚡ OVERPOWER!", overpowerColor, sh / 2 + 130)
         }
 
         // FPS counter (top-left, small)

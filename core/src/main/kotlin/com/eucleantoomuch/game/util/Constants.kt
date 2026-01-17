@@ -6,10 +6,10 @@ object Constants {
     const val VIRTUAL_HEIGHT = 720f
 
     // EUC Physics
-    const val MAX_LEAN_ANGLE = 35f          // degrees
-    const val CRITICAL_LEAN = 0.85f         // 85% of max lean = instant fall
+    const val MAX_LEAN_ANGLE = 45f          // degrees (increased for more range)
+    const val CRITICAL_LEAN = 0.95f         // 95% of max lean = instant fall (more forgiving)
     const val MIN_SPEED = 2f                // m/s (always moving forward)
-    const val MAX_SPEED = 20f               // m/s (~72 km/h)
+    const val MAX_SPEED = 23.6f             // m/s (85 km/h)
     const val ACCELERATION = 5f             // m/s²
     const val DECELERATION = 8f             // m/s² (braking)
     const val MAX_TURN_RATE = 90f           // degrees/second

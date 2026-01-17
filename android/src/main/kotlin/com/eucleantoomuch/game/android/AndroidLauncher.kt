@@ -32,7 +32,10 @@ class AndroidLauncher : AndroidApplication() {
             numSamples = 2
         }
 
-        initialize(EucGame(), config)
+        // Create platform services for Android (vibration, beep sounds)
+        val platformServices = AndroidPlatformServices(this)
+
+        initialize(EucGame(platformServices), config)
 
         // Hide system bars for full immersive experience
         hideSystemBars()
