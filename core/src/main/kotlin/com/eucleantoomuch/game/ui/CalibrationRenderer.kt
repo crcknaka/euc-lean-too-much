@@ -3,190 +3,225 @@ package com.eucleantoomuch.game.ui
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.BitmapFont
-import com.badlogic.gdx.graphics.g2d.GlyphLayout
-import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.utils.Disposable
 
 class CalibrationRenderer : Disposable {
-    private val batch = SpriteBatch()
-    private val shapeRenderer = ShapeRenderer()
-    private val layout = GlyphLayout()
-
-    // Fonts with smooth filtering
-    private val titleFont = createSmoothFont(3.5f)
-    private val instructionFont = createSmoothFont(1.8f)
-    private val buttonFont = createSmoothFont(2.2f)
-    private val valueFont = createSmoothFont(1.5f)
-
-    private var screenWidth = Gdx.graphics.width.toFloat()
-    private var screenHeight = Gdx.graphics.height.toFloat()
+    private val ui = UIRenderer()
 
     private val calibrateButton = Rectangle()
     private val skipButton = Rectangle()
 
-    // Modern colors
-    private val bgDark = Color(0.08f, 0.08f, 0.12f, 1f)
-    private val panelBg = Color(0.12f, 0.12f, 0.18f, 0.98f)
-    private val accentGreen = Color(0.2f, 0.8f, 0.4f, 1f)
-    private val accentGreenDark = Color(0.15f, 0.6f, 0.3f, 1f)
-    private val accentGray = Color(0.35f, 0.35f, 0.4f, 1f)
-    private val accentGrayDark = Color(0.25f, 0.25f, 0.3f, 1f)
-    private val accentCyan = Color(0.3f, 0.9f, 0.9f, 1f)
-    private val textWhite = Color(0.95f, 0.95f, 0.95f, 1f)
-    private val textGray = Color(0.55f, 0.55f, 0.6f, 1f)
-
-    private fun createSmoothFont(scale: Float): BitmapFont {
-        return BitmapFont().apply {
-            data.setScale(scale)
-            setUseIntegerPositions(false)
-            region.texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
-        }
-    }
+    // Animation states
+    private var enterAnim = 0f
+    private var dotTrailX = FloatArray(10) { 0f }
+    private var dotTrailY = FloatArray(10) { 0f }
+    private var trailIndex = 0
+    private var trailTimer = 0f
+    private var calibrateHover = 0f
+    private var skipHover = 0f
+    private var successFlash = 0f
 
     enum class Action {
         NONE, CALIBRATE, SKIP
     }
 
     fun render(rawX: Float, rawY: Float): Action {
-        val centerX = screenWidth / 2
-        val centerY = screenHeight / 2
+        UITheme.Anim.update(Gdx.graphics.deltaTime)
+        UIFonts.initialize()
 
-        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+        val centerX = sw / 2
+        val centerY = sh / 2
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
+        // Animations
+        enterAnim = UITheme.Anim.ease(enterAnim, 1f, 4f)
+        successFlash = UITheme.Anim.ease(successFlash, 0f, 3f)
 
-        // Background
-        shapeRenderer.color = bgDark
-        shapeRenderer.rect(0f, 0f, screenWidth, screenHeight)
+        // Hover states
+        val touchX = Gdx.input.x.toFloat()
+        val touchY = sh - Gdx.input.y.toFloat()
+        calibrateHover = UITheme.Anim.ease(calibrateHover, if (calibrateButton.contains(touchX, touchY)) 1f else 0f, 8f)
+        skipHover = UITheme.Anim.ease(skipHover, if (skipButton.contains(touchX, touchY)) 1f else 0f, 8f)
 
-        // Central panel
-        val panelWidth = 500f
-        val panelHeight = 400f
+        // Update dot trail
+        trailTimer += Gdx.graphics.deltaTime
+        if (trailTimer > 0.05f) {
+            trailTimer = 0f
+            trailIndex = (trailIndex + 1) % dotTrailX.size
+            val maxTilt = 10f
+            val normalizedX = (rawX / maxTilt).coerceIn(-1f, 1f)
+            val normalizedY = (rawY / maxTilt).coerceIn(-1f, 1f)
+            dotTrailX[trailIndex] = normalizedY
+            dotTrailY[trailIndex] = -normalizedX
+        }
+
+        ui.beginShapes()
+
+        // Gradient background
+        for (i in 0 until 20) {
+            val t = i / 20f
+            val stripY = sh * t
+            ui.shapes.color = UITheme.lerp(UITheme.background, UITheme.backgroundLight, t)
+            ui.shapes.rect(0f, stripY, sw, sh / 20f + 1)
+        }
+
+        // Panel
+        val uiScale = UITheme.Dimensions.scale()
+        val panelWidth = 500f * uiScale * enterAnim
+        val panelHeight = 480f * uiScale * enterAnim
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
-        // Panel shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.3f)
-        drawRoundedRect(panelX + 4, panelY - 4, panelWidth, panelHeight, 16f)
-
-        // Panel background
-        shapeRenderer.color = panelBg
-        drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 16f)
+        ui.panel(panelX, panelY, panelWidth, panelHeight,
+            backgroundColor = UITheme.surface)
 
         // Tilt indicator
-        val indicatorSize = 160f
+        val indicatorSize = 180f * enterAnim
         val indicatorCenterX = centerX
-        val indicatorCenterY = centerY + 50
+        val indicatorCenterY = centerY + 40
 
         // Indicator shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.3f)
-        shapeRenderer.circle(indicatorCenterX + 2, indicatorCenterY - 2, indicatorSize / 2 + 2)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.3f)
+        ui.shapes.circle(indicatorCenterX + 3, indicatorCenterY - 3, indicatorSize / 2 + 3)
 
         // Indicator background
-        shapeRenderer.color = Color(0.15f, 0.15f, 0.2f, 1f)
-        shapeRenderer.circle(indicatorCenterX, indicatorCenterY, indicatorSize / 2)
+        ui.shapes.color = UITheme.surfaceLight
+        ui.shapes.circle(indicatorCenterX, indicatorCenterY, indicatorSize / 2)
 
-        // Target zone
-        shapeRenderer.color = Color(0.2f, 0.5f, 0.3f, 0.6f)
-        shapeRenderer.circle(indicatorCenterX, indicatorCenterY, 25f)
+        // Grid circles
+        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.15f)
+        for (r in listOf(0.33f, 0.66f, 1f)) {
+            // Draw circle outline approximation
+            val segments = 32
+            val radius = indicatorSize / 2 * r - 5
+            for (i in 0 until segments) {
+                val angle1 = (i.toFloat() / segments) * MathUtils.PI2
+                val angle2 = ((i + 1).toFloat() / segments) * MathUtils.PI2
+                ui.shapes.rectLine(
+                    indicatorCenterX + radius * MathUtils.cos(angle1),
+                    indicatorCenterY + radius * MathUtils.sin(angle1),
+                    indicatorCenterX + radius * MathUtils.cos(angle2),
+                    indicatorCenterY + radius * MathUtils.sin(angle2),
+                    1f
+                )
+            }
+        }
 
         // Crosshair
-        shapeRenderer.color = Color(0.35f, 0.35f, 0.4f, 0.6f)
-        shapeRenderer.rectLine(indicatorCenterX - indicatorSize / 2 + 12, indicatorCenterY,
-            indicatorCenterX + indicatorSize / 2 - 12, indicatorCenterY, 1.5f)
-        shapeRenderer.rectLine(indicatorCenterX, indicatorCenterY - indicatorSize / 2 + 12,
-            indicatorCenterX, indicatorCenterY + indicatorSize / 2 - 12, 1.5f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.3f)
+        ui.shapes.rectLine(indicatorCenterX - indicatorSize / 2 + 10, indicatorCenterY,
+            indicatorCenterX + indicatorSize / 2 - 10, indicatorCenterY, 1.5f)
+        ui.shapes.rectLine(indicatorCenterX, indicatorCenterY - indicatorSize / 2 + 10,
+            indicatorCenterX, indicatorCenterY + indicatorSize / 2 - 10, 1.5f)
 
-        // Current tilt position
+        // Target zone (center)
+        val targetPulse = UITheme.Anim.pulse(2f, 0.4f, 0.6f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.4f)
+        ui.shapes.circle(indicatorCenterX, indicatorCenterY, 30f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.primary, targetPulse * 0.7f)
+        ui.shapes.circle(indicatorCenterX, indicatorCenterY, 15f)
+
+        // Dot trail
+        for (i in dotTrailX.indices) {
+            val idx = (trailIndex - i + dotTrailX.size) % dotTrailX.size
+            val alpha = (1f - i.toFloat() / dotTrailX.size) * 0.3f
+            val trailDotX = indicatorCenterX + dotTrailX[idx] * indicatorSize / 2 * 0.8f
+            val trailDotY = indicatorCenterY + dotTrailY[idx] * indicatorSize / 2 * 0.8f
+            ui.shapes.color = UITheme.withAlpha(UITheme.cyan, alpha)
+            ui.shapes.circle(trailDotX, trailDotY, 4f - i * 0.3f)
+        }
+
+        // Current position dot
         val maxTilt = 10f
         val normalizedX = (rawX / maxTilt).coerceIn(-1f, 1f)
         val normalizedY = (rawY / maxTilt).coerceIn(-1f, 1f)
-        val dotX = indicatorCenterX + normalizedY * indicatorSize / 2 * 0.75f
-        val dotY = indicatorCenterY - normalizedX * indicatorSize / 2 * 0.75f
+        val dotX = indicatorCenterX + normalizedY * indicatorSize / 2 * 0.8f
+        val dotY = indicatorCenterY - normalizedX * indicatorSize / 2 * 0.8f
+
+        // Is centered?
+        val distFromCenter = Vector2.dst(dotX, dotY, indicatorCenterX, indicatorCenterY)
+        val isCentered = distFromCenter < 25f
 
         // Dot shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.4f)
-        shapeRenderer.circle(dotX + 1.5f, dotY - 1.5f, 13f)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.4f)
+        ui.shapes.circle(dotX + 2, dotY - 2, 14f)
+
+        // Dot glow when centered
+        if (isCentered) {
+            val glowPulse = UITheme.Anim.pulse(4f, 0.3f, 0.6f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, glowPulse)
+            ui.shapes.circle(dotX, dotY, 20f)
+        }
 
         // Main dot
-        shapeRenderer.color = accentCyan
-        shapeRenderer.circle(dotX, dotY, 12f)
+        val dotColor = if (isCentered) UITheme.primary else UITheme.cyan
+        ui.shapes.color = dotColor
+        ui.shapes.circle(dotX, dotY, 12f)
 
-        // Highlight
-        shapeRenderer.color = Color(1f, 1f, 1f, 0.4f)
-        shapeRenderer.circle(dotX - 3, dotY + 3, 4f)
+        // Dot highlight
+        ui.shapes.color = UITheme.withAlpha(Color.WHITE, 0.5f)
+        ui.shapes.circle(dotX - 3, dotY + 3, 4f)
 
-        // Button dimensions
-        val buttonWidth = 180f
-        val buttonHeight = 50f
-        val buttonSpacing = 15f
-        val totalButtonsWidth = buttonWidth * 2 + buttonSpacing
+        // Success flash
+        if (successFlash > 0.1f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, successFlash * 0.3f)
+            ui.shapes.rect(0f, 0f, sw, sh)
+        }
 
-        // Buttons side by side
-        val buttonsY = panelY + 25
-        calibrateButton.set(centerX - totalButtonsWidth / 2, buttonsY, buttonWidth, buttonHeight)
+        // Buttons
+        val buttonWidth = 200f * uiScale
+        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
+        val buttonSpacing = 20f * uiScale
+        val totalWidth = buttonWidth * 2 + buttonSpacing
+        val buttonsY = panelY + 28f * uiScale
+
+        calibrateButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         skipButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
 
-        // Calibrate button
-        shapeRenderer.color = accentGreenDark
-        drawRoundedRect(calibrateButton.x, calibrateButton.y - 3, calibrateButton.width, calibrateButton.height, 10f)
-        shapeRenderer.color = accentGreen
-        drawRoundedRect(calibrateButton.x, calibrateButton.y, calibrateButton.width, calibrateButton.height, 10f)
+        ui.button(calibrateButton, UITheme.primary, glowIntensity = calibrateHover * 0.6f + (if (isCentered) 0.3f else 0f))
+        ui.button(skipButton, UITheme.surfaceLight, glowIntensity = skipHover * 0.3f)
 
-        // Skip button
-        shapeRenderer.color = accentGrayDark
-        drawRoundedRect(skipButton.x, skipButton.y - 3, skipButton.width, skipButton.height, 10f)
-        shapeRenderer.color = accentGray
-        drawRoundedRect(skipButton.x, skipButton.y, skipButton.width, skipButton.height, 10f)
+        ui.endShapes()
 
-        shapeRenderer.end()
-
-        batch.begin()
+        // === Text ===
+        ui.beginBatch()
 
         // Title
-        titleFont.color = textWhite
-        layout.setText(titleFont, "CALIBRATION")
-        titleFont.draw(batch, "CALIBRATION", centerX - layout.width / 2, panelY + panelHeight - 30)
+        val titleY = panelY + panelHeight - 35 * enterAnim
+        ui.textCentered("CALIBRATION", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
-        // Instructions with proper spacing
-        instructionFont.color = textGray
-        layout.setText(instructionFont, "Hold phone in playing position")
-        instructionFont.draw(batch, "Hold phone in playing position", centerX - layout.width / 2, panelY + panelHeight - 75)
+        // Instructions
+        val instrY = titleY - 50
+        UIFonts.body.color = UITheme.textSecondary
+        ui.textCentered("Hold device in playing position", centerX, instrY, UIFonts.body, UITheme.textSecondary)
 
-        layout.setText(instructionFont, "Center the dot, then tap CALIBRATE")
-        instructionFont.draw(batch, "Center the dot, then tap CALIBRATE", centerX - layout.width / 2, panelY + panelHeight - 105)
+        val instrY2 = instrY - 30
+        val hintColor = if (isCentered) UITheme.primary else UITheme.textMuted
+        ui.textCentered(
+            if (isCentered) "Centered! Tap CALIBRATE" else "Center the dot, then tap CALIBRATE",
+            centerX, instrY2, UIFonts.caption, hintColor
+        )
 
-        // Accelerometer values (below indicator)
-        valueFont.color = textGray
+        // Accelerometer values
+        val valuesY = indicatorCenterY - indicatorSize / 2 - 25
+        UIFonts.tiny.color = UITheme.textMuted
         val valuesText = "X: ${String.format("%.1f", rawX)}  Y: ${String.format("%.1f", rawY)}"
-        layout.setText(valueFont, valuesText)
-        valueFont.draw(batch, valuesText, centerX - layout.width / 2, indicatorCenterY - indicatorSize / 2 - 18)
+        ui.textCentered(valuesText, centerX, valuesY, UIFonts.tiny, UITheme.textMuted)
 
-        // Button text
-        buttonFont.color = textWhite
+        // Button labels
+        ui.textCentered("CALIBRATE", calibrateButton.x + calibrateButton.width / 2, calibrateButton.y + calibrateButton.height / 2, UIFonts.button, UITheme.textPrimary)
+        ui.textCentered("SKIP", skipButton.x + skipButton.width / 2, skipButton.y + skipButton.height / 2, UIFonts.button, UITheme.textPrimary)
 
-        layout.setText(buttonFont, "CALIBRATE")
-        buttonFont.draw(batch, "CALIBRATE",
-            calibrateButton.x + (calibrateButton.width - layout.width) / 2,
-            calibrateButton.y + calibrateButton.height / 2 + layout.height / 2)
+        ui.endBatch()
 
-        layout.setText(buttonFont, "SKIP")
-        buttonFont.draw(batch, "SKIP",
-            skipButton.x + (skipButton.width - layout.width) / 2,
-            skipButton.y + skipButton.height / 2 + layout.height / 2)
-
-        batch.end()
-
-        // Check for clicks/touches
+        // === Input ===
         if (Gdx.input.justTouched()) {
-            val touchX = Gdx.input.x.toFloat()
-            val touchY = screenHeight - Gdx.input.y.toFloat()
-
             if (calibrateButton.contains(touchX, touchY)) {
+                successFlash = 1f
                 return Action.CALIBRATE
             }
             if (skipButton.contains(touchX, touchY)) {
@@ -194,8 +229,8 @@ class CalibrationRenderer : Disposable {
             }
         }
 
-        // Keyboard shortcuts
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+            successFlash = 1f
             return Action.CALIBRATE
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.S)) {
@@ -205,28 +240,12 @@ class CalibrationRenderer : Disposable {
         return Action.NONE
     }
 
-    private fun drawRoundedRect(x: Float, y: Float, width: Float, height: Float, radius: Float) {
-        shapeRenderer.rect(x + radius, y, width - 2 * radius, height)
-        shapeRenderer.rect(x, y + radius, width, height - 2 * radius)
-        shapeRenderer.circle(x + radius, y + radius, radius)
-        shapeRenderer.circle(x + width - radius, y + radius, radius)
-        shapeRenderer.circle(x + radius, y + height - radius, radius)
-        shapeRenderer.circle(x + width - radius, y + height - radius, radius)
-    }
-
     fun resize(width: Int, height: Int) {
-        screenWidth = width.toFloat()
-        screenHeight = height.toFloat()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapeRenderer.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        ui.resize(width, height)
+        enterAnim = 0f
     }
 
     override fun dispose() {
-        batch.dispose()
-        titleFont.dispose()
-        instructionFont.dispose()
-        buttonFont.dispose()
-        valueFont.dispose()
-        shapeRenderer.dispose()
+        ui.dispose()
     }
 }

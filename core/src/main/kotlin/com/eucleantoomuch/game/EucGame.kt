@@ -333,6 +333,9 @@ class EucGame : ApplicationAdapter() {
         // Record score
         isNewHighScore = highScoreManager.recordGame(session)
 
+        // Reset game over animations
+        gameOverRenderer.reset()
+
         // Transition to game over
         stateManager.transition(GameState.GameOver(session))
     }

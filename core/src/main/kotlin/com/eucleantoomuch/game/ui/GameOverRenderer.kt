@@ -3,177 +3,167 @@ package com.eucleantoomuch.game.ui
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.BitmapFont
-import com.badlogic.gdx.graphics.g2d.GlyphLayout
-import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.state.GameSession
 
 class GameOverRenderer : Disposable {
-    private val batch = SpriteBatch()
-    private val shapeRenderer = ShapeRenderer()
-    private val layout = GlyphLayout()
-
-    // Fonts with smooth filtering
-    private val titleFont = createSmoothFont(4f)
-    private val labelFont = createSmoothFont(2f)
-    private val valueFont = createSmoothFont(2.2f)
-    private val buttonFont = createSmoothFont(2.3f)
-    private val badgeFont = createSmoothFont(2.5f)
-
-    private var screenWidth = Gdx.graphics.width.toFloat()
-    private var screenHeight = Gdx.graphics.height.toFloat()
+    private val ui = UIRenderer()
 
     private val retryButton = Rectangle()
     private val menuButton = Rectangle()
 
-    // Modern colors
-    private val bgOverlay = Color(0.05f, 0.05f, 0.1f, 0.92f)
-    private val panelColor = Color(0.12f, 0.12f, 0.18f, 0.98f)
-    private val accentGreen = Color(0.2f, 0.8f, 0.4f, 1f)
-    private val accentGreenDark = Color(0.15f, 0.6f, 0.3f, 1f)
-    private val accentGray = Color(0.35f, 0.35f, 0.4f, 1f)
-    private val accentGrayDark = Color(0.25f, 0.25f, 0.3f, 1f)
-    private val goldColor = Color(1f, 0.85f, 0.3f, 1f)
-    private val redColor = Color(0.9f, 0.25f, 0.25f, 1f)
-    private val textWhite = Color(0.95f, 0.95f, 0.95f, 1f)
-    private val textGray = Color(0.65f, 0.65f, 0.7f, 1f)
-
-    private fun createSmoothFont(scale: Float): BitmapFont {
-        return BitmapFont().apply {
-            data.setScale(scale)
-            setUseIntegerPositions(false)
-            region.texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
-        }
-    }
+    // Animation states
+    private var overlayAlpha = 0f
+    private var panelScale = 0f
+    private var statsReveal = 0f
+    private var newHighScoreAnim = 0f
+    private var retryHover = 0f
+    private var menuHover = 0f
 
     enum class ButtonClicked {
         NONE, RETRY, MENU
     }
 
     fun render(session: GameSession, isNewHighScore: Boolean): ButtonClicked {
-        val centerX = screenWidth / 2
-        val centerY = screenHeight / 2
+        UITheme.Anim.update(Gdx.graphics.deltaTime)
+        UIFonts.initialize()
 
-        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+        val centerX = sw / 2
+        val centerY = sh / 2
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
+        // Update animations
+        overlayAlpha = UITheme.Anim.ease(overlayAlpha, 0.85f, 4f)
+        panelScale = UITheme.Anim.ease(panelScale, 1f, 5f)
+        statsReveal = UITheme.Anim.ease(statsReveal, 1f, 3f)
 
-        // Full screen dark overlay
-        shapeRenderer.color = bgOverlay
-        shapeRenderer.rect(0f, 0f, screenWidth, screenHeight)
+        if (isNewHighScore) {
+            newHighScoreAnim += Gdx.graphics.deltaTime
+        }
 
-        // Central panel - sized to fit content properly
-        val panelWidth = 480f
-        val panelHeight = 380f
+        // Check hover
+        val touchX = Gdx.input.x.toFloat()
+        val touchY = sh - Gdx.input.y.toFloat()
+        retryHover = UITheme.Anim.ease(retryHover, if (retryButton.contains(touchX, touchY)) 1f else 0f, 8f)
+        menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 8f)
+
+        ui.beginShapes()
+
+        // Dark overlay with vignette effect
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
+        ui.shapes.rect(0f, 0f, sw, sh)
+
+        // Vignette corners
+        val vignetteColor = UITheme.withAlpha(Color.BLACK, overlayAlpha * 0.3f)
+        ui.shapes.color = vignetteColor
+        ui.shapes.circle(0f, 0f, sh * 0.3f)
+        ui.shapes.circle(sw, 0f, sh * 0.3f)
+        ui.shapes.circle(0f, sh, sh * 0.3f)
+        ui.shapes.circle(sw, sh, sh * 0.3f)
+
+        // Panel dimensions with scale animation
+        val uiScale = UITheme.Dimensions.scale()
+        val panelWidth = 480f * uiScale * panelScale
+        val panelHeight = 450f * uiScale * panelScale
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
-        // Panel shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.4f)
-        drawRoundedRect(panelX + 5, panelY - 5, panelWidth, panelHeight, 16f)
+        // Panel with glow for new high score
+        if (isNewHighScore && panelScale > 0.9f) {
+            val glowPulse = UITheme.Anim.pulse(3f, 0.2f, 0.5f)
+            for (i in 4 downTo 1) {
+                ui.roundedRect(
+                    panelX - i * 4, panelY - i * 4,
+                    panelWidth + i * 8, panelHeight + i * 8,
+                    UITheme.Dimensions.panelRadius + i * 2,
+                    UITheme.withAlpha(UITheme.accent, glowPulse * 0.15f * i)
+                )
+            }
+        }
 
-        // Panel background
-        shapeRenderer.color = panelColor
-        drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 16f)
+        // Main panel
+        ui.panel(panelX, panelY, panelWidth, panelHeight,
+            backgroundColor = UITheme.surface,
+            borderColor = if (isNewHighScore) UITheme.accent else null)
 
-        // Button dimensions
-        val buttonWidth = 200f
-        val buttonHeight = 55f
-        val buttonSpacing = 15f
-        val totalButtonsWidth = buttonWidth * 2 + buttonSpacing
+        // Button layout
+        val buttonWidth = 190f * uiScale
+        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
+        val buttonSpacing = 20f * uiScale
+        val totalWidth = buttonWidth * 2 + buttonSpacing
+        val buttonsY = panelY + 28f * uiScale
 
-        // Position buttons side by side at bottom of panel
-        val buttonsY = panelY + 25
-        retryButton.set(centerX - totalButtonsWidth / 2, buttonsY, buttonWidth, buttonHeight)
+        retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
 
-        // Retry button (green)
-        shapeRenderer.color = accentGreenDark
-        drawRoundedRect(retryButton.x, retryButton.y - 3, retryButton.width, retryButton.height, 10f)
-        shapeRenderer.color = accentGreen
-        drawRoundedRect(retryButton.x, retryButton.y, retryButton.width, retryButton.height, 10f)
+        // Buttons
+        ui.button(retryButton, UITheme.primary, glowIntensity = retryHover * 0.6f)
+        ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.3f)
 
-        // Menu button (gray)
-        shapeRenderer.color = accentGrayDark
-        drawRoundedRect(menuButton.x, menuButton.y - 3, menuButton.width, menuButton.height, 10f)
-        shapeRenderer.color = accentGray
-        drawRoundedRect(menuButton.x, menuButton.y, menuButton.width, menuButton.height, 10f)
+        ui.endShapes()
 
-        shapeRenderer.end()
+        // === Text ===
+        ui.beginBatch()
 
-        batch.begin()
+        if (panelScale > 0.5f) {
+            // Title
+            val titleY = panelY + panelHeight - 50 * uiScale
+            val titleColor = if (isNewHighScore) {
+                UITheme.lerp(UITheme.danger, UITheme.accent, UITheme.Anim.pulse(2f, 0f, 1f))
+            } else {
+                UITheme.danger
+            }
+            ui.textCentered("GAME OVER", centerX, titleY, UIFonts.title, titleColor)
 
-        // Title - "GAME OVER" at top of panel
-        titleFont.color = redColor
-        layout.setText(titleFont, "GAME OVER")
-        val titleY = panelY + panelHeight - 35
-        titleFont.draw(batch, "GAME OVER", centerX - layout.width / 2, titleY)
+            // New high score badge
+            var statsStartY = titleY - 70f * uiScale
+            if (isNewHighScore) {
+                val badgePulse = UITheme.Anim.pulse(4f, 0.8f, 1f)
+                val badgeColor = UITheme.lerp(UITheme.accent, UITheme.accentBright, badgePulse)
+                ui.textCentered("** NEW HIGH SCORE! **", centerX, statsStartY, UIFonts.body, badgeColor)
+                statsStartY -= 55f * uiScale
+            }
 
-        // New high score badge (if applicable)
-        var statsStartY = titleY - 65
-        if (isNewHighScore) {
-            badgeFont.color = goldColor
-            layout.setText(badgeFont, "NEW HIGH SCORE!")
-            badgeFont.draw(batch, "NEW HIGH SCORE!", centerX - layout.width / 2, statsStartY)
-            statsStartY -= 50
+            // Stats with reveal animation
+            val statsAlpha = (statsReveal * 1.5f - 0.5f).coerceIn(0f, 1f)
+            if (statsAlpha > 0) {
+                val lineHeight = 60f * uiScale
+
+                // Score - centered
+                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
+                ui.textCentered("SCORE", centerX, statsStartY, UIFonts.caption, UIFonts.caption.color)
+                UIFonts.heading.color = UITheme.withAlpha(UITheme.accent, statsAlpha)
+                ui.textCentered(session.score.toString(), centerX, statsStartY - 35f * uiScale, UIFonts.heading, UIFonts.heading.color)
+
+                // Distance - centered
+                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
+                ui.textCentered("DISTANCE", centerX, statsStartY - lineHeight * 1.3f, UIFonts.caption, UIFonts.caption.color)
+                UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
+                ui.textCentered("${session.distanceTraveled.toInt()} m", centerX, statsStartY - lineHeight * 1.3f - 35f * uiScale, UIFonts.heading, UIFonts.heading.color)
+
+                // Top Speed - centered
+                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
+                ui.textCentered("TOP SPEED", centerX, statsStartY - lineHeight * 2.6f, UIFonts.caption, UIFonts.caption.color)
+                UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
+                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX, statsStartY - lineHeight * 2.6f - 35f * uiScale, UIFonts.heading, UIFonts.heading.color)
+            }
+
+            // Button labels
+            ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2, UIFonts.button, UITheme.textPrimary)
+            ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2, UIFonts.button, UITheme.textPrimary)
         }
 
-        // Stats layout with proper spacing
-        val statsLeftX = centerX - 100
-        val statsRightX = centerX + 30
-        val lineSpacing = 42f
+        ui.endBatch()
 
-        // Score
-        labelFont.color = textGray
-        labelFont.draw(batch, "SCORE", statsLeftX, statsStartY)
-        valueFont.color = goldColor
-        valueFont.draw(batch, session.score.toString(), statsRightX, statsStartY)
-
-        // Distance
-        labelFont.color = textGray
-        labelFont.draw(batch, "DISTANCE", statsLeftX, statsStartY - lineSpacing)
-        valueFont.color = textWhite
-        valueFont.draw(batch, "${session.distanceTraveled.toInt()} m", statsRightX, statsStartY - lineSpacing)
-
-        // Top Speed
-        labelFont.color = textGray
-        labelFont.draw(batch, "TOP SPEED", statsLeftX, statsStartY - lineSpacing * 2)
-        valueFont.color = textWhite
-        valueFont.draw(batch, "${(session.maxSpeed * 3.6f).toInt()} km/h", statsRightX, statsStartY - lineSpacing * 2)
-
-        // Button text (centered)
-        buttonFont.color = textWhite
-
-        layout.setText(buttonFont, "RETRY")
-        buttonFont.draw(batch, "RETRY",
-            retryButton.x + (retryButton.width - layout.width) / 2,
-            retryButton.y + retryButton.height / 2 + layout.height / 2)
-
-        layout.setText(buttonFont, "MENU")
-        buttonFont.draw(batch, "MENU",
-            menuButton.x + (menuButton.width - layout.width) / 2,
-            menuButton.y + menuButton.height / 2 + layout.height / 2)
-
-        batch.end()
-
-        // Check for clicks/touches
+        // === Input ===
         if (Gdx.input.justTouched()) {
-            val touchX = Gdx.input.x.toFloat()
-            val touchY = screenHeight - Gdx.input.y.toFloat()
-
-            if (retryButton.contains(touchX, touchY)) {
-                return ButtonClicked.RETRY
-            }
-            if (menuButton.contains(touchX, touchY)) {
-                return ButtonClicked.MENU
-            }
+            if (retryButton.contains(touchX, touchY)) return ButtonClicked.RETRY
+            if (menuButton.contains(touchX, touchY)) return ButtonClicked.MENU
         }
 
-        // Keyboard shortcuts
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             return ButtonClicked.RETRY
         }
@@ -184,29 +174,18 @@ class GameOverRenderer : Disposable {
         return ButtonClicked.NONE
     }
 
-    private fun drawRoundedRect(x: Float, y: Float, width: Float, height: Float, radius: Float) {
-        shapeRenderer.rect(x + radius, y, width - 2 * radius, height)
-        shapeRenderer.rect(x, y + radius, width, height - 2 * radius)
-        shapeRenderer.circle(x + radius, y + radius, radius)
-        shapeRenderer.circle(x + width - radius, y + radius, radius)
-        shapeRenderer.circle(x + radius, y + height - radius, radius)
-        shapeRenderer.circle(x + width - radius, y + height - radius, radius)
+    fun reset() {
+        overlayAlpha = 0f
+        panelScale = 0f
+        statsReveal = 0f
+        newHighScoreAnim = 0f
     }
 
     fun resize(width: Int, height: Int) {
-        screenWidth = width.toFloat()
-        screenHeight = height.toFloat()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapeRenderer.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        ui.resize(width, height)
     }
 
     override fun dispose() {
-        batch.dispose()
-        titleFont.dispose()
-        labelFont.dispose()
-        valueFont.dispose()
-        buttonFont.dispose()
-        badgeFont.dispose()
-        shapeRenderer.dispose()
+        ui.dispose()
     }
 }

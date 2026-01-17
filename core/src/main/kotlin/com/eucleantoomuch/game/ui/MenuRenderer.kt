@@ -3,47 +3,39 @@ package com.eucleantoomuch.game.ui
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.BitmapFont
-import com.badlogic.gdx.graphics.g2d.GlyphLayout
-import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
+import kotlin.math.sin
 
 class MenuRenderer : Disposable {
-    private val batch = SpriteBatch()
-    private val shapeRenderer = ShapeRenderer()
-    private val layout = GlyphLayout()
-
-    // Fonts with smooth filtering
-    private val titleFont = createSmoothFont(5f)
-    private val subtitleFont = createSmoothFont(2.8f)
-    private val buttonFont = createSmoothFont(2.5f)
-    private val statsFont = createSmoothFont(2f)
-    private val smallFont = createSmoothFont(1.6f)
-
-    private var screenWidth = Gdx.graphics.width.toFloat()
-    private var screenHeight = Gdx.graphics.height.toFloat()
+    private val ui = UIRenderer()
 
     private val playButton = Rectangle()
     private val calibrateButton = Rectangle()
 
-    // Modern color scheme
-    private val bgDark = Color(0.08f, 0.08f, 0.12f, 1f)
-    private val accentGreen = Color(0.2f, 0.8f, 0.4f, 1f)
-    private val accentGreenDark = Color(0.15f, 0.6f, 0.3f, 1f)
-    private val accentBlue = Color(0.3f, 0.5f, 0.9f, 1f)
-    private val accentBlueDark = Color(0.2f, 0.4f, 0.7f, 1f)
-    private val goldColor = Color(1f, 0.85f, 0.3f, 1f)
-    private val textWhite = Color(0.95f, 0.95f, 0.95f, 1f)
-    private val textGray = Color(0.6f, 0.6f, 0.65f, 1f)
+    // Animation states
+    private var playButtonHover = 0f
+    private var calibrateButtonHover = 0f
+    private var titlePulse = 0f
+    private var enterAnimProgress = 0f
 
-    private fun createSmoothFont(scale: Float): BitmapFont {
-        return BitmapFont().apply {
-            data.setScale(scale)
-            setUseIntegerPositions(false)
-            region.texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+    // Particle system for background
+    private val particles = Array(30) { BackgroundParticle() }
+
+    private class BackgroundParticle {
+        var x = MathUtils.random(0f, 1f)
+        var y = MathUtils.random(0f, 1f)
+        var size = MathUtils.random(2f, 6f)
+        var speed = MathUtils.random(0.01f, 0.03f)
+        var alpha = MathUtils.random(0.1f, 0.3f)
+
+        fun update() {
+            y += speed * Gdx.graphics.deltaTime
+            if (y > 1.1f) {
+                y = -0.1f
+                x = MathUtils.random(0f, 1f)
+            }
         }
     }
 
@@ -52,105 +44,158 @@ class MenuRenderer : Disposable {
     }
 
     fun render(highScore: Int, maxDistance: Float): ButtonClicked {
-        val centerX = screenWidth / 2
-        val centerY = screenHeight / 2
+        UITheme.Anim.update(Gdx.graphics.deltaTime)
+        UIFonts.initialize()
 
-        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+        val centerX = sw / 2
+        val centerY = sh / 2
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
+        // Update animations
+        enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 3f)
+        titlePulse = UITheme.Anim.pulse(1.5f, 0.95f, 1f)
 
-        // Background
-        shapeRenderer.color = bgDark
-        shapeRenderer.rect(0f, 0f, screenWidth, screenHeight)
+        // Update particles
+        particles.forEach { it.update() }
 
-        // Decorative wheel in background (subtle)
-        shapeRenderer.color = Color(0.12f, 0.12f, 0.16f, 1f)
-        shapeRenderer.circle(centerX - 280, centerY, 150f)
-        shapeRenderer.color = bgDark
-        shapeRenderer.circle(centerX - 280, centerY, 110f)
+        // Check hover state
+        val touchX = Gdx.input.x.toFloat()
+        val touchY = sh - Gdx.input.y.toFloat()
+        val playHovered = playButton.contains(touchX, touchY)
+        val calibrateHovered = calibrateButton.contains(touchX, touchY)
 
-        // Button dimensions
-        val buttonWidth = 300f
-        val buttonHeight = 70f
-        val buttonSpacing = 20f
+        playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 8f)
+        calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 8f)
 
-        // Position buttons in center
-        val buttonsStartY = centerY - 20
+        // === Draw Background ===
+        ui.beginShapes()
+
+        // Gradient background
+        val bgTop = UITheme.backgroundLight
+        val bgBottom = UITheme.background
+        for (i in 0 until 20) {
+            val t = i / 20f
+            val stripY = sh * t
+            val stripHeight = sh / 20f + 1
+            ui.shapes.color = UITheme.lerp(bgBottom, bgTop, t)
+            ui.shapes.rect(0f, stripY, sw, stripHeight)
+        }
+
+        // Animated particles
+        particles.forEach { p ->
+            ui.shapes.color = UITheme.withAlpha(UITheme.primary, p.alpha * enterAnimProgress)
+            ui.shapes.circle(p.x * sw, p.y * sh, p.size)
+        }
+
+        // Decorative EUC wheel silhouette
+        val wheelX = centerX - 200 * enterAnimProgress
+        val wheelY = centerY - 50
+        val wheelRadius = 100f * enterAnimProgress
+        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.3f)
+        ui.shapes.circle(wheelX, wheelY, wheelRadius)
+        ui.shapes.color = UITheme.background
+        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.7f)
+
+        // Spokes
+        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.2f)
+        val spokeTime = UITheme.Anim.time() * 0.5f
+        for (i in 0 until 8) {
+            val angle = (i * 45f + spokeTime * 30f) * MathUtils.degreesToRadians
+            val innerR = wheelRadius * 0.25f
+            val outerR = wheelRadius * 0.65f
+            ui.shapes.rectLine(
+                wheelX + innerR * MathUtils.cos(angle),
+                wheelY + innerR * MathUtils.sin(angle),
+                wheelX + outerR * MathUtils.cos(angle),
+                wheelY + outerR * MathUtils.sin(angle),
+                3f
+            )
+        }
+
+        // === Buttons ===
+        val scale = UITheme.Dimensions.scale()
+        val buttonWidth = 420f * scale
+        val buttonHeight = UITheme.Dimensions.buttonHeight
+        val buttonSpacing = 24f * scale
+
+        val buttonsStartY = centerY
         playButton.set(centerX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
         calibrateButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
 
-        // Play button with 3D effect
-        shapeRenderer.color = accentGreenDark
-        drawRoundedRect(playButton.x, playButton.y - 4, playButton.width, playButton.height, 12f)
-        shapeRenderer.color = accentGreen
-        drawRoundedRect(playButton.x, playButton.y, playButton.width, playButton.height, 12f)
+        // Apply enter animation
+        val playY = playButton.y - (1 - enterAnimProgress) * 100
+        val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 150
+
+        // Play button with glow
+        val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
+        ui.button(playRect, UITheme.primary, pressedOffset = 0f, glowIntensity = playButtonHover * 0.8f)
 
         // Calibrate button
-        shapeRenderer.color = accentBlueDark
-        drawRoundedRect(calibrateButton.x, calibrateButton.y - 4, calibrateButton.width, calibrateButton.height, 12f)
-        shapeRenderer.color = accentBlue
-        drawRoundedRect(calibrateButton.x, calibrateButton.y, calibrateButton.width, calibrateButton.height, 12f)
+        val calibrateRect = Rectangle(calibrateButton.x, calibrateY, calibrateButton.width, calibrateButton.height)
+        ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.5f)
 
         // Stats panel at bottom
-        val statsHeight = 70f
-        shapeRenderer.color = Color(0.1f, 0.1f, 0.14f, 0.9f)
-        shapeRenderer.rect(0f, 0f, screenWidth, statsHeight)
+        val statsHeight = 90f * scale
+        ui.panel(0f, 0f, sw, statsHeight, radius = 0f, shadowOffset = 0f,
+            backgroundColor = UITheme.withAlpha(UITheme.surface, 0.95f))
 
-        // Decorative line above stats
-        shapeRenderer.color = accentGreen
-        shapeRenderer.rect(0f, statsHeight - 2, screenWidth, 2f)
+        // Accent line
+        ui.shapes.color = UITheme.primary
+        ui.shapes.rect(0f, statsHeight - 3, sw, 3f)
 
-        shapeRenderer.end()
+        ui.endShapes()
 
-        batch.begin()
+        // === Draw Text ===
+        ui.beginBatch()
 
-        // Title "EUC" - positioned at top with proper spacing
-        titleFont.color = textWhite
-        layout.setText(titleFont, "EUC")
-        val titleY = screenHeight - 50
-        titleFont.draw(batch, "EUC", centerX - layout.width / 2, titleY)
+        // Title "EUC" with subtle animation
+        val titleY = sh - 60 + (1 - enterAnimProgress) * 50
+        val titleScale = titlePulse
+        UIFonts.display.data.setScale(UIFonts.display.data.scaleX * titleScale)
+        ui.textCentered("EUC", centerX, titleY, UIFonts.display, UITheme.textPrimary)
+        UIFonts.display.data.setScale(UIFonts.display.data.scaleX / titleScale)
 
-        // Subtitle "LEAN TOO MUCH" - with good spacing below title
-        subtitleFont.color = accentGreen
-        layout.setText(subtitleFont, "LEAN TOO MUCH")
-        val subtitleY = titleY - 70  // Good gap below title
-        subtitleFont.draw(batch, "LEAN TOO MUCH", centerX - layout.width / 2, subtitleY)
+        // Subtitle with glow effect
+        val subtitleY = titleY - 75
+        ui.textCentered("LEAN TOO MUCH", centerX, subtitleY, UIFonts.heading, UITheme.primary)
 
-        // Button text (centered)
-        buttonFont.color = textWhite
+        // Button labels
+        ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
+        ui.textCentered("CALIBRATE", calibrateRect.x + calibrateRect.width / 2, calibrateRect.y + calibrateRect.height / 2, UIFonts.button, UITheme.textPrimary)
 
-        layout.setText(buttonFont, "PLAY")
-        buttonFont.draw(batch, "PLAY",
-            playButton.x + (playButton.width - layout.width) / 2,
-            playButton.y + playButton.height / 2 + layout.height / 2)
+        // Stats
+        val statsLabelY = 80f * scale
+        val statsValueY = statsLabelY - 30f * scale
+        val sideMargin = 70f * scale  // Increased margin for rounded screen corners
 
-        layout.setText(buttonFont, "CALIBRATE")
-        buttonFont.draw(batch, "CALIBRATE",
-            calibrateButton.x + (calibrateButton.width - layout.width) / 2,
-            calibrateButton.y + calibrateButton.height / 2 + layout.height / 2)
+        // High score (left)
+        UIFonts.caption.color = UITheme.textSecondary
+        ui.layout.setText(UIFonts.caption, "HIGH SCORE")
+        UIFonts.caption.draw(ui.batch, "HIGH SCORE", sideMargin, statsLabelY)
 
-        // Stats at bottom
-        val statsY = 42f
+        UIFonts.heading.color = UITheme.accent
+        UIFonts.heading.draw(ui.batch, highScore.toString(), sideMargin, statsValueY)
 
-        statsFont.color = goldColor
-        statsFont.draw(batch, "HIGH SCORE: $highScore", 30f, statsY)
+        // Best distance (right)
+        UIFonts.caption.color = UITheme.textSecondary
+        val distLabel = "BEST DISTANCE"
+        ui.layout.setText(UIFonts.caption, distLabel)
+        UIFonts.caption.draw(ui.batch, distLabel, sw - ui.layout.width - sideMargin, statsLabelY)
 
-        statsFont.color = textGray
-        layout.setText(statsFont, "BEST: ${maxDistance.toInt()}m")
-        statsFont.draw(batch, "BEST: ${maxDistance.toInt()}m", screenWidth - layout.width - 30, statsY)
+        val distValue = "${maxDistance.toInt()}m"
+        ui.layout.setText(UIFonts.heading, distValue)
+        UIFonts.heading.color = UITheme.textPrimary
+        UIFonts.heading.draw(ui.batch, distValue, sw - ui.layout.width - sideMargin, statsValueY)
 
-        // Instructions in center bottom
-        smallFont.color = textGray
-        layout.setText(smallFont, "Tilt to control")
-        smallFont.draw(batch, "Tilt to control", centerX - layout.width / 2, statsY)
+        // Center hint
+        UIFonts.caption.color = UITheme.textMuted
+        ui.textCentered("Tilt to control - Lean to accelerate", centerX, 50f * scale, UIFonts.caption, UITheme.textMuted)
 
-        batch.end()
+        ui.endBatch()
 
-        // Check for clicks/touches
+        // === Handle Input ===
         if (Gdx.input.justTouched()) {
-            val touchX = Gdx.input.x.toFloat()
-            val touchY = screenHeight - Gdx.input.y.toFloat()
-
             if (playButton.contains(touchX, touchY)) {
                 return ButtonClicked.PLAY
             }
@@ -159,7 +204,6 @@ class MenuRenderer : Disposable {
             }
         }
 
-        // Keyboard shortcuts
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
             return ButtonClicked.PLAY
         }
@@ -170,29 +214,12 @@ class MenuRenderer : Disposable {
         return ButtonClicked.NONE
     }
 
-    private fun drawRoundedRect(x: Float, y: Float, width: Float, height: Float, radius: Float) {
-        shapeRenderer.rect(x + radius, y, width - 2 * radius, height)
-        shapeRenderer.rect(x, y + radius, width, height - 2 * radius)
-        shapeRenderer.circle(x + radius, y + radius, radius)
-        shapeRenderer.circle(x + width - radius, y + radius, radius)
-        shapeRenderer.circle(x + radius, y + height - radius, radius)
-        shapeRenderer.circle(x + width - radius, y + height - radius, radius)
-    }
-
     fun resize(width: Int, height: Int) {
-        screenWidth = width.toFloat()
-        screenHeight = height.toFloat()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapeRenderer.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        ui.resize(width, height)
+        enterAnimProgress = 0f // Reset animation on resize
     }
 
     override fun dispose() {
-        batch.dispose()
-        titleFont.dispose()
-        subtitleFont.dispose()
-        buttonFont.dispose()
-        statsFont.dispose()
-        smallFont.dispose()
-        shapeRenderer.dispose()
+        ui.dispose()
     }
 }

@@ -2,240 +2,262 @@ package com.eucleantoomuch.game.ui
 
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.graphics.Texture
-import com.badlogic.gdx.graphics.g2d.BitmapFont
-import com.badlogic.gdx.graphics.g2d.GlyphLayout
-import com.badlogic.gdx.graphics.g2d.SpriteBatch
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer
+import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.state.GameSession
 import kotlin.math.sqrt
 
 class Hud : Disposable {
-    private val batch = SpriteBatch()
-    private val shapeRenderer = ShapeRenderer()
-    private val layout = GlyphLayout()
+    private val ui = UIRenderer()
 
-    // Fonts with smooth filtering
-    private val scoreFont = createSmoothFont(3.5f)
-    private val labelFont = createSmoothFont(1.4f)
-    private val speedFont = createSmoothFont(2.8f)
-    private val unitFont = createSmoothFont(1.6f)
-    private val warningFont = createSmoothFont(2.8f)
-    private val countdownFont = createSmoothFont(5f)
-
-    private var screenWidth = Gdx.graphics.width.toFloat()
-    private var screenHeight = Gdx.graphics.height.toFloat()
-
-    // Modern colors
-    private val panelBg = Color(0.1f, 0.1f, 0.15f, 0.85f)
-    private val accentGreen = Color(0.2f, 0.8f, 0.4f, 1f)
-    private val accentYellow = Color(1f, 0.9f, 0.3f, 1f)
-    private val accentRed = Color(0.9f, 0.3f, 0.3f, 1f)
-    private val accentCyan = Color(0.3f, 0.9f, 0.9f, 1f)
-    private val textWhite = Color(0.95f, 0.95f, 0.95f, 1f)
-    private val textGray = Color(0.6f, 0.6f, 0.65f, 1f)
-
-    private fun createSmoothFont(scale: Float): BitmapFont {
-        return BitmapFont().apply {
-            data.setScale(scale)
-            setUseIntegerPositions(false)
-            region.texture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
-        }
-    }
+    // Animation states
+    private var scorePopScale = 1f
+    private var lastScore = 0
+    private var warningFlash = 0f
+    private var speedBarSmooth = 0f
 
     fun render(session: GameSession, euc: EucComponent) {
-        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        UITheme.Anim.update(Gdx.graphics.deltaTime)
+        UIFonts.initialize()
 
-        // Draw lean indicator
-        drawLeanIndicator(euc)
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
 
-        // Draw speed panel
+        // Score pop animation
+        if (session.score != lastScore) {
+            scorePopScale = 1.3f
+            lastScore = session.score
+        }
+        scorePopScale = UITheme.Anim.ease(scorePopScale, 1f, 8f)
+
+        // Smooth speed bar
+        val targetSpeed = (euc.speed / 25f).coerceIn(0f, 1f)
+        speedBarSmooth = UITheme.Anim.ease(speedBarSmooth, targetSpeed, 5f)
+
+        // Warning flash
+        if (euc.isAboutToFall()) {
+            warningFlash += Gdx.graphics.deltaTime * 8f
+        } else {
+            warningFlash = UITheme.Anim.ease(warningFlash, 0f, 5f)
+        }
+
+        val scale = UITheme.Dimensions.scale()
+
+        ui.beginShapes()
+
+        // === Top Score Panel ===
+        val topPanelWidth = 280f * scale
+        val topPanelHeight = 100f * scale
+        val topPanelY = sh - topPanelHeight - 20f * scale
+        ui.roundedRect(sw / 2 - topPanelWidth / 2, topPanelY, topPanelWidth, topPanelHeight,
+            16f * scale, UITheme.withAlpha(UITheme.surface, 0.9f))
+
+        // === Speed Panel (bottom left) ===
         drawSpeedPanel(euc)
 
-        batch.begin()
+        // === Lean Indicator (bottom right) ===
+        drawLeanIndicator(euc)
 
-        // Score (top center)
-        scoreFont.color = textWhite
-        val scoreText = session.score.toString()
-        layout.setText(scoreFont, scoreText)
-        scoreFont.draw(batch, scoreText, screenWidth / 2 - layout.width / 2, screenHeight - 25)
+        // === Warning Overlay ===
+        if (warningFlash > 0.1f) {
+            val flashAlpha = (MathUtils.sin(warningFlash * 3f) * 0.5f + 0.5f) * 0.15f
+            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha)
+            ui.shapes.rect(0f, 0f, sw, sh)
 
-        // "SCORE" label
-        labelFont.color = textGray
-        layout.setText(labelFont, "SCORE")
-        labelFont.draw(batch, "SCORE", screenWidth / 2 - layout.width / 2, screenHeight - 70)
+            // Red vignette at edges
+            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha * 2)
+            ui.shapes.rect(0f, 0f, 20f, sh)
+            ui.shapes.rect(sw - 20f, 0f, 20f, sh)
+            ui.shapes.rect(0f, 0f, sw, 20f)
+            ui.shapes.rect(0f, sh - 20f, sw, 20f)
+        }
 
-        // Puddle warning
+        ui.endShapes()
+
+        // === Text ===
+        ui.beginBatch()
+
+        // Score
+        val scoreLabelY = topPanelY + topPanelHeight - 25f * scale
+        val scoreValueY = scoreLabelY - 40f * scale
+        UIFonts.caption.color = UITheme.textSecondary
+        ui.textCentered("SCORE", sw / 2, scoreLabelY, UIFonts.caption, UITheme.textSecondary)
+
+        // Score value with pop effect
+        val originalScale = UIFonts.title.data.scaleX
+        UIFonts.title.data.setScale(originalScale * scorePopScale)
+        ui.textCentered(session.score.toString(), sw / 2, scoreValueY, UIFonts.title, UITheme.textPrimary)
+        UIFonts.title.data.setScale(originalScale)
+
+        // Warnings
         if (euc.inPuddle) {
-            drawWarningBadge("PUDDLE!", accentCyan, 0f)
+            drawWarningBadge("SLIPPERY!", UITheme.cyan, sh / 2 + 30)
         }
 
-        // Danger warning
         if (euc.isAboutToFall()) {
-            drawWarningBadge("DANGER!", accentRed, 50f)
+            val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
+            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 30)
         }
 
-        batch.end()
-    }
-
-    private fun drawWarningBadge(text: String, color: Color, offsetY: Float) {
-        // Pulsing effect
-        val pulse = (Math.sin(Gdx.graphics.frameId * 0.15) * 0.3 + 0.7).toFloat()
-        warningFont.color = Color(color.r, color.g, color.b, pulse)
-        layout.setText(warningFont, text)
-        warningFont.draw(batch, text, screenWidth / 2 - layout.width / 2, screenHeight / 2 + offsetY)
+        ui.endBatch()
     }
 
     private fun drawSpeedPanel(euc: EucComponent) {
-        val panelWidth = 160f
-        val panelHeight = 80f
-        val panelX = 15f
-        val panelY = 15f
-
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
+        val scale = UITheme.Dimensions.scale()
+        val panelWidth = 200f * scale
+        val panelHeight = 110f * scale
+        val panelX = 25f * scale
+        val panelY = 25f * scale
 
         // Panel background
-        shapeRenderer.color = panelBg
-        drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 10f)
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 14f, UITheme.withAlpha(UITheme.surface, 0.9f))
 
         // Speed bar background
-        val barX = panelX + 10
-        val barY = panelY + 10
-        val barWidth = panelWidth - 20
-        val barHeight = 6f
+        val barX = panelX + 12
+        val barY = panelY + 12
+        val barWidth = panelWidth - 24
+        val barHeight = 8f
 
-        shapeRenderer.color = Color(0.2f, 0.2f, 0.25f, 1f)
-        shapeRenderer.rect(barX, barY, barWidth, barHeight)
+        ui.roundedRect(barX, barY, barWidth, barHeight, 4f, UITheme.surfaceLight)
 
-        // Speed bar fill
-        val speedPercent = (euc.speed / 20f).coerceIn(0f, 1f)
-        val barColor = when {
-            speedPercent < 0.5f -> accentGreen
-            speedPercent < 0.8f -> accentYellow
-            else -> accentRed
+        // Speed bar fill with color gradient
+        val speedColor = when {
+            speedBarSmooth < 0.4f -> UITheme.primary
+            speedBarSmooth < 0.7f -> UITheme.warning
+            else -> UITheme.danger
         }
-        shapeRenderer.color = barColor
-        shapeRenderer.rect(barX, barY, barWidth * speedPercent, barHeight)
+        val fillWidth = (barWidth * speedBarSmooth).coerceAtLeast(8f)
+        ui.roundedRect(barX, barY, fillWidth, barHeight, 4f, speedColor)
 
-        shapeRenderer.end()
+        // Glow effect at high speed
+        if (speedBarSmooth > 0.7f) {
+            val glowAlpha = (speedBarSmooth - 0.7f) / 0.3f * UITheme.Anim.pulse(4f, 0.3f, 0.6f)
+            ui.roundedRect(barX, barY - 2, fillWidth, barHeight + 4, 5f, UITheme.withAlpha(speedColor, glowAlpha))
+        }
 
-        batch.begin()
+        // Speed text
+        ui.endShapes()
+        ui.beginBatch()
 
         val speedKmh = (euc.speed * 3.6f).toInt()
-        speedFont.color = textWhite
-        layout.setText(speedFont, "$speedKmh")
-        speedFont.draw(batch, "$speedKmh", panelX + 18, panelY + panelHeight - 12)
+        UIFonts.title.color = UITheme.textPrimary
+        UIFonts.title.draw(ui.batch, "$speedKmh", panelX + 20, panelY + panelHeight - 18)
 
-        unitFont.color = textGray
-        unitFont.draw(batch, "km/h", panelX + 18 + layout.width + 8, panelY + panelHeight - 20)
+        ui.layout.setText(UIFonts.title, "$speedKmh")
+        UIFonts.caption.color = UITheme.textSecondary
+        UIFonts.caption.draw(ui.batch, "km/h", panelX + 25 + ui.layout.width, panelY + panelHeight - 28)
 
-        batch.end()
+        ui.endBatch()
+        ui.beginShapes()
     }
 
     private fun drawLeanIndicator(euc: EucComponent) {
-        val indicatorSize = 120f
-        val indicatorX = screenWidth - indicatorSize - 15
-        val indicatorY = 15f
+        val scale = UITheme.Dimensions.scale()
+        val indicatorSize = 130f * scale
+        val indicatorX = ui.screenWidth - indicatorSize - 25f * scale
+        val indicatorY = 25f * scale
         val centerX = indicatorX + indicatorSize / 2
         val centerY = indicatorY + indicatorSize / 2
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
-
         // Shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.3f)
-        shapeRenderer.circle(centerX + 2, centerY - 2, indicatorSize / 2 + 2)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.3f)
+        ui.shapes.circle(centerX + 2, centerY - 2, indicatorSize / 2 + 2)
 
-        // Background
-        shapeRenderer.color = panelBg
-        shapeRenderer.circle(centerX, centerY, indicatorSize / 2)
+        // Background with zones
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.95f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2)
 
-        // Danger zone (red)
-        val dangerThreshold = 0.7f
-        shapeRenderer.color = Color(0.5f, 0.12f, 0.12f, 0.6f)
-        shapeRenderer.circle(centerX, centerY, indicatorSize / 2 - 3)
+        // Danger zone (outer red)
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.25f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 - 3)
 
         // Warning zone (yellow)
-        shapeRenderer.color = Color(0.5f, 0.4f, 0.1f, 0.5f)
-        shapeRenderer.circle(centerX, centerY, indicatorSize / 2 * 0.82f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.2f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.75f)
 
-        // Safe zone (green)
-        shapeRenderer.color = Color(0.12f, 0.4f, 0.15f, 0.7f)
-        shapeRenderer.circle(centerX, centerY, indicatorSize / 2 * dangerThreshold)
+        // Safe zone (green center)
+        ui.shapes.color = UITheme.withAlpha(UITheme.primary, 0.25f)
+        ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.5f)
 
-        // Crosshair
-        shapeRenderer.color = Color(0.35f, 0.35f, 0.4f, 0.5f)
-        shapeRenderer.rectLine(centerX - indicatorSize / 2 + 8, centerY,
-            centerX + indicatorSize / 2 - 8, centerY, 1.5f)
-        shapeRenderer.rectLine(centerX, centerY - indicatorSize / 2 + 8,
-            centerX, centerY + indicatorSize / 2 - 8, 1.5f)
+        // Grid lines
+        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.2f)
+        ui.shapes.rectLine(centerX - indicatorSize / 2 + 8, centerY,
+            centerX + indicatorSize / 2 - 8, centerY, 1f)
+        ui.shapes.rectLine(centerX, centerY - indicatorSize / 2 + 8,
+            centerX, centerY + indicatorSize / 2 - 8, 1f)
 
         // Current lean position
         val totalLean = sqrt(euc.forwardLean * euc.forwardLean + euc.sideLean * euc.sideLean)
-        val indicatorPosX = centerX + euc.sideLean * indicatorSize / 2 * 0.82f
-        val indicatorPosY = centerY + euc.forwardLean * indicatorSize / 2 * 0.82f
+        val dotX = centerX + euc.sideLean * indicatorSize / 2 * 0.8f
+        val dotY = centerY + euc.forwardLean * indicatorSize / 2 * 0.8f
+
+        // Dot color based on danger
+        val dotColor = when {
+            totalLean > 0.85f -> UITheme.danger
+            totalLean > 0.6f -> UITheme.warning
+            else -> UITheme.textPrimary
+        }
 
         // Dot shadow
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.4f)
-        shapeRenderer.circle(indicatorPosX + 1.5f, indicatorPosY - 1.5f, 9f)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.4f)
+        ui.shapes.circle(dotX + 1.5f, dotY - 1.5f, 10f)
 
-        // Dot
-        val dotColor = when {
-            totalLean > 0.85f -> accentRed
-            totalLean > dangerThreshold -> accentYellow
-            else -> textWhite
+        // Main dot
+        ui.shapes.color = dotColor
+        ui.shapes.circle(dotX, dotY, 9f)
+
+        // Dot highlight
+        ui.shapes.color = UITheme.withAlpha(Color.WHITE, 0.4f)
+        ui.shapes.circle(dotX - 2.5f, dotY + 2.5f, 3f)
+
+        // Danger glow when leaning too much
+        if (totalLean > 0.7f) {
+            val glowIntensity = (totalLean - 0.7f) / 0.3f * UITheme.Anim.pulse(5f, 0.3f, 0.7f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.danger, glowIntensity * 0.3f)
+            ui.shapes.circle(dotX, dotY, 15f)
         }
-        shapeRenderer.color = dotColor
-        shapeRenderer.circle(indicatorPosX, indicatorPosY, 8f)
-
-        // Highlight
-        shapeRenderer.color = Color(1f, 1f, 1f, 0.4f)
-        shapeRenderer.circle(indicatorPosX - 2, indicatorPosY + 2, 3f)
-
-        shapeRenderer.end()
     }
 
-    private fun drawRoundedRect(x: Float, y: Float, width: Float, height: Float, radius: Float) {
-        shapeRenderer.rect(x + radius, y, width - 2 * radius, height)
-        shapeRenderer.rect(x, y + radius, width, height - 2 * radius)
-        shapeRenderer.circle(x + radius, y + radius, radius)
-        shapeRenderer.circle(x + width - radius, y + radius, radius)
-        shapeRenderer.circle(x + radius, y + height - radius, radius)
-        shapeRenderer.circle(x + width - radius, y + height - radius, radius)
+    private fun drawWarningBadge(text: String, color: Color, y: Float) {
+        val pulse = UITheme.Anim.pulse(4f, 0.8f, 1f)
+        UIFonts.heading.color = UITheme.withAlpha(color, pulse)
+        ui.textCentered(text, ui.screenWidth / 2, y, UIFonts.heading, UIFonts.heading.color)
     }
 
     fun renderCountdown(seconds: Int) {
-        Gdx.gl.glEnable(com.badlogic.gdx.graphics.GL20.GL_BLEND)
+        UITheme.Anim.update(Gdx.graphics.deltaTime)
+        UIFonts.initialize()
 
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled)
-        shapeRenderer.color = Color(0f, 0f, 0f, 0.5f)
-        shapeRenderer.circle(screenWidth / 2, screenHeight / 2, 70f)
-        shapeRenderer.end()
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
 
-        batch.begin()
-        countdownFont.color = if (seconds > 0) accentYellow else accentGreen
+        ui.beginShapes()
+
+        // Dark circle background
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.9f)
+        ui.shapes.circle(sw / 2, sh / 2, 80f)
+
+        // Ring
+        val ringColor = if (seconds > 0) UITheme.warning else UITheme.primary
+        ui.gauge(sw / 2, sh / 2, 70f, 1f, UITheme.surfaceLight, ringColor, 6f)
+
+        ui.endShapes()
+
+        ui.beginBatch()
+
         val text = if (seconds > 0) seconds.toString() else "GO!"
-        layout.setText(countdownFont, text)
-        countdownFont.draw(batch, text, screenWidth / 2 - layout.width / 2, screenHeight / 2 + layout.height / 2)
-        batch.end()
+        val textColor = if (seconds > 0) UITheme.warning else UITheme.primary
+        ui.textCentered(text, sw / 2, sh / 2, UIFonts.display, textColor)
+
+        ui.endBatch()
     }
 
     fun resize(width: Int, height: Int) {
-        screenWidth = width.toFloat()
-        screenHeight = height.toFloat()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapeRenderer.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        ui.resize(width, height)
     }
 
     override fun dispose() {
-        batch.dispose()
-        scoreFont.dispose()
-        labelFont.dispose()
-        speedFont.dispose()
-        unitFont.dispose()
-        warningFont.dispose()
-        countdownFont.dispose()
-        shapeRenderer.dispose()
+        ui.dispose()
     }
 }
