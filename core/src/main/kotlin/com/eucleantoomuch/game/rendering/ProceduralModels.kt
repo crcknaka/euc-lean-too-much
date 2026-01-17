@@ -27,6 +27,8 @@ class ProceduralModels : Disposable {
     private val riderBodyColor = Color(0.3f, 0.5f, 0.7f, 1f)     // Blue jacket
     private val riderPantsColor = Color(0.2f, 0.2f, 0.3f, 1f)    // Dark pants
     private val riderSkinColor = Color(0.9f, 0.7f, 0.6f, 1f)     // Skin
+    private val helmetColor = Color(0.15f, 0.15f, 0.15f, 1f)     // Dark helmet
+    private val helmetVisorColor = Color(0.1f, 0.1f, 0.12f, 1f)  // Slightly reflective visor
     private val roadColor = Color(0.3f, 0.3f, 0.3f, 1f)          // Dark gray
     private val sidewalkColor = Color(0.6f, 0.6f, 0.6f, 1f)      // Light gray
     private val roadLineColor = Color(1f, 1f, 1f, 1f)            // White
@@ -150,11 +152,28 @@ class ProceduralModels : Disposable {
         bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.0f * riderScale, 0f))
         bodyPart.box(0.35f * riderScale, 0.6f * riderScale, 0.22f * riderScale)
 
-        // Head
+        // Head (face area visible below helmet)
         val skinMaterial = Material(ColorAttribute.createDiffuse(riderSkinColor))
         val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, skinMaterial)
-        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.5f * riderScale, 0f))
-        headPart.sphere(0.22f * riderScale, 0.28f * riderScale, 0.22f * riderScale, 8, 8)
+        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.48f * riderScale, 0.02f * riderScale))
+        headPart.sphere(0.18f * riderScale, 0.22f * riderScale, 0.18f * riderScale, 8, 8)
+
+        // Helmet shell (covers top and back of head)
+        val helmetMaterial = Material(ColorAttribute.createDiffuse(helmetColor))
+        val helmetPart = modelBuilder.part("helmet", GL20.GL_TRIANGLES, attributes, helmetMaterial)
+        helmetPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.54f * riderScale, -0.02f * riderScale))
+        helmetPart.sphere(0.26f * riderScale, 0.24f * riderScale, 0.26f * riderScale, 10, 10)
+
+        // Helmet visor/brim (front protective part)
+        val visorMaterial = Material(ColorAttribute.createDiffuse(helmetVisorColor))
+        val visorPart = modelBuilder.part("visor", GL20.GL_TRIANGLES, attributes, visorMaterial)
+        visorPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.52f * riderScale, 0.12f * riderScale))
+        visorPart.box(0.22f * riderScale, 0.06f * riderScale, 0.08f * riderScale)
+
+        // Helmet vents (top detail)
+        val ventPart = modelBuilder.part("vent", GL20.GL_TRIANGLES, attributes, visorMaterial)
+        ventPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.66f * riderScale, 0f))
+        ventPart.box(0.08f * riderScale, 0.03f * riderScale, 0.16f * riderScale)
 
         return modelBuilder.end().also { models.add(it) }
     }
