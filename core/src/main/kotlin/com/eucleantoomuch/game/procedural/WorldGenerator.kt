@@ -33,7 +33,12 @@ class WorldGenerator(
 
     // Pre-create some building models with different heights
     private val buildingModels = mutableListOf<Pair<Float, ModelInstance>>()
+    private val skyscraperModels = mutableListOf<Pair<Float, ModelInstance>>()  // Rare tall buildings
     private val carModels = mutableListOf<ModelInstance>()
+
+    // Track skyscraper cluster state
+    private var skyscraperClusterRemaining = 0  // How many more skyscrapers in current cluster
+    private var lastSkyscraperChunk = -100      // Last chunk with a skyscraper
 
     // Scenery models
     private val treeModels = mutableListOf<ModelInstance>()
@@ -67,6 +72,12 @@ class WorldGenerator(
             val model = models.createBuildingModel(height, models.getRandomBuildingColor())
             buildingModels.add(Pair(height, ModelInstance(model)))
         }
+        // Add rare tall skyscrapers (for skyscraper clusters)
+        for (i in 0..2) {
+            val height = MathUtils.random(70f, 100f)  // Very tall buildings
+            val model = models.createBuildingModel(height, models.getRandomBuildingColor())
+            skyscraperModels.add(Pair(height, ModelInstance(model)))
+        }
 
         // Create variety of cars
         for (i in 0..3) {
@@ -75,14 +86,20 @@ class WorldGenerator(
         }
 
         // Create tree variants with height variation
-        for (i in 0..4) {
-            val height = MathUtils.random(6f, 10f)
+        // Most trees are normal height, but occasionally a tall one
+        for (i in 0..5) {
+            val height = MathUtils.random(6f, 10f)  // Normal trees
             treeModels.add(ModelInstance(models.createTreeModel(height)))
         }
-        for (i in 0..4) {
-            val height = MathUtils.random(5f, 8f)
+        // Add a couple of tall trees (rare)
+        treeModels.add(ModelInstance(models.createTreeModel(MathUtils.random(14f, 18f))))
+
+        for (i in 0..5) {
+            val height = MathUtils.random(5f, 8f)  // Normal round trees
             treeModels.add(ModelInstance(models.createRoundTreeModel(height)))
         }
+        // Add a tall round tree (rare)
+        treeModels.add(ModelInstance(models.createRoundTreeModel(MathUtils.random(12f, 15f))))
 
         // Create other scenery models
         lampPostModel = ModelInstance(models.createLampPostModel())
@@ -508,6 +525,16 @@ class WorldGenerator(
         val entities = mutableListOf<Entity>()
         val buildingSpacing = 12f
 
+        // Check if we should start a skyscraper cluster (rare, ~5% chance per chunk)
+        // But not too close to the last cluster
+        if (skyscraperClusterRemaining == 0 &&
+            chunkIndex - lastSkyscraperChunk > 5 &&
+            MathUtils.random() < 0.05f) {
+            // Start a cluster of 2-3 skyscrapers
+            skyscraperClusterRemaining = MathUtils.random(2, 3)
+            lastSkyscraperChunk = chunkIndex
+        }
+
         var z = chunkStartZ
         while (z < chunkStartZ + Constants.CHUNK_LENGTH) {
             // Random X offset for variety (-2 to +3 meters from base position)
@@ -515,8 +542,17 @@ class WorldGenerator(
             val leftXOffset = MathUtils.random(-2f, 3f)
             val rightXOffset = MathUtils.random(-2f, 3f)
 
-            // Left side building (negative X, so subtract offset to move further from road)
-            val (heightL, instanceL) = buildingModels.random()
+            // Decide if this building slot should be a skyscraper
+            val useSkyscraperLeft = skyscraperClusterRemaining > 0 && MathUtils.randomBoolean()
+            val useSkyscraperRight = skyscraperClusterRemaining > 0 && !useSkyscraperLeft
+
+            // Left side building
+            val (heightL, instanceL) = if (useSkyscraperLeft && skyscraperModels.isNotEmpty()) {
+                skyscraperClusterRemaining--
+                skyscraperModels.random()
+            } else {
+                buildingModels.random()
+            }
             entities.add(createBuildingEntity(
                 -Constants.BUILDING_OFFSET_X - leftXOffset,
                 z + MathUtils.random(-2f, 2f),
@@ -525,8 +561,13 @@ class WorldGenerator(
                 chunkIndex
             ))
 
-            // Right side building (positive X, so add offset to move further from road)
-            val (heightR, instanceR) = buildingModels.random()
+            // Right side building
+            val (heightR, instanceR) = if (useSkyscraperRight && skyscraperModels.isNotEmpty()) {
+                skyscraperClusterRemaining--
+                skyscraperModels.random()
+            } else {
+                buildingModels.random()
+            }
             entities.add(createBuildingEntity(
                 Constants.BUILDING_OFFSET_X + rightXOffset,
                 z + MathUtils.random(-2f, 2f),
@@ -1076,5 +1117,8 @@ class WorldGenerator(
         activeChunks.keys.toList().forEach { removeChunk(it) }
         // Reset zebra crossing tracking
         lastZebraCrossingChunk = -10
+        // Reset skyscraper cluster tracking
+        skyscraperClusterRemaining = 0
+        lastSkyscraperChunk = -100
     }
 }
