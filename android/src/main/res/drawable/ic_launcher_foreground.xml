@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background circle for the wheel -->
+    <path
+        android:fillColor="#333333"
+        android:pathData="M54,54m-28,0a28,28 0,1 1,56 0a28,28 0,1 1,-56 0"/>
+
+    <!-- Inner wheel circle -->
+    <path
+        android:fillColor="#1A1A1A"
+        android:pathData="M54,54m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0"/>
+
+    <!-- Wheel highlight -->
+    <path
+        android:fillColor="#4A4A4A"
+        android:pathData="M54,54m-18,0a18,18 0,1 1,36 0a18,18 0,1 1,-36 0"/>
+
+    <!-- Center hub -->
+    <path
+        android:fillColor="#666666"
+        android:pathData="M54,54m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+
+    <!-- Rider silhouette - body -->
+    <path
+        android:fillColor="#4A90D9"
+        android:pathData="M48,20 L60,20 L58,38 L50,38 Z"/>
+
+    <!-- Rider silhouette - head -->
+    <path
+        android:fillColor="#E8C4A0"
+        android:pathData="M54,14m-6,0a6,6 0,1 1,12 0a6,6 0,1 1,-12 0"/>
+
+    <!-- Rider legs -->
+    <path
+        android:fillColor="#2D2D2D"
+        android:pathData="M50,38 L48,52 L56,52 L58,38 Z"/>
+
+</vector>
