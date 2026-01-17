@@ -268,7 +268,7 @@ class EucGame : ApplicationAdapter() {
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
-                riderTransform.position.y += 0.25f  // Stand on top of EUC
+                riderTransform.position.y += 0.5f  // Stand on top of EUC (adjusted for bigger model)
                 riderTransform.yaw = playerTransform.yaw
                 riderTransform.updateRotationFromYaw()
             }
@@ -377,9 +377,9 @@ class EucGame : ApplicationAdapter() {
             }
         }
 
-        // Position arm at shoulder level relative to rider
-        val shoulderOffsetX = if (isLeft) -0.18f else 0.18f
-        val shoulderOffsetY = 0.25f + 1.1f  // rider offset + shoulder height on rider
+        // Position arm at shoulder level relative to rider (scaled 1.4x)
+        val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
+        val shoulderOffsetY = 0.5f + 1.5f  // rider offset + shoulder height on scaled rider
 
         armTransform.position.set(playerTransform.position)
         armTransform.position.y += shoulderOffsetY
@@ -420,6 +420,11 @@ class EucGame : ApplicationAdapter() {
     }
 
     private fun resetGame() {
+        // Remove rider and arm entities explicitly (they don't have PlayerComponent)
+        riderEntity?.let { engine.removeEntity(it) }
+        leftArmEntity?.let { engine.removeEntity(it) }
+        rightArmEntity?.let { engine.removeEntity(it) }
+
         // Remove all entities
         for (entity in engine.getEntitiesFor(Families.player)) {
             engine.removeEntity(entity)

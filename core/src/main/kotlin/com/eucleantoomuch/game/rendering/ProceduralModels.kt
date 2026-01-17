@@ -53,7 +53,7 @@ class ProceduralModels : Disposable {
             val modelFile = Gdx.files.internal("monowheel.g3db")
             if (modelFile.exists()) {
                 // External model loaded - apply scale and rotation
-                eucModelScale = 0.003f  // Even smaller scale
+                eucModelScale = 0.005f  // Bigger scale
                 eucModelRotationX = 180f  // Flip vertically
                 eucModelRotationY = 0f    // No horizontal flip (was facing backwards)
                 modelLoader.loadModel(modelFile).also { models.add(it) }
@@ -93,29 +93,31 @@ class ProceduralModels : Disposable {
     fun createRiderModel(): Model {
         modelBuilder.begin()
 
+        val riderScale = 1.4f  // Scale factor for rider
+
         val pantsMaterial = Material(ColorAttribute.createDiffuse(riderPantsColor))
 
         // Left leg
         val leftLegPart = modelBuilder.part("left_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.08f, 0.5f, 0f))
-        leftLegPart.box(0.1f, 0.5f, 0.12f)
+        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.1f * riderScale, 0.35f * riderScale, 0f))
+        leftLegPart.box(0.12f * riderScale, 0.7f * riderScale, 0.14f * riderScale)
 
         // Right leg
         val rightLegPart = modelBuilder.part("right_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.08f, 0.5f, 0f))
-        rightLegPart.box(0.1f, 0.5f, 0.12f)
+        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.1f * riderScale, 0.35f * riderScale, 0f))
+        rightLegPart.box(0.12f * riderScale, 0.7f * riderScale, 0.14f * riderScale)
 
         // Body/torso
         val bodyMaterial = Material(ColorAttribute.createDiffuse(riderBodyColor))
         val bodyPart = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, bodyMaterial)
-        bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.0f, 0f))
-        bodyPart.box(0.3f, 0.5f, 0.2f)
+        bodyPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.0f * riderScale, 0f))
+        bodyPart.box(0.35f * riderScale, 0.6f * riderScale, 0.22f * riderScale)
 
         // Head
         val skinMaterial = Material(ColorAttribute.createDiffuse(riderSkinColor))
         val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, skinMaterial)
-        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.4f, 0f))
-        headPart.sphere(0.2f, 0.25f, 0.2f, 8, 8)
+        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.5f * riderScale, 0f))
+        headPart.sphere(0.22f * riderScale, 0.28f * riderScale, 0.22f * riderScale, 8, 8)
 
         return modelBuilder.end().also { models.add(it) }
     }
@@ -123,11 +125,13 @@ class ProceduralModels : Disposable {
     fun createArmModel(): Model {
         modelBuilder.begin()
 
+        val armScale = 1.4f  // Same scale as rider
+
         val bodyMaterial = Material(ColorAttribute.createDiffuse(riderBodyColor))
         val armPart = modelBuilder.part("arm", GL20.GL_TRIANGLES, attributes, bodyMaterial)
         // Arm is a box, pivot point at shoulder (top of arm)
-        armPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -0.2f, 0f))
-        armPart.box(0.08f, 0.4f, 0.08f)
+        armPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -0.25f * armScale, 0f))
+        armPart.box(0.1f * armScale, 0.5f * armScale, 0.1f * armScale)
 
         return modelBuilder.end().also { models.add(it) }
     }
