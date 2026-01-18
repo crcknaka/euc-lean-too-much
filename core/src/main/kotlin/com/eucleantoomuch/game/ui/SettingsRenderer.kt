@@ -24,6 +24,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val pwmWarningRightButton = Rectangle()
     private val maxFpsLeftButton = Rectangle()
     private val maxFpsRightButton = Rectangle()
+    private val privacyPolicyButton = Rectangle()
+    private val termsButton = Rectangle()
 
     private var backButtonHover = 0f
     private var leftButtonHover = 0f
@@ -36,7 +38,14 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private var pwmRightButtonHover = 0f
     private var maxFpsLeftButtonHover = 0f
     private var maxFpsRightButtonHover = 0f
+    private var privacyButtonHover = 0f
+    private var termsButtonHover = 0f
     private var enterAnimProgress = 0f
+
+    companion object {
+        private const val PRIVACY_POLICY_URL = "https://crcknaka.github.io/euc-lean-too-much/privacy-policy.html"
+        private const val TERMS_URL = "https://crcknaka.github.io/euc-lean-too-much/terms-of-service.html"
+    }
 
     enum class Action {
         NONE, BACK
@@ -69,6 +78,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
         val maxFpsLeftHovered = maxFpsLeftButton.contains(touchX, touchY)
         val maxFpsRightHovered = maxFpsRightButton.contains(touchX, touchY)
+        val privacyHovered = privacyPolicyButton.contains(touchX, touchY)
+        val termsHovered = termsButton.contains(touchX, touchY)
 
         backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 10f)
         leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 10f)
@@ -81,6 +92,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
         maxFpsLeftButtonHover = UITheme.Anim.ease(maxFpsLeftButtonHover, if (maxFpsLeftHovered) 1f else 0f, 10f)
         maxFpsRightButtonHover = UITheme.Anim.ease(maxFpsRightButtonHover, if (maxFpsRightHovered) 1f else 0f, 10f)
+        privacyButtonHover = UITheme.Anim.ease(privacyButtonHover, if (privacyHovered) 1f else 0f, 10f)
+        termsButtonHover = UITheme.Anim.ease(termsButtonHover, if (termsHovered) 1f else 0f, 10f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -291,6 +304,40 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 36f * scale, buttonWidth, buttonHeight)
         ui.button(backButton, UITheme.accent, glowIntensity = backButtonHover * 0.8f)
 
+        // Privacy Policy and Terms buttons (small links at bottom of panel)
+        val linkButtonWidth = 160f * scale
+        val linkButtonHeight = 40f * scale
+        val linkButtonY = panelY + 15f * scale
+        val linkButtonSpacing = 20f * scale
+
+        privacyPolicyButton.set(
+            centerX - linkButtonWidth - linkButtonSpacing / 2,
+            linkButtonY,
+            linkButtonWidth,
+            linkButtonHeight
+        )
+        ui.panel(
+            privacyPolicyButton.x, privacyPolicyButton.y,
+            privacyPolicyButton.width, privacyPolicyButton.height,
+            radius = 8f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
+        )
+
+        termsButton.set(
+            centerX + linkButtonSpacing / 2,
+            linkButtonY,
+            linkButtonWidth,
+            linkButtonHeight
+        )
+        ui.panel(
+            termsButton.x, termsButton.y,
+            termsButton.width, termsButton.height,
+            radius = 8f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
+        )
+
         ui.endShapes()
 
         // === Draw Text ===
@@ -392,9 +439,17 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2,
             UIFonts.button, UITheme.textPrimary)
 
-        // Hint at bottom
-        ui.textCentered("Higher distance = better view, lower FPS", centerX, panelY + 50f * scale,
-            UIFonts.caption, UITheme.textMuted)
+        // Privacy Policy and Terms link text
+        val linkTextColor = if (privacyButtonHover > 0.5f) UITheme.accent else UITheme.textMuted
+        val termsTextColor = if (termsButtonHover > 0.5f) UITheme.accent else UITheme.textMuted
+        ui.textCentered("Privacy Policy",
+            privacyPolicyButton.x + privacyPolicyButton.width / 2,
+            privacyPolicyButton.y + privacyPolicyButton.height / 2,
+            UIFonts.caption, linkTextColor)
+        ui.textCentered("Terms",
+            termsButton.x + termsButton.width / 2,
+            termsButton.y + termsButton.height / 2,
+            UIFonts.caption, termsTextColor)
 
         ui.endBatch()
 
@@ -443,6 +498,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             if (maxFpsRightButton.contains(touchX, touchY)) {
                 val newIndex = (maxFpsCurrentIndex + 1).coerceAtMost(SettingsManager.MAX_FPS_OPTIONS.size - 1)
                 settingsManager.setMaxFpsByIndex(newIndex)
+            }
+            if (privacyPolicyButton.contains(touchX, touchY)) {
+                Gdx.net.openURI(PRIVACY_POLICY_URL)
+            }
+            if (termsButton.contains(touchX, touchY)) {
+                Gdx.net.openURI(TERMS_URL)
             }
         }
 

@@ -91,7 +91,7 @@ class GameOverRenderer : Disposable {
 
         // Panel dimensions with scale animation - wider panel
         val panelWidth = 640f * scale * panelScale
-        val panelHeight = 650f * scale * panelScale  // Taller for more spacing
+        val panelHeight = 580f * scale * panelScale  // Compact height with side-by-side stats
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
@@ -180,24 +180,24 @@ class GameOverRenderer : Disposable {
             val statsAlpha = (statsReveal * 1.5f - 0.5f).coerceIn(0f, 1f)
             if (statsAlpha > 0) {
                 val lineHeight = 75f * scale
+                val columnOffset = 130f * scale  // Half-width between SCORE and DISTANCE columns
 
-                // Score - centered with larger text
+                // Score and Distance in one row
                 UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("SCORE", centerX, statsStartY, UIFonts.caption, UIFonts.caption.color)
+                ui.textCentered("SCORE", centerX - columnOffset, statsStartY, UIFonts.caption, UIFonts.caption.color)
                 UIFonts.heading.color = UITheme.withAlpha(UITheme.accent, statsAlpha)
-                ui.textCentered(session.score.toString(), centerX, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+                ui.textCentered(session.score.toString(), centerX - columnOffset, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
 
-                // Distance - centered
                 UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("DISTANCE", centerX, statsStartY - lineHeight * 1.25f, UIFonts.caption, UIFonts.caption.color)
+                ui.textCentered("DISTANCE", centerX + columnOffset, statsStartY, UIFonts.caption, UIFonts.caption.color)
                 UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
-                ui.textCentered("${session.distanceTraveled.toInt()} m", centerX, statsStartY - lineHeight * 1.25f - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+                ui.textCentered("${session.distanceTraveled.toInt()} m", centerX + columnOffset, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
 
-                // Top Speed - centered
+                // Top Speed - centered below
                 UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("TOP SPEED", centerX, statsStartY - lineHeight * 2.5f, UIFonts.caption, UIFonts.caption.color)
+                ui.textCentered("TOP SPEED", centerX, statsStartY - lineHeight * 1.25f, UIFonts.caption, UIFonts.caption.color)
                 UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
-                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX, statsStartY - lineHeight * 2.5f - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX, statsStartY - lineHeight * 1.25f - 42f * scale, UIFonts.heading, UIFonts.heading.color)
             }
 
             // Button labels with larger text

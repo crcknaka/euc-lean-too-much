@@ -7,7 +7,9 @@
       "Bash(cmd /c \"gradlew.bat :core:compileKotlin\")",
       "Bash(./gradlew assembleDebug:*)",
       "Bash(cmd /c \"gradlew.bat compileDebugKotlin\")",
-      "Bash(./gradlew.bat compileDebugKotlin:*)"
+      "Bash(./gradlew.bat compileDebugKotlin:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Privacy Policy, Terms of Service, and GitHub Pages site\n\n- Rename app to \"EUC Rider\" in strings.xml\n- Add privacy policy and terms of service HTML files\n- Create docs/ folder for GitHub Pages with landing page\n- Contact email: info@sitespro.org\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git add:*)"
     ]
   }
 }
