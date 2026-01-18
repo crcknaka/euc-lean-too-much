@@ -440,6 +440,9 @@ class EucGame(
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
         }
 
+        // No motion blur during countdown
+        renderer.postProcessing.blurStrength = 0f
+
         renderer.render()
 
         // Render countdown overlay
@@ -494,6 +497,12 @@ class EucGame(
 
             // Update motor sound (pitch/volume based on speed and PWM)
             motorSoundManager.update(eucComponent.speed, eucComponent.pwm, delta)
+
+            // Update motion blur based on speed (starts at 40 km/h, max at 80 km/h)
+            val speedKmh = eucComponent.speed * 3.6f
+            val blurStart = 40f
+            val blurMax = 80f
+            renderer.postProcessing.blurStrength = ((speedKmh - blurStart) / (blurMax - blurStart)).coerceIn(0f, 0.4f)
         }
 
         // Update music fade

@@ -64,7 +64,11 @@ class GameRenderer(
     private val lodDistance = 80f
     private val lodDistanceSq = lodDistance * lodDistance
 
+    // Post-processing effects
+    val postProcessing = PostProcessing()
+
     init {
+        postProcessing.initialize()
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
         camera.far = 300f
         camera.update()
@@ -76,6 +80,9 @@ class GameRenderer(
     }
 
     fun render() {
+        // Begin post-processing (render to framebuffer)
+        postProcessing.begin()
+
         // Clear screen with sky color
         Gdx.gl.glClearColor(skyR, skyG, skyB, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
@@ -204,6 +211,9 @@ class GameRenderer(
         }
 
         modelBatch.end()
+
+        // End post-processing (apply effects and render to screen)
+        postProcessing.end()
     }
 
     /**
@@ -270,5 +280,6 @@ class GameRenderer(
 
     override fun dispose() {
         modelBatch.dispose()
+        postProcessing.dispose()
     }
 }
