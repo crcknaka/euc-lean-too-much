@@ -698,7 +698,13 @@ class EucGame(
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
                 riderTransform.position.x -= 0.05f  // Slightly right to center on wheel
-                riderTransform.position.y += 0.7f + fallAnimationController.riderYOffset
+
+                // Compensate Y position for forward pitch - raise rider when leaning forward
+                // so the model doesn't clip through ground
+                val pitchCompensation = (fallAnimationController.riderPitch / 90f) * 0.5f
+                val baseY = 0.7f + fallAnimationController.riderYOffset + pitchCompensation
+                riderTransform.position.y = (playerTransform.position.y + baseY).coerceAtLeast(0.3f)
+
                 riderTransform.position.z += fallAnimationController.riderForwardOffset
 
                 // Apply fall rotation to rider's visual lean
@@ -707,7 +713,9 @@ class EucGame(
             }
             riderEntity?.getComponent(EucComponent::class.java)?.let { riderEuc ->
                 // Apply fall pitch/roll to visual lean (converts rotation to lean values)
-                riderEuc.visualForwardLean = eucComponent.visualForwardLean + fallAnimationController.riderPitch / 90f
+                // Clamp pitch to 75 degrees max to prevent model going underground
+                val clampedPitch = fallAnimationController.riderPitch.coerceAtMost(75f)
+                riderEuc.visualForwardLean = eucComponent.visualForwardLean + clampedPitch / 90f
                 riderEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
             }
 

@@ -136,9 +136,16 @@ class AndroidLauncher : AndroidApplication() {
      * Find display mode with CURRENT system resolution and highest refresh rate.
      * This respects the user's system resolution setting while enabling high refresh rate.
      */
+    @Suppress("DEPRECATION")
     private fun getHighRefreshRateMode(): Int {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val display = windowManager.defaultDisplay
+            // Use new API on Android R+, fallback to deprecated API on older versions
+            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                windowManager.defaultDisplay
+            } ?: return 0
+
             val supportedModes = display.supportedModes
             val currentMode = display.mode
 
