@@ -36,6 +36,7 @@ import com.eucleantoomuch.game.ui.MenuRenderer
 import com.eucleantoomuch.game.ui.PauseRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
 import com.eucleantoomuch.game.ui.UIFonts
+import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -58,6 +59,7 @@ class EucGame(
     private lateinit var pauseRenderer: PauseRenderer
     private lateinit var calibrationRenderer: CalibrationRenderer
     private lateinit var settingsRenderer: SettingsRenderer
+    private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
 
     // Game state
     private var session = GameSession()
@@ -155,6 +157,7 @@ class EucGame(
         pauseRenderer = PauseRenderer()
         calibrationRenderer = CalibrationRenderer()
         settingsRenderer = SettingsRenderer(settingsManager)
+        wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
 
         // Apply saved render distance setting
         applyRenderDistance()
@@ -233,6 +236,7 @@ class EucGame(
         when (val state = stateManager.current()) {
             is GameState.Loading -> renderLoading()
             is GameState.Menu -> renderMenu()
+            is GameState.WheelSelection -> renderWheelSelection()
             is GameState.Settings -> renderSettings()
             is GameState.Calibrating -> renderCalibration()
             is GameState.Countdown -> renderCountdown(delta)
@@ -267,11 +271,8 @@ class EucGame(
 
         when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance)) {
             MenuRenderer.ButtonClicked.PLAY -> {
-                if (gameInput.isCalibrated()) {
-                    startGame()
-                } else {
-                    stateManager.transition(GameState.Calibrating)
-                }
+                // Go to wheel selection first
+                stateManager.transition(GameState.WheelSelection)
             }
             MenuRenderer.ButtonClicked.CALIBRATE -> {
                 stateManager.transition(GameState.Calibrating)
@@ -285,6 +286,26 @@ class EucGame(
                 System.exit(0)
             }
             MenuRenderer.ButtonClicked.NONE -> {}
+        }
+    }
+
+    private fun renderWheelSelection() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        when (wheelSelectionRenderer.render()) {
+            WheelSelectionRenderer.Action.START -> {
+                // Proceed to calibration or game
+                if (gameInput.isCalibrated()) {
+                    startGame()
+                } else {
+                    stateManager.transition(GameState.Calibrating)
+                }
+            }
+            WheelSelectionRenderer.Action.BACK -> {
+                stateManager.transition(GameState.Menu)
+            }
+            WheelSelectionRenderer.Action.NONE -> {}
         }
     }
 
@@ -617,8 +638,9 @@ class EucGame(
     private fun startGame() {
         resetGame()
 
-        // Create player
-        playerEntity = entityFactory.createPlayer()
+        // Get selected wheel type and create player with it
+        val wheelType = settingsManager.getSelectedWheel()
+        playerEntity = entityFactory.createPlayer(wheelType)
         riderEntity = entityFactory.createRiderModel()
         leftArmEntity = entityFactory.createArm(isLeft = true)
         rightArmEntity = entityFactory.createArm(isLeft = false)
@@ -827,6 +849,7 @@ class EucGame(
         pauseRenderer.resize(width, height)
         calibrationRenderer.resize(width, height)
         settingsRenderer.resize(width, height)
+        wheelSelectionRenderer.resize(width, height)
     }
 
     override fun resume() {
@@ -843,6 +866,7 @@ class EucGame(
         pauseRenderer.recreate()
         calibrationRenderer.recreate()
         settingsRenderer.recreate()
+        wheelSelectionRenderer.recreate()
     }
 
     override fun dispose() {
@@ -854,5 +878,6 @@ class EucGame(
         pauseRenderer.dispose()
         calibrationRenderer.dispose()
         settingsRenderer.dispose()
+        wheelSelectionRenderer.dispose()
     }
 }

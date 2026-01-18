@@ -2,6 +2,7 @@ package com.eucleantoomuch.game.state
 
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Preferences
+import com.eucleantoomuch.game.model.WheelType
 
 class SettingsManager {
     private val prefs: Preferences by lazy {
@@ -15,6 +16,7 @@ class SettingsManager {
         private const val KEY_BEEPS_ENABLED = "beepsEnabled"
         private const val KEY_AVAS_MODE = "avasMode"
         private const val KEY_MAX_FPS = "maxFps"
+        private const val KEY_SELECTED_WHEEL = "selectedWheel"
 
         // Max FPS options (0 = unlimited/120+)
         val MAX_FPS_OPTIONS = listOf(
@@ -100,6 +102,16 @@ class SettingsManager {
             prefs.putInteger(KEY_MAX_FPS, value)
             prefs.flush()
         }
+
+    // Selected wheel type
+    var selectedWheelId: String
+        get() = prefs.getString(KEY_SELECTED_WHEEL, "standard")
+        set(value) {
+            prefs.putString(KEY_SELECTED_WHEEL, value)
+            prefs.flush()
+        }
+
+    fun getSelectedWheel(): WheelType = WheelType.fromId(selectedWheelId)
 
     fun getMaxFpsIndex(): Int {
         val current = maxFps

@@ -56,7 +56,9 @@ class EucPhysicsSystem(
         euc.visualSideLean = lerp(euc.visualSideLean, euc.sideLean, deltaTime * 8f)
 
         // Calculate PWM (motor load) - this determines cutout
-        euc.calculatePwm()
+        // Apply wheel-specific PWM sensitivity
+        val basePwm = euc.calculatePwm()
+        euc.pwm = basePwm * euc.pwmSensitivity
 
         // Check for fall condition (PWM cutout at 100%)
         if (euc.isPwmCutout()) {
@@ -68,12 +70,24 @@ class EucPhysicsSystem(
             return
         }
 
-        // Calculate speed based on forward lean
-        val targetSpeed = EucPhysics.calculateTargetSpeed(euc.forwardLean)
-        euc.speed = EucPhysics.updateSpeed(euc.speed, targetSpeed, deltaTime)
+        // Calculate speed based on forward lean (using wheel-specific maxSpeed)
+        val targetSpeed = EucPhysics.calculateTargetSpeed(euc.forwardLean, euc.maxSpeed)
+        euc.speed = EucPhysics.updateSpeed(
+            euc.speed,
+            targetSpeed,
+            deltaTime,
+            euc.acceleration,
+            euc.deceleration,
+            euc.maxSpeed
+        )
 
-        // Calculate turn rate based on side lean
-        val turnRate = EucPhysics.calculateTurnRate(euc.sideLean, euc.speed)
+        // Calculate turn rate based on side lean (using wheel-specific responsiveness)
+        val turnRate = EucPhysics.calculateTurnRate(
+            euc.sideLean,
+            euc.speed,
+            euc.turnResponsiveness,
+            euc.maxSpeed
+        )
 
         // Update velocity - forward is +Z in our coordinate system
         velocity.linear.set(0f, 0f, euc.speed)

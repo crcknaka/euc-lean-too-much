@@ -7,11 +7,12 @@ object EucPhysics {
     /**
      * Calculate target speed based on forward lean
      * @param forwardLean Normalized lean (-1 to 1)
+     * @param maxSpeed Maximum speed for this wheel type
      * @return Target speed in m/s
      */
-    fun calculateTargetSpeed(forwardLean: Float): Float {
+    fun calculateTargetSpeed(forwardLean: Float, maxSpeed: Float = Constants.MAX_SPEED): Float {
         return when {
-            forwardLean > 0 -> lerp(Constants.MIN_SPEED, Constants.MAX_SPEED, forwardLean)
+            forwardLean > 0 -> lerp(Constants.MIN_SPEED, maxSpeed, forwardLean)
             forwardLean < 0 -> lerp(Constants.MIN_SPEED, 0f, -forwardLean)
             else -> Constants.MIN_SPEED
         }
@@ -22,22 +23,44 @@ object EucPhysics {
      * @param currentSpeed Current speed in m/s
      * @param targetSpeed Target speed in m/s
      * @param deltaTime Frame delta time
+     * @param acceleration Acceleration rate for this wheel type
+     * @param deceleration Deceleration rate for this wheel type
+     * @param maxSpeed Maximum speed for this wheel type
      * @return New speed
      */
-    fun updateSpeed(currentSpeed: Float, targetSpeed: Float, deltaTime: Float): Float {
-        val accel = if (targetSpeed > currentSpeed) Constants.ACCELERATION else Constants.DECELERATION
+    fun updateSpeed(
+        currentSpeed: Float,
+        targetSpeed: Float,
+        deltaTime: Float,
+        acceleration: Float = Constants.ACCELERATION,
+        deceleration: Float = Constants.DECELERATION,
+        maxSpeed: Float = Constants.MAX_SPEED
+    ): Float {
+        val accel = if (targetSpeed > currentSpeed) acceleration else deceleration
         return moveTowards(currentSpeed, targetSpeed, accel * deltaTime)
-            .coerceIn(0f, Constants.MAX_SPEED)
+            .coerceIn(0f, maxSpeed)
     }
 
     /**
      * Calculate turn rate based on side lean and current speed
      * Turning is slower at higher speeds (more realistic)
+     * @param sideLean Normalized side lean (-1 to 1)
+     * @param currentSpeed Current speed in m/s
+     * @param turnResponsiveness Turn rate multiplier for this wheel type
+     * @param maxSpeed Maximum speed for calculating speed factor
+     * @return Turn rate in degrees/second
      */
-    fun calculateTurnRate(sideLean: Float, currentSpeed: Float): Float {
+    fun calculateTurnRate(
+        sideLean: Float,
+        currentSpeed: Float,
+        turnResponsiveness: Float = Constants.TURN_RESPONSIVENESS,
+        maxSpeed: Float = Constants.MAX_SPEED
+    ): Float {
         // Speed factor: turning is harder at high speed
-        val speedFactor = 1f - (currentSpeed / Constants.MAX_SPEED) * 0.5f
-        return sideLean * Constants.MAX_TURN_RATE * speedFactor
+        val speedFactor = 1f - (currentSpeed / maxSpeed) * 0.5f
+        // Turn responsiveness affects how agile the wheel is
+        val responsivenessFactor = turnResponsiveness / Constants.TURN_RESPONSIVENESS
+        return sideLean * Constants.MAX_TURN_RATE * speedFactor * responsivenessFactor
     }
 
     /**

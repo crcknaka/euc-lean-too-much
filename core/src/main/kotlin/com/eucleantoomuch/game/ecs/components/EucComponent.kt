@@ -11,6 +11,12 @@ class EucComponent : Component, Pool.Poolable {
     var maxSpeed: Float = Constants.MAX_SPEED
     var criticalLean: Float = Constants.CRITICAL_LEAN
 
+    // Wheel-specific physics parameters
+    var acceleration: Float = Constants.ACCELERATION
+    var deceleration: Float = Constants.DECELERATION
+    var pwmSensitivity: Float = 1.0f
+    var turnResponsiveness: Float = Constants.TURN_RESPONSIVENESS
+
     // Puddle effect
     var inPuddle: Boolean = false
     var puddleTimer: Float = 0f
@@ -28,6 +34,10 @@ class EucComponent : Component, Pool.Poolable {
         speed = Constants.MIN_SPEED
         maxSpeed = Constants.MAX_SPEED
         criticalLean = Constants.CRITICAL_LEAN
+        acceleration = Constants.ACCELERATION
+        deceleration = Constants.DECELERATION
+        pwmSensitivity = 1.0f
+        turnResponsiveness = Constants.TURN_RESPONSIVENESS
         inPuddle = false
         puddleTimer = 0f
         visualForwardLean = 0f
@@ -44,7 +54,7 @@ class EucComponent : Component, Pool.Poolable {
      * PWM represents motor load - combination of:
      * - Current speed vs max speed (higher speed = more PWM needed to maintain)
      * - Forward lean (acceleration demand)
-     * - Side lean (turning demand)
+     * - Side lean (turning demand) - minimal impact, turning doesn't stress motor much
      * At PWM >= 1.0, the motor can't keep up = cutout
      */
     fun calculatePwm(): Float {
@@ -55,8 +65,9 @@ class EucComponent : Component, Pool.Poolable {
         // Positive lean = accelerating = more PWM needed
         val accelDemand = if (forwardLean > 0) forwardLean * 0.4f else forwardLean * 0.1f
 
-        // Side lean also uses PWM for turning torque
-        val turnDemand = kotlin.math.abs(sideLean) * 0.15f
+        // Side lean has minimal impact on PWM - turning uses gyro, not motor torque
+        // Only adds small amount at extreme turns
+        val turnDemand = kotlin.math.abs(sideLean) * 0.05f
 
         // Total PWM
         pwm = (speedFactor + accelDemand + turnDemand).coerceIn(0f, 1.5f)

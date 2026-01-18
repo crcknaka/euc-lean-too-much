@@ -4,6 +4,7 @@ import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.eucleantoomuch.game.ecs.components.*
+import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.rendering.ProceduralModels
 import com.eucleantoomuch.game.util.Constants
 
@@ -15,7 +16,7 @@ class EntityFactory(
     private val riderModel by lazy { models.createRiderModel() }
     private val armModel by lazy { models.createArmModel() }
 
-    fun createPlayer(): Entity {
+    fun createPlayer(wheelType: WheelType = WheelType.Standard): Entity {
         val entity = engine.createEntity()
 
         // Create model instance first - this triggers lazy init and sets eucModelScale
@@ -48,8 +49,15 @@ class EntityFactory(
         // Player marker
         entity.add(PlayerComponent())
 
-        // EUC state
-        entity.add(EucComponent())
+        // EUC state with wheel-specific physics
+        entity.add(EucComponent().apply {
+            maxSpeed = wheelType.maxSpeed
+            criticalLean = wheelType.criticalLean
+            acceleration = wheelType.acceleration
+            deceleration = wheelType.deceleration
+            pwmSensitivity = wheelType.pwmSensitivity
+            turnResponsiveness = wheelType.turnResponsiveness
+        })
 
         engine.addEntity(entity)
         return entity
