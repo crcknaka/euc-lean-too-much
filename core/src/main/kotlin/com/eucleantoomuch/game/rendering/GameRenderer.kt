@@ -114,7 +114,18 @@ class GameRenderer(
 
                     // Lean forward (around X axis) and side (around Z axis)
                     val forwardLeanAngle = euc.visualForwardLean * 20f
-                    val sideLeanAngle = euc.visualSideLean * 15f
+                    // Side lean: normal riding uses values -1 to 1 (mapped to ±15°)
+                    // During fall, visualSideLean can exceed ±1 (eucRoll/90 gets added)
+                    // For values > 1 or < -1, we need the full angle for fall animation (up to 90°)
+                    val sideLeanAngle = if (kotlin.math.abs(euc.visualSideLean) > 1f) {
+                        // Falling: interpret as direct angle contribution
+                        // visualSideLean = baseLean + eucRoll/90, so eucRoll/90 part needs *90 to get degrees
+                        val baseLean = euc.visualSideLean.coerceIn(-1f, 1f)
+                        val fallContribution = euc.visualSideLean - baseLean
+                        baseLean * 15f + fallContribution * 90f
+                    } else {
+                        euc.visualSideLean * 15f
+                    }
                     tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
                     tempMatrix.rotate(0f, 0f, 1f, -sideLeanAngle)
                 } else if (euc != null) {
