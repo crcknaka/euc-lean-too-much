@@ -141,6 +141,8 @@ class EucPhysicsSystem(
      * Brake: forwardLean < -10% at 22+ km/h (brake input has limited range ~0.13 max)
      * Has 30% chance to trigger each time conditions are met.
      * Stops immediately when input is released.
+     *
+     * External wobble (from pothole/manhole) decays when slowing down.
      */
     private fun updateWobble(euc: EucComponent, deltaTime: Float) {
         // Check if flooring gas (>85% forward lean at high speed)
@@ -166,6 +168,9 @@ class EucPhysicsSystem(
 
         wasFlooringIt = isFlooringIt
 
+        // Check if wobble was triggered externally (pothole/manhole)
+        val hasExternalWobble = euc.isWobbling && euc.wobbleIntensity > 0.01f
+
         if (isFlooringIt && wobbleActive) {
             // Build up wobble while flooring it (only if wobble was triggered)
             val leanFactor = if (isFlooringGas) {
@@ -182,15 +187,33 @@ class EucPhysicsSystem(
             // Update wobble timer - fall after 3 seconds
             euc.wobbleTimer += deltaTime
             euc.isWobbling = true
-        } else {
-            // Fast decay when input released or wobble didn't trigger
-            euc.wobbleIntensity = (euc.wobbleIntensity - wobbleDecayRate * deltaTime).coerceAtLeast(0f)
+        } else if (hasExternalWobble) {
+            // External wobble (pothole/manhole) - decays when slowing down
+            // Wobble persists at high speed, decays faster when braking/slowing
+            val speedKmh = euc.speed * 3.6f
+            val slowdownThreshold = 60f  // km/h - wobble starts decaying below this speed
 
-            // Reset wobble timer when not actively wobbling
-            if (!isFlooringIt) {
+            if (speedKmh < slowdownThreshold) {
+                // Decay rate increases as speed decreases
+                val decayMultiplier = 1f + (slowdownThreshold - speedKmh) / 10f
+                euc.wobbleIntensity = (euc.wobbleIntensity - wobbleDecayRate * decayMultiplier * deltaTime).coerceAtLeast(0f)
+            }
+
+            // Still count wobble timer while wobbling
+            if (euc.wobbleIntensity > 0.01f) {
+                euc.wobbleTimer += deltaTime
+            } else {
+                // Wobble fully decayed - reset state
                 euc.wobbleTimer = 0f
                 euc.isWobbling = false
             }
+        } else {
+            // No active wobble - fast decay
+            euc.wobbleIntensity = (euc.wobbleIntensity - wobbleDecayRate * deltaTime).coerceAtLeast(0f)
+
+            // Reset wobble timer when not actively wobbling
+            euc.wobbleTimer = 0f
+            euc.isWobbling = false
         }
 
         // Update wobble phase (oscillation) and apply to visual

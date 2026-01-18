@@ -106,6 +106,20 @@ class CollisionSystem : EntitySystem(5) {
                     onCollision?.invoke(ObstacleType.PUDDLE, false)
                 }
             }
+            ObstacleType.MANHOLE -> {
+                // Manhole causes wobble effect instead of instant game over
+                if (!euc.isWobbling) {
+                    euc.applyWobbleEffect(0.6f)
+                    onCollision?.invoke(ObstacleType.MANHOLE, false)
+                }
+            }
+            ObstacleType.POTHOLE -> {
+                // Pothole causes full wobble - need to slow down to recover
+                if (!euc.isWobbling) {
+                    euc.applyWobbleEffect(0.7f)
+                    onCollision?.invoke(ObstacleType.POTHOLE, false)
+                }
+            }
             else -> {
                 // All other obstacles cause game over
                 if (obstacle.causesGameOver) {

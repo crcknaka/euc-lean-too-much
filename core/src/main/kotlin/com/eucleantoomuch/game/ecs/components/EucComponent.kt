@@ -110,4 +110,14 @@ class EucComponent : Component, Pool.Poolable {
         inPuddle = true
         puddleTimer = duration
     }
+
+    /**
+     * Apply wobble effect from external source (e.g., manhole collision).
+     * Sets wobble intensity immediately and starts the wobble timer.
+     */
+    fun applyWobbleEffect(intensity: Float = 0.6f) {
+        wobbleIntensity = intensity.coerceIn(0f, 0.8f)
+        wobbleTimer = 0f  // Reset timer - player has 3 seconds to stabilize
+        isWobbling = true
+    }
 }
