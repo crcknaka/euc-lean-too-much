@@ -161,10 +161,10 @@ class FallAnimationController(
             armSpread = easeOutQuad(impactT) * 0.3f  // Slight spread
             armForwardAngle = easeOutQuad(impactT) * 60f  // Arms reach forward
 
-            // EUC starts tipping to side
+            // EUC starts tipping to side - tips quickly on impact
             val eucRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
-            eucRoll = easeOutQuad(impactT) * 25f * eucRollDir
-            eucYOffset = easeInQuad(impactT) * -0.05f
+            eucRoll = easeOutQuad(impactT) * 45f * eucRollDir  // Faster initial tip
+            eucYOffset = 0.15f + easeInQuad(impactT) * -0.05f  // Start above ground
             eucForwardOffset = easeOutQuad(impactT) * 0.2f * speedFactor  // Starts sliding
 
         // === PHASE 2: Tumble (0.15 - 0.5s) ===
@@ -198,10 +198,10 @@ class FallAnimationController(
 
             // EUC falls over to its side and slides forward
             val eucRollDir = if (initialSideLean >= 0) 1f else -1f
-            eucRoll = 25f * eucRollDir + easeInQuad(tumbleT) * 55f * eucRollDir  // 25 -> 80 degrees
-            eucYOffset = -0.05f + easeInQuad(tumbleT) * -0.25f  // Drop as it tips
+            eucRoll = 45f * eucRollDir + easeInQuad(tumbleT) * 55f * eucRollDir  // 45 -> 100 degrees (past 90 = bounced over)
+            eucYOffset = 0.10f + easeInQuad(tumbleT) * -0.05f  // Drop as it tips, stay above ground
             eucForwardOffset = 0.2f * speedFactor + easeOutQuad(tumbleT) * 1.2f * speedFactor  // Slides forward
-            eucSideOffset = easeOutQuad(tumbleT) * 0.3f * eucRollDir
+            eucSideOffset = easeOutQuad(tumbleT) * 0.4f * eucRollDir
 
         // === PHASE 3: Settle (0.5 - 1.0s) ===
         } else {
@@ -234,10 +234,10 @@ class FallAnimationController(
 
             // EUC lying on its side, sliding to a stop
             val eucRollDir = if (initialSideLean >= 0) 1f else -1f
-            eucRoll = 80f * eucRollDir + easeOutQuad(settleT) * 10f * eucRollDir  // Settles to 90
-            eucYOffset = -0.3f  // On the ground
+            eucRoll = 100f * eucRollDir + easeOutQuad(settleT) * 5f * eucRollDir  // Settles to ~105 (slightly past flat)
+            eucYOffset = 0.05f  // On the ground but not clipping through
             eucForwardOffset = 1.4f * speedFactor + easeOutQuad(settleT) * 0.3f * speedFactor  // Slides to stop
-            eucSideOffset = 0.3f * eucRollDir
+            eucSideOffset = 0.4f * eucRollDir
         }
     }
 
