@@ -3,7 +3,15 @@ package com.eucleantoomuch.game.ecs
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.gdx.graphics.g3d.ModelInstance
-import com.eucleantoomuch.game.ecs.components.*
+import com.eucleantoomuch.game.ecs.components.ArmComponent
+import com.eucleantoomuch.game.ecs.components.ArmTagComponent
+import com.eucleantoomuch.game.ecs.components.ColliderComponent
+import com.eucleantoomuch.game.ecs.components.CollisionGroups
+import com.eucleantoomuch.game.ecs.components.EucComponent
+import com.eucleantoomuch.game.ecs.components.ModelComponent
+import com.eucleantoomuch.game.ecs.components.PlayerComponent
+import com.eucleantoomuch.game.ecs.components.TransformComponent
+import com.eucleantoomuch.game.ecs.components.VelocityComponent
 import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.rendering.ProceduralModels
 import com.eucleantoomuch.game.util.Constants
@@ -14,7 +22,8 @@ class EntityFactory(
 ) {
     private val eucModel by lazy { models.createEucModel() }
     private val riderModel by lazy { models.createRiderModel() }
-    private val armModel by lazy { models.createArmModel() }
+    private val leftArmModel by lazy { models.createArmModel(isLeft = true) }
+    private val rightArmModel by lazy { models.createArmModel(isLeft = false) }
 
     fun createPlayer(wheelType: WheelType = WheelType.Standard): Entity {
         val entity = engine.createEntity()
@@ -78,27 +87,36 @@ class EntityFactory(
         // Add EUC component so rider leans with EUC
         entity.add(EucComponent())
 
+        // Add ArmComponent for arm animation state
+        entity.add(ArmComponent())
+
         engine.addEntity(entity)
         return entity
     }
 
-    fun createArm(isLeft: Boolean): Entity {
+    /**
+     * Create an arm entity that will be attached to the rider.
+     * @param isLeft true for left arm, false for right arm
+     */
+    fun createArmEntity(isLeft: Boolean): Entity {
         val entity = engine.createEntity()
 
-        entity.add(TransformComponent())
+        entity.add(TransformComponent().apply {
+            // Default scale (will be used for arm rendering)
+            scale.set(1f, 1f, 1f)
+        })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(armModel)
+            modelInstance = ModelInstance(if (isLeft) leftArmModel else rightArmModel)
         })
 
-        entity.add(ArmComponent().apply {
-            isLeftArm = isLeft
+        // Tag to identify which arm this is
+        entity.add(ArmTagComponent().apply {
+            this.isLeft = isLeft
         })
-
-        // Add EUC component so arm leans with rider
-        entity.add(EucComponent())
 
         engine.addEntity(entity)
         return entity
     }
+
 }

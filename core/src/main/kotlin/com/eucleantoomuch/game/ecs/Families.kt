@@ -53,4 +53,10 @@ object Families {
         TransformComponent::class.java,
         ModelComponent::class.java
     ).get()
+
+    // Rider entities (have both EucComponent and ArmComponent for arm animation)
+    val rider: Family = Family.all(
+        EucComponent::class.java,
+        ArmComponent::class.java
+    ).get()
 }

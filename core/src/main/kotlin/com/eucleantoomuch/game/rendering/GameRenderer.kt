@@ -15,6 +15,7 @@ import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.ArmComponent
+import com.eucleantoomuch.game.ecs.components.ArmTagComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
@@ -42,9 +43,13 @@ class GameRenderer(
     private val modelMapper = ComponentMapper.getFor(ModelComponent::class.java)
     private val eucMapper = ComponentMapper.getFor(EucComponent::class.java)
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
+    private val armTagMapper = ComponentMapper.getFor(ArmTagComponent::class.java)
     private val armMapper = ComponentMapper.getFor(ArmComponent::class.java)
 
     private val tempMatrix = Matrix4()
+
+    // Reference to rider entity for arm rendering (set externally)
+    var riderEntity: com.badlogic.ashley.core.Entity? = null
 
     // Sky color
     private val skyR = 0.5f
@@ -129,22 +134,11 @@ class GameRenderer(
                     tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
                     tempMatrix.rotate(0f, 0f, 1f, -sideLeanAngle)
                 } else if (euc != null) {
-                    // Check if this is an arm
-                    val arm = armMapper.get(entity)
-                    if (arm != null) {
-                        // For arm: apply yaw rotation (negated to match visual direction)
-                        tempMatrix.rotate(0f, 1f, 0f, -transform.yaw)
-
-                        // Lean forward and side
-                        val forwardLeanAngle = euc.visualForwardLean * 20f
-                        val sideLeanAngle = euc.visualSideLean * 15f
-                        tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
-                        tempMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
-
-                        // Rotate arm around Z axis (spread out or down) + wave offset
-                        val armRotation = if (arm.isLeftArm) -arm.armAngle else arm.armAngle
-                        val totalRotation = armRotation + arm.waveOffset
-                        tempMatrix.rotate(0f, 0f, 1f, totalRotation)
+                    // Check if this is an arm entity
+                    val armTag = armTagMapper.get(entity)
+                    if (armTag != null) {
+                        // Arm rendering - attach to rider's shoulder with proper transforms
+                        renderArm(tempMatrix, transform, armTag.isLeft)
                     } else {
                         // For rider: apply yaw rotation (negated to match visual direction)
                         tempMatrix.rotate(0f, 1f, 0f, -transform.yaw)
@@ -155,6 +149,10 @@ class GameRenderer(
                         tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
                         tempMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
                     }
+                } else if (armTagMapper.get(entity) != null) {
+                    // Arm entity without EucComponent - still need to render
+                    val armTag = armTagMapper.get(entity)
+                    renderArm(tempMatrix, transform, armTag.isLeft)
                 } else {
                     // For other entities: standard rotation
                     tempMatrix.rotate(transform.rotation)
@@ -168,6 +166,61 @@ class GameRenderer(
         }
 
         modelBatch.end()
+    }
+
+    /**
+     * Build transform matrix for arm rendering.
+     * Arms are attached to rider's shoulders and follow rider's lean.
+     * Note: matrix has already been reset with idt() but NOT translated yet.
+     */
+    @Suppress("UNUSED_PARAMETER")
+    private fun renderArm(matrix: Matrix4, armTransform: TransformComponent, isLeft: Boolean) {
+        val rider = riderEntity ?: return
+        val riderTransform = transformMapper.get(rider) ?: return
+        val riderEuc = eucMapper.get(rider) ?: return
+        val armComponent = armMapper.get(rider) ?: return
+
+        // Shoulder offset in local rider space
+        val shoulderX = armComponent.shoulderOffsetX * (if (isLeft) -1f else 1f)
+        val shoulderY = armComponent.shoulderOffsetY
+        val shoulderZ = armComponent.shoulderOffsetZ
+
+        // Get arm angles
+        val armPitch = if (isLeft) armComponent.leftArmPitch else armComponent.rightArmPitch
+        val armYaw = if (isLeft) armComponent.leftArmYaw else armComponent.rightArmYaw
+
+        // Reset matrix (idt already called, but let's be safe)
+        matrix.idt()
+
+        // Start with rider's base position
+        matrix.translate(riderTransform.position)
+
+        // Apply rider's yaw (body facing direction)
+        matrix.rotate(0f, 1f, 0f, -riderTransform.yaw)
+
+        // Apply rider's lean (forward and side)
+        val forwardLeanAngle = riderEuc.visualForwardLean * 20f
+        val sideLeanAngle = riderEuc.visualSideLean * 15f
+        matrix.rotate(1f, 0f, 0f, forwardLeanAngle)
+        matrix.rotate(0f, 0f, 1f, sideLeanAngle)
+
+        // Translate to shoulder position (in leaned body space)
+        matrix.translate(shoulderX, shoulderY, shoulderZ)
+
+        // Apply arm rotation (relative to shoulder)
+        // The arm model points DOWN (-Y) by default
+        // To raise arm to the side (horizontal), we rotate around Z axis
+        // armYaw = 90 means arm horizontal (pointing outward from body)
+        // armPitch controls up/down tilt of the raised arm
+
+        // First: rotate around Z to lift arm outward
+        // Left arm needs negative Z rotation to go left, right arm needs positive to go right
+        val liftDirection = if (isLeft) -1f else 1f
+        matrix.rotate(0f, 0f, 1f, armYaw * liftDirection)
+
+        // Then: rotate around X for forward/back tilt (pitch)
+        // When arm is raised, this becomes up/down motion
+        matrix.rotate(1f, 0f, 0f, armPitch)
     }
 
     fun resize(width: Int, height: Int) {

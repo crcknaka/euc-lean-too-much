@@ -144,10 +144,11 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
+    // Rider scale constant for consistency
+    val riderScale = 1.4f
+
     fun createRiderModel(): Model {
         modelBuilder.begin()
-
-        val riderScale = 1.4f  // Scale factor for rider
 
         val pantsMaterial = Material(ColorAttribute.createDiffuse(riderPantsColor))
 
@@ -193,16 +194,40 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createArmModel(): Model {
+    /**
+     * Create an arm model (upper arm + forearm + hand).
+     * The arm is created with pivot at the shoulder (origin at 0,0,0).
+     * @param isLeft true for left arm, false for right arm (currently both arms use same model)
+     */
+    @Suppress("UNUSED_PARAMETER")
+    fun createArmModel(isLeft: Boolean): Model {
         modelBuilder.begin()
 
-        val armScale = 1.4f  // Same scale as rider
-
         val bodyMaterial = Material(ColorAttribute.createDiffuse(riderBodyColor))
-        val armPart = modelBuilder.part("arm", GL20.GL_TRIANGLES, attributes, bodyMaterial)
-        // Arm is a box, pivot point at shoulder (top of arm)
-        armPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -0.25f * armScale, 0f))
-        armPart.box(0.1f * armScale, 0.5f * armScale, 0.1f * armScale)
+        val skinMaterial = Material(ColorAttribute.createDiffuse(riderSkinColor))
+
+        // Arm dimensions
+        val upperArmLength = 0.35f * riderScale
+        val upperArmThickness = 0.09f * riderScale
+        val forearmLength = 0.3f * riderScale
+        val forearmThickness = 0.07f * riderScale
+        val handSize = 0.08f * riderScale
+
+        // Upper arm (from shoulder down)
+        // Positioned so top of upper arm is at origin (shoulder attachment point)
+        val upperArmPart = modelBuilder.part("upper_arm", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        upperArmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -upperArmLength / 2, 0f))
+        upperArmPart.box(upperArmThickness, upperArmLength, upperArmThickness)
+
+        // Forearm (continues from upper arm)
+        val forearmPart = modelBuilder.part("forearm", GL20.GL_TRIANGLES, attributes, bodyMaterial)
+        forearmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -upperArmLength - forearmLength / 2, 0f))
+        forearmPart.box(forearmThickness, forearmLength, forearmThickness)
+
+        // Hand (at end of forearm)
+        val handPart = modelBuilder.part("hand", GL20.GL_TRIANGLES, attributes, skinMaterial)
+        handPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, -upperArmLength - forearmLength - handSize / 2, 0f))
+        handPart.box(handSize, handSize * 0.6f, handSize * 0.4f)
 
         return modelBuilder.end().also { models.add(it) }
     }

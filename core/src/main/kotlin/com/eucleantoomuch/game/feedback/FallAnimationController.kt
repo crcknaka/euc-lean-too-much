@@ -37,12 +37,6 @@ class FallAnimationController(
     var riderForwardOffset = 0f // How much rider has moved forward (thrown off)
         private set
 
-    // Arm animation state
-    var armSpread = 0f          // Arms swing outward on impact (0-1)
-        private set
-    var armForwardAngle = 0f    // Arms reach forward (degrees, for catching fall)
-        private set
-
     // EUC animation state
     var eucRoll = 0f            // EUC tips over
         private set
@@ -101,8 +95,6 @@ class FallAnimationController(
         riderRoll = 0f
         riderYOffset = 0f
         riderForwardOffset = 0f
-        armSpread = 0f
-        armForwardAngle = 0f
         eucRoll = 0f
         eucYOffset = 0f
         eucForwardOffset = 0f
@@ -157,10 +149,6 @@ class FallAnimationController(
             riderYOffset = easeInQuad(impactT) * -0.3f  // Slight drop toward ground
             riderForwardOffset = easeOutQuad(impactT) * 0.5f * speedFactor
 
-            // Arms go FORWARD (protective reflex - hands out to catch fall)
-            armSpread = easeOutQuad(impactT) * 0.3f  // Slight spread
-            armForwardAngle = easeOutQuad(impactT) * 60f  // Arms reach forward
-
             // EUC starts tipping to side - tips quickly on impact
             val eucRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
             eucRoll = easeOutQuad(impactT) * 45f * eucRollDir  // Faster initial tip
@@ -191,10 +179,6 @@ class FallAnimationController(
             // Rider gains some roll as they tumble
             val riderRollDir = if (initialSideLean != 0f) sign(initialSideLean) else rollDirection
             riderRoll = easeInOutQuad(tumbleT) * 15f * riderRollDir
-
-            // Arms stay forward (catching fall)
-            armSpread = 0.3f + tumbleT * 0.2f  // Slight spread
-            armForwardAngle = 60f + easeOutQuad(tumbleT) * 30f  // Arms fully forward (90 degrees)
 
             // EUC falls over to its side and slides forward
             val eucRollDir = if (initialSideLean >= 0) 1f else -1f
@@ -227,10 +211,6 @@ class FallAnimationController(
             // Roll settles
             val riderRollDir = if (initialSideLean >= 0) 1f else -1f
             riderRoll = 15f * riderRollDir
-
-            // Arms forward (bracing on ground)
-            armSpread = 0.5f
-            armForwardAngle = 90f  // Fully forward
 
             // EUC lying on its side, sliding to a stop
             val eucRollDir = if (initialSideLean >= 0) 1f else -1f
@@ -300,8 +280,6 @@ class FallAnimationController(
         riderRoll = 0f
         riderYOffset = 0f
         riderForwardOffset = 0f
-        armSpread = 0f
-        armForwardAngle = 0f
         eucRoll = 0f
         eucYOffset = 0f
         eucForwardOffset = 0f
