@@ -52,19 +52,9 @@ class WorldGenerator(
     // Cloud models
     private val cloudModels = mutableListOf<ModelInstance>()
 
-    // Tower crane models
-    private val towerCraneModels = mutableListOf<ModelInstance>()
-
-    // Airplane model
-    private lateinit var airplaneModel: ModelInstance
-
     // Pigeon models (walking and flying)
     private lateinit var pigeonWalkingModel: ModelInstance
     private lateinit var pigeonFlyingModel: ModelInstance
-
-    // Track airplane spawning (very rare, one at a time in sky)
-    private var lastAirplaneChunk = -100
-    private var activeAirplaneEntity: Entity? = null
 
     // Track pigeon flock ID for group behavior
     private var nextFlockId = 0
@@ -82,9 +72,6 @@ class WorldGenerator(
 
     // Track which chunks have zebra crossings
     private var lastZebraCrossingChunk = -10  // Start with no recent crossing
-
-    // Track tower crane spawning (rare, one at a time)
-    private var lastCraneChunk = -50  // Start with no recent crane
 
     init {
         // Create zebra crossing model
@@ -147,15 +134,6 @@ class WorldGenerator(
             val scaleZ = MathUtils.random(0.8f, 1.2f)
             cloudModels.add(ModelInstance(models.createCloudModel(scaleX, scaleZ)))
         }
-
-        // Create tower crane variants with different heights
-        for (i in 0..2) {
-            val height = MathUtils.random(40f, 55f)
-            towerCraneModels.add(ModelInstance(models.createTowerCraneModel(height)))
-        }
-
-        // Create airplane model
-        airplaneModel = ModelInstance(models.createAirplaneModel())
 
         // Create pigeon models
         pigeonWalkingModel = ModelInstance(models.createPigeonModel(isFlying = false))
@@ -238,9 +216,6 @@ class WorldGenerator(
         // Buildings on both sides
         entities.addAll(generateBuildings(chunkIndex, chunkStartZ))
 
-        // Tower cranes (rare, appear near construction/skyscraper areas)
-        entities.addAll(generateTowerCranes(chunkIndex, chunkStartZ))
-
         // Scenery between buildings (trees, benches, etc.)
         entities.addAll(generateScenery(chunkIndex, chunkStartZ))
 
@@ -252,9 +227,6 @@ class WorldGenerator(
 
         // Pigeons on sidewalks
         entities.addAll(generatePigeons(chunkIndex, chunkStartZ))
-
-        // Airplanes in the sky (very rare)
-        trySpawnAirplane(chunkIndex, chunkStartZ)
 
         // Background buildings on horizon (fill gaps between main buildings)
         entities.addAll(generateBackgroundBuildings(chunkIndex, chunkStartZ))
@@ -864,70 +836,6 @@ class WorldGenerator(
         return entity
     }
 
-    private fun generateTowerCranes(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
-        val entities = mutableListOf<Entity>()
-
-        // Tower cranes are rare - only spawn if:
-        // 1. Enough distance from last crane (at least 8 chunks apart)
-        // 2. Random chance (10% when conditions met)
-        // 3. More likely near skyscraper clusters
-        val distanceFromLastCrane = chunkIndex - lastCraneChunk
-        val nearSkyscraperCluster = skyscraperClusterRemaining > 0 || chunkIndex - lastSkyscraperChunk < 3
-
-        val spawnChance = if (nearSkyscraperCluster) 0.25f else 0.08f
-
-        if (distanceFromLastCrane >= 8 && MathUtils.random() < spawnChance) {
-            lastCraneChunk = chunkIndex
-
-            // Decide which side (slightly more likely on right side)
-            val isLeftSide = MathUtils.random() < 0.4f
-
-            // Position crane behind buildings (further from road)
-            val baseX = if (isLeftSide) {
-                -Constants.BUILDING_OFFSET_X - MathUtils.random(8f, 15f)
-            } else {
-                Constants.BUILDING_OFFSET_X + MathUtils.random(8f, 15f)
-            }
-
-            val z = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
-
-            entities.add(createTowerCraneEntity(baseX, z, chunkIndex, isLeftSide))
-        }
-
-        return entities
-    }
-
-    private fun createTowerCraneEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
-        val entity = engine.createEntity()
-
-        entity.add(TransformComponent().apply {
-            position.set(x, 0f, z)
-            // Rotate crane so jib points in interesting direction
-            // If on left side, jib can point towards road or away
-            // If on right side, same logic
-            yaw = if (isLeftSide) {
-                MathUtils.random(-30f, 120f)  // Mostly pointing towards road or forward
-            } else {
-                MathUtils.random(60f, 210f)   // Mostly pointing towards road or forward
-            }
-            updateRotationFromYaw()
-        })
-
-        entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(towerCraneModels.random().model)
-        })
-
-        entity.add(GroundComponent().apply {
-            type = GroundType.BUILDING
-            this.chunkIndex = chunkIndex
-        })
-
-        // No collider - cranes are background decoration, too far from road to hit
-
-        engine.addEntity(entity)
-        return entity
-    }
-
     private fun generatePigeons(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
         val entities = mutableListOf<Entity>()
 
@@ -1048,72 +956,6 @@ class WorldGenerator(
 
         engine.addEntity(entity)
         return entity
-    }
-
-    /**
-     * Try to spawn an airplane in the sky
-     * Airplanes are very rare - only one can exist at a time
-     */
-    private fun trySpawnAirplane(chunkIndex: Int, chunkStartZ: Float) {
-        // Check if there's already an active airplane
-        if (activeAirplaneEntity != null) {
-            // Check if airplane still exists in engine
-            val airplane = activeAirplaneEntity
-            if (airplane != null) {
-                val airplaneComp = airplane.getComponent(AirplaneComponent::class.java)
-                if (airplaneComp != null && airplaneComp.lifetime < airplaneComp.maxLifetime) {
-                    return  // Airplane still active, don't spawn new one
-                }
-            }
-            activeAirplaneEntity = null
-        }
-
-        // Check spawn conditions:
-        // 1. At least 20 chunks since last airplane
-        // 2. Random chance (3%)
-        val distanceFromLastAirplane = chunkIndex - lastAirplaneChunk
-        if (distanceFromLastAirplane < 20) return
-        if (MathUtils.random() > 0.03f) return
-
-        lastAirplaneChunk = chunkIndex
-
-        // Spawn airplane
-        val entity = engine.createEntity()
-
-        // Random starting position - off to the side, high in the sky
-        val startSide = if (MathUtils.randomBoolean()) -1f else 1f
-        val startX = startSide * MathUtils.random(80f, 150f)  // Far to the side
-        val altitude = MathUtils.random(100f, 140f)           // High in sky
-        val startZ = chunkStartZ + MathUtils.random(-50f, 100f)
-
-        // Flight direction - generally crossing the screen
-        val dirX = -startSide * MathUtils.random(0.3f, 0.7f)  // Cross towards other side
-        val dirZ = MathUtils.random(0.5f, 0.9f)               // Moving forward
-        val direction = Vector3(dirX, 0f, dirZ).nor()
-
-        // Calculate yaw from direction (plane nose points in flight direction)
-        val yaw = MathUtils.atan2(direction.x, direction.z) * MathUtils.radiansToDegrees
-
-        entity.add(TransformComponent().apply {
-            position.set(startX, altitude, startZ)
-            this.yaw = yaw
-            updateRotationFromYaw()
-        })
-
-        entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(airplaneModel.model)
-        })
-
-        entity.add(AirplaneComponent().apply {
-            speed = MathUtils.random(60f, 90f)  // Fast but visible
-            this.direction.set(direction)
-            this.altitude = altitude
-            contrailEnabled = true
-            maxLifetime = MathUtils.random(40f, 70f)  // 40-70 seconds flight
-        })
-
-        engine.addEntity(entity)
-        activeAirplaneEntity = entity
     }
 
     private fun createSceneryItem(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
@@ -1521,11 +1363,6 @@ class WorldGenerator(
         // Reset skyscraper cluster tracking
         skyscraperClusterRemaining = 0
         lastSkyscraperChunk = -100
-        // Reset tower crane tracking
-        lastCraneChunk = -50
-        // Reset airplane tracking
-        lastAirplaneChunk = -100
-        activeAirplaneEntity = null
         // Reset pigeon flock tracking
         nextFlockId = 0
     }

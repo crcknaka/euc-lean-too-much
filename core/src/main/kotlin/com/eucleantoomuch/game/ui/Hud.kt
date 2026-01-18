@@ -109,14 +109,16 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.textCentered(session.score.toString(), sw / 2, scoreValueY, UIFonts.title, UITheme.textPrimary)
         UIFonts.title.data.setScale(originalScale)
 
-        // Warnings - centered on screen
+        // Warnings - positioned lower to not obstruct view
+        val warningBaseY = sh * 0.22f  // Lower on screen (22% from bottom)
+
         if (euc.inPuddle) {
-            drawWarningBadge("SLIPPERY!", UITheme.cyan, sh / 2 + 40f * scale)
+            drawWarningBadge("SLIPPERY!", UITheme.cyan, warningBaseY + 70f * scale)
         }
 
         if (euc.isAboutToFall()) {
             val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
-            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), sh / 2 - 40f * scale)
+            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), warningBaseY)
         }
 
         // PWM warning indicator
@@ -124,7 +126,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val pwmPercent = euc.getPwmPercent()
             val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
-            drawWarningBadge("PWM $pwmPercent%", warningColor, sh / 2 + 100f * scale)
+            drawWarningBadge("PWM $pwmPercent%", warningColor, warningBaseY + 140f * scale)
         }
 
         // FPS counter (top-left, visible but unobtrusive)

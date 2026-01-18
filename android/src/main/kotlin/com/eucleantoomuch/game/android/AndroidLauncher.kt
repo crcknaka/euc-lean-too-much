@@ -41,6 +41,8 @@ class AndroidLauncher : AndroidApplication() {
             useGyroscope = false
             useImmersiveMode = true
             numSamples = 2
+            // Disable foreground FPS limit to allow 120Hz
+            // (libGDX defaults to 60fps in foreground on some devices)
         }
 
         // Create platform services for Android (vibration, beep sounds)
@@ -108,10 +110,23 @@ class AndroidLauncher : AndroidApplication() {
             }
 
             val surfaceView = findSurfaceView(window.decorView)
+            surfaceView?.holder?.addCallback(object : SurfaceHolder.Callback {
+                override fun surfaceCreated(holder: SurfaceHolder) {
+                    // Set frame rate when surface is actually ready
+                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                }
+                override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                    // Also try setting when surface changes
+                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                }
+                override fun surfaceDestroyed(holder: SurfaceHolder) {}
+            })
+
+            // Also try immediate set if surface already exists
             surfaceView?.holder?.surface?.let { surface ->
-                // Request 120Hz with FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
-                // This tells system we're rendering at fixed rate and shouldn't drop frames
-                surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+                if (surface.isValid) {
+                    surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                }
             }
         }
     }

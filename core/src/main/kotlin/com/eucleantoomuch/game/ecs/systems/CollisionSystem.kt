@@ -41,13 +41,27 @@ class CollisionSystem : EntitySystem(5) {
         // Update player collider bounds
         playerCollider.updateBounds(playerTransform.position)
 
-        // Check collision with all obstacles
+        // Check collision with nearby obstacles only
+        val playerZ = playerTransform.position.z
+        val collisionCheckRange = 10f  // Only check obstacles within this Z distance
+
         for (obstacleEntity in obstacleEntities) {
             val obstacleTransform = transformMapper.get(obstacleEntity)
-            val obstacleCollider = colliderMapper.get(obstacleEntity)
             val obstacleComponent = obstacleMapper.get(obstacleEntity)
 
             if (obstacleComponent.hasBeenPassed) continue
+
+            // Skip obstacles too far away (quick Z distance check)
+            val zDist = obstacleTransform.position.z - playerZ
+            if (zDist > collisionCheckRange || zDist < -5f) {
+                // Mark as passed if player is well ahead
+                if (zDist < -2f) {
+                    obstacleComponent.hasBeenPassed = true
+                }
+                continue
+            }
+
+            val obstacleCollider = colliderMapper.get(obstacleEntity)
 
             // Update obstacle bounds
             obstacleCollider.updateBounds(obstacleTransform.position)
@@ -55,11 +69,6 @@ class CollisionSystem : EntitySystem(5) {
             // Simple AABB collision check
             if (checkAABBCollision(playerCollider, obstacleCollider)) {
                 handleCollision(playerComponent, eucComponent, obstacleComponent)
-            }
-
-            // Mark as passed if player is ahead (for scoring)
-            if (playerTransform.position.z > obstacleTransform.position.z + 2f) {
-                obstacleComponent.hasBeenPassed = true
             }
         }
     }

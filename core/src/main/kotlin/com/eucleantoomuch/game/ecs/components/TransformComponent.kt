@@ -11,12 +11,14 @@ class TransformComponent : Component, Pool.Poolable {
     val scale = Vector3(1f, 1f, 1f)
 
     var yaw: Float = 0f  // Y-axis rotation in degrees (for simpler turning)
+    private var lastYaw: Float = Float.MIN_VALUE  // Track last yaw to avoid recalculating
 
     override fun reset() {
         position.setZero()
         rotation.idt()
         scale.set(1f, 1f, 1f)
         yaw = 0f
+        lastYaw = Float.MIN_VALUE
     }
 
     fun setPosition(x: Float, y: Float, z: Float): TransformComponent {
@@ -25,6 +27,9 @@ class TransformComponent : Component, Pool.Poolable {
     }
 
     fun updateRotationFromYaw() {
-        rotation.setFromAxis(Vector3.Y, yaw)
+        if (yaw != lastYaw) {
+            rotation.setFromAxis(Vector3.Y, yaw)
+            lastYaw = yaw
+        }
     }
 }

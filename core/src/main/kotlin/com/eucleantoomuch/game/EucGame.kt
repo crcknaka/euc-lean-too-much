@@ -87,6 +87,10 @@ class EucGame(
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
 
+        // Disable libGDX foreground FPS limit to allow high refresh rates (120Hz+)
+        // By default libGDX limits to 60 FPS on Android
+        Gdx.graphics.setForegroundFPS(0)  // 0 = unlimited
+
         // Initialize state manager
         stateManager = GameStateManager()
         highScoreManager = HighScoreManager()
@@ -138,7 +142,6 @@ class EucGame(
         engine.addSystem(MovementSystem())
         engine.addSystem(PedestrianAISystem())
         engine.addSystem(CarAISystem())
-        engine.addSystem(AirplaneSystem(models))
         engine.addSystem(PigeonSystem(models))
         engine.addSystem(collisionSystem)
         engine.addSystem(CullingSystem())

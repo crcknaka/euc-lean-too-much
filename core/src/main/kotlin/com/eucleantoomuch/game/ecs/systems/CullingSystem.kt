@@ -38,16 +38,15 @@ class CullingSystem : EntitySystem(7) {
             val transform = transformMapper.get(entity)
             val car = carMapper.get(entity)
 
-            // Cars coming towards player (direction = -1) should also be culled when far behind
-            // Cars going same direction (direction = 1) cull normally
-            // For oncoming cars, also cull if they've gone too far behind the player
-            val shouldCull = transform.position.z < playerZ + cullDistance
+            // Default cull: entities that have gone too far behind the player
+            val tooFarBehind = transform.position.z < playerZ + cullDistance
 
-            // Also cull cars that have gone too far ahead (oncoming cars that passed)
-            val tooFarAhead = car != null && car.direction == -1 &&
-                              transform.position.z < playerZ + cullDistance
+            // Oncoming cars (direction = -1) that have passed the player and gone too far behind
+            // should also be culled - they move in negative Z direction so check if they're far ahead
+            val oncomingCarPassedPlayer = car != null && car.direction == -1 &&
+                              transform.position.z > playerZ - cullDistance
 
-            if (shouldCull || tooFarAhead) {
+            if (tooFarBehind || oncomingCarPassedPlayer) {
                 toRemove.add(entity)
             }
         }

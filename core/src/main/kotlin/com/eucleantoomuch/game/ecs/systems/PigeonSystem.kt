@@ -54,16 +54,12 @@ class PigeonSystem(
             playerZ = playerTransform.position.z
         }
 
-        // Update all pigeons
+        // Update all pigeons in a single pass
+        // Flock startle propagation works because we mark isStartled flag on flock members,
+        // which they check at the start of their own checkForStartle call
         val pigeons = engine.getEntitiesFor(Families.pigeons)
-
-        // First pass: check for startles (so flocks react together)
         for (entity in pigeons) {
             checkForStartle(entity)
-        }
-
-        // Second pass: update behavior
-        for (entity in pigeons) {
             updatePigeon(entity, deltaTime)
         }
 
