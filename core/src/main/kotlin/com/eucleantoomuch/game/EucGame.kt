@@ -80,6 +80,10 @@ class EucGame(
     // Fall animation controller
     private lateinit var fallAnimationController: FallAnimationController
 
+    // FPS limiting
+    private var lastFrameTime = 0L
+    private var currentMaxFps = 0  // 0 = unlimited
+
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
 
@@ -181,7 +185,34 @@ class EucGame(
         motorSoundManager.avasMode = settingsManager.avasMode
     }
 
+    private fun applyFpsLimit() {
+        // Check if max FPS setting changed
+        val settingMaxFps = settingsManager.maxFps
+        if (settingMaxFps != currentMaxFps) {
+            currentMaxFps = settingMaxFps
+        }
+
+        // Apply FPS limit (0 = unlimited)
+        if (currentMaxFps > 0) {
+            val targetFrameTime = 1000L / currentMaxFps
+            val currentTime = System.currentTimeMillis()
+            val elapsed = currentTime - lastFrameTime
+
+            if (elapsed < targetFrameTime) {
+                try {
+                    Thread.sleep(targetFrameTime - elapsed)
+                } catch (e: InterruptedException) {
+                    // Ignore
+                }
+            }
+        }
+        lastFrameTime = System.currentTimeMillis()
+    }
+
     override fun render() {
+        // Apply FPS limit if set
+        applyFpsLimit()
+
         val delta = Gdx.graphics.deltaTime
 
         // Update input

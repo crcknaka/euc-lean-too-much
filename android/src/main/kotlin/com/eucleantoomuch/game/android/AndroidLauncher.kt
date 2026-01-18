@@ -2,6 +2,9 @@ package com.eucleantoomuch.game.android
 
 import android.os.Build
 import android.os.Bundle
+import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
 import androidx.core.view.WindowCompat
@@ -24,6 +27,14 @@ class AndroidLauncher : AndroidApplication() {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
 
+        // Request high refresh rate (120Hz) on supported devices
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val highRefreshMode = getHighRefreshRateMode()
+            window.attributes = window.attributes.apply {
+                preferredDisplayModeId = highRefreshMode
+            }
+        }
+
         val config = AndroidApplicationConfiguration().apply {
             useAccelerometer = true
             useCompass = false
@@ -36,6 +47,14 @@ class AndroidLauncher : AndroidApplication() {
         val platformServices = AndroidPlatformServices(this)
 
         initialize(EucGame(platformServices), config)
+
+        // Request 120Hz frame rate on the surface (Android 11+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Find the SurfaceView and set frame rate
+            window.decorView.post {
+                requestHighFrameRate()
+            }
+        }
 
         // Hide system bars for full immersive experience
         hideSystemBars()
@@ -68,5 +87,65 @@ class AndroidLauncher : AndroidApplication() {
                 or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
             )
         }
+    }
+
+    /**
+     * Request high frame rate (120Hz) on the GL surface
+     * This tells the system we want consistent 120fps rendering
+     */
+    private fun requestHighFrameRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Find SurfaceView in the view hierarchy
+            fun findSurfaceView(view: View): SurfaceView? {
+                if (view is SurfaceView) return view
+                if (view is android.view.ViewGroup) {
+                    for (i in 0 until view.childCount) {
+                        val found = findSurfaceView(view.getChildAt(i))
+                        if (found != null) return found
+                    }
+                }
+                return null
+            }
+
+            val surfaceView = findSurfaceView(window.decorView)
+            surfaceView?.holder?.surface?.let { surface ->
+                // Request 120Hz with FRAME_RATE_COMPATIBILITY_FIXED_SOURCE
+                // This tells system we're rendering at fixed rate and shouldn't drop frames
+                surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+            }
+        }
+    }
+
+    /**
+     * Find display mode with CURRENT system resolution and highest refresh rate.
+     * This respects the user's system resolution setting while enabling high refresh rate.
+     */
+    private fun getHighRefreshRateMode(): Int {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val display = windowManager.defaultDisplay
+            val supportedModes = display.supportedModes
+            val currentMode = display.mode
+
+            // Use current system resolution (respects user's display settings)
+            val currentWidth = currentMode.physicalWidth
+            val currentHeight = currentMode.physicalHeight
+
+            // Find mode with SAME resolution as current but highest refresh rate
+            var bestMode = currentMode
+            var maxRefreshRate = currentMode.refreshRate
+
+            for (mode in supportedModes) {
+                // Only consider modes with same resolution as current system setting
+                if (mode.physicalWidth == currentWidth && mode.physicalHeight == currentHeight) {
+                    if (mode.refreshRate > maxRefreshRate) {
+                        maxRefreshRate = mode.refreshRate
+                        bestMode = mode
+                    }
+                }
+            }
+
+            return bestMode.modeId
+        }
+        return 0
     }
 }

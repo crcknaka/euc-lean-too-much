@@ -14,6 +14,14 @@ class SettingsManager {
         private const val KEY_PWM_WARNING = "pwmWarning"
         private const val KEY_BEEPS_ENABLED = "beepsEnabled"
         private const val KEY_AVAS_MODE = "avasMode"
+        private const val KEY_MAX_FPS = "maxFps"
+
+        // Max FPS options (0 = unlimited/120+)
+        val MAX_FPS_OPTIONS = listOf(
+            "60" to 60,
+            "90" to 90,
+            "120+" to 0  // 0 means unlimited
+        )
 
         // Render distance presets (in meters)
         const val RENDER_DISTANCE_LOW = 100f
@@ -84,6 +92,29 @@ class SettingsManager {
             prefs.putInteger(KEY_AVAS_MODE, value)
             prefs.flush()
         }
+
+    // Max FPS (0 = unlimited/120+, 60 = 60fps, 90 = 90fps)
+    var maxFps: Int
+        get() = prefs.getInteger(KEY_MAX_FPS, 0)  // Default to unlimited (120+)
+        set(value) {
+            prefs.putInteger(KEY_MAX_FPS, value)
+            prefs.flush()
+        }
+
+    fun getMaxFpsIndex(): Int {
+        val current = maxFps
+        return MAX_FPS_OPTIONS.indexOfFirst { it.second == current }.takeIf { it >= 0 } ?: 2  // Default to 120+
+    }
+
+    fun setMaxFpsByIndex(index: Int) {
+        if (index in MAX_FPS_OPTIONS.indices) {
+            maxFps = MAX_FPS_OPTIONS[index].second
+        }
+    }
+
+    fun getMaxFpsName(): String {
+        return MAX_FPS_OPTIONS.getOrNull(getMaxFpsIndex())?.first ?: "120+"
+    }
 
     fun getAvasModeIndex(): Int {
         val current = avasMode

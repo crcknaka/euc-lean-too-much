@@ -22,6 +22,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val avasRightButton = Rectangle()
     private val pwmWarningLeftButton = Rectangle()
     private val pwmWarningRightButton = Rectangle()
+    private val maxFpsLeftButton = Rectangle()
+    private val maxFpsRightButton = Rectangle()
 
     private var backButtonHover = 0f
     private var leftButtonHover = 0f
@@ -32,6 +34,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private var avasRightButtonHover = 0f
     private var pwmLeftButtonHover = 0f
     private var pwmRightButtonHover = 0f
+    private var maxFpsLeftButtonHover = 0f
+    private var maxFpsRightButtonHover = 0f
     private var enterAnimProgress = 0f
 
     enum class Action {
@@ -63,6 +67,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val avasRightHovered = avasRightButton.contains(touchX, touchY)
         val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
         val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
+        val maxFpsLeftHovered = maxFpsLeftButton.contains(touchX, touchY)
+        val maxFpsRightHovered = maxFpsRightButton.contains(touchX, touchY)
 
         backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 10f)
         leftButtonHover = UITheme.Anim.ease(leftButtonHover, if (leftHovered) 1f else 0f, 10f)
@@ -73,6 +79,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
         pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 10f)
         pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
+        maxFpsLeftButtonHover = UITheme.Anim.ease(maxFpsLeftButtonHover, if (maxFpsLeftHovered) 1f else 0f, 10f)
+        maxFpsRightButtonHover = UITheme.Anim.ease(maxFpsRightButtonHover, if (maxFpsRightHovered) 1f else 0f, 10f)
 
         // === Draw Background ===
         ui.beginShapes()
@@ -90,7 +98,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Main settings panel
         val panelWidth = 780f * scale * enterAnimProgress
-        val panelHeight = 730f * scale * enterAnimProgress  // Increased for motor sound checkbox
+        val panelHeight = 860f * scale * enterAnimProgress  // Increased for Max FPS setting
         val panelX = centerX - panelWidth / 2
         val panelY = sh / 2 - panelHeight / 2 + 40f * scale
 
@@ -134,8 +142,38 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             shadowOffset = 0f
         )
 
+        // === Max FPS Setting ===
+        val maxFpsSettingY = renderDistanceY - 130f * scale
+
+        maxFpsLeftButton.set(
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
+            maxFpsSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(maxFpsLeftButton, UITheme.secondary, glowIntensity = maxFpsLeftButtonHover * 0.6f)
+
+        maxFpsRightButton.set(
+            centerX + valueBoxWidth / 2 + 16f * scale,
+            maxFpsSettingY - arrowButtonSize / 2,
+            arrowButtonSize,
+            arrowButtonSize
+        )
+        ui.button(maxFpsRightButton, UITheme.secondary, glowIntensity = maxFpsRightButtonHover * 0.6f)
+
+        // Max FPS Value box
+        ui.panel(
+            centerX - valueBoxWidth / 2,
+            maxFpsSettingY - 40f * scale,
+            valueBoxWidth,
+            80f * scale,
+            radius = 14f * scale,
+            backgroundColor = UITheme.surfaceLight,
+            shadowOffset = 0f
+        )
+
         // === PWM Warning Setting ===
-        val pwmSettingY = renderDistanceY - 130f * scale
+        val pwmSettingY = maxFpsSettingY - 130f * scale
 
         pwmWarningLeftButton.set(
             centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
@@ -283,6 +321,25 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val currentDistance = settingsManager.renderDistance.toInt()
         ui.textCentered("$currentName (${currentDistance}m)", centerX, renderDistanceY, UIFonts.body, UITheme.accent)
 
+        // Max FPS label
+        val maxFpsLabelY = maxFpsSettingY + 70f * scale
+        ui.textCentered("Max FPS", centerX, maxFpsLabelY, UIFonts.body, UITheme.textSecondary)
+
+        // Max FPS Arrow symbols
+        ui.textCentered("<",
+            maxFpsLeftButton.x + maxFpsLeftButton.width / 2,
+            maxFpsLeftButton.y + maxFpsLeftButton.height / 2,
+            UIFonts.heading, UITheme.textPrimary)
+
+        ui.textCentered(">",
+            maxFpsRightButton.x + maxFpsRightButton.width / 2,
+            maxFpsRightButton.y + maxFpsRightButton.height / 2,
+            UIFonts.heading, UITheme.textPrimary)
+
+        // Max FPS Current value
+        val maxFpsCurrentName = settingsManager.getMaxFpsName()
+        ui.textCentered(maxFpsCurrentName, centerX, maxFpsSettingY, UIFonts.body, UITheme.accent)
+
         // PWM Warning label
         val pwmLabelY = pwmSettingY + 70f * scale
         ui.textCentered("PWM Warning", centerX, pwmLabelY, UIFonts.body, UITheme.textSecondary)
@@ -377,6 +434,15 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             if (pwmWarningRightButton.contains(touchX, touchY)) {
                 val newIndex = (pwmCurrentIndex + 1).coerceAtMost(SettingsManager.PWM_WARNING_OPTIONS.size - 1)
                 settingsManager.setPwmWarningByIndex(newIndex)
+            }
+            val maxFpsCurrentIndex = settingsManager.getMaxFpsIndex()
+            if (maxFpsLeftButton.contains(touchX, touchY)) {
+                val newIndex = (maxFpsCurrentIndex - 1).coerceAtLeast(0)
+                settingsManager.setMaxFpsByIndex(newIndex)
+            }
+            if (maxFpsRightButton.contains(touchX, touchY)) {
+                val newIndex = (maxFpsCurrentIndex + 1).coerceAtMost(SettingsManager.MAX_FPS_OPTIONS.size - 1)
+                settingsManager.setMaxFpsByIndex(newIndex)
             }
         }
 
