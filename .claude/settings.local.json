@@ -11,7 +11,9 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Privacy Policy, Terms of Service, and GitHub Pages site\n\n- Rename app to \"EUC Rider\" in strings.xml\n- Add privacy policy and terms of service HTML files\n- Create docs/ folder for GitHub Pages with landing page\n- Contact email: info@sitespro.org\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git add:*)",
       "Bash(./gradlew:*)",
-      "Bash(.\\\\gradlew.bat compileKotlin:*)"
+      "Bash(.\\\\gradlew.bat compileKotlin:*)",
+      "Bash(.gradlew.bat android:assembleDebug)",
+      "Bash(powershell -Command \"cd C:\\\\Projects\\\\euc-lean-too-much; .\\\\gradlew.bat android:assembleDebug\")"
     ]
   }
 }
