@@ -193,11 +193,19 @@ class GameOverRenderer : Disposable {
                 UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
                 ui.textCentered("${session.distanceTraveled.toInt()} m", centerX + columnOffset, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
 
-                // Top Speed - centered below
+                // Top Speed and Near Misses in one row
+                val secondRowY = statsStartY - lineHeight * 1.25f
                 UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("TOP SPEED", centerX, statsStartY - lineHeight * 1.25f, UIFonts.caption, UIFonts.caption.color)
+                ui.textCentered("TOP SPEED", centerX - columnOffset, secondRowY, UIFonts.caption, UIFonts.caption.color)
                 UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
-                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX, statsStartY - lineHeight * 1.25f - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX - columnOffset, secondRowY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+
+                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
+                ui.textCentered("NEAR MISSES", centerX + columnOffset, secondRowY, UIFonts.caption, UIFonts.caption.color)
+                // Color based on count - green if any, gray if none
+                val nearMissColor = if (session.nearMisses > 0) UITheme.accent else UITheme.textPrimary
+                UIFonts.heading.color = UITheme.withAlpha(nearMissColor, statsAlpha)
+                ui.textCentered(session.nearMisses.toString(), centerX + columnOffset, secondRowY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
             }
 
             // Button labels with larger text

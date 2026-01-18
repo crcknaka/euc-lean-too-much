@@ -156,6 +156,25 @@ object UIFeedback : Disposable {
         }
     }
 
+    /**
+     * Near miss sound - quick "whoosh" feeling when passing close to pedestrian.
+     * Rising tone with haptic for dramatic effect.
+     */
+    fun nearMiss() {
+        if (!enabled) return
+
+        // Quick rising tone for "close call" feel
+        beepProvider?.playBeep(400, 30)
+        beepProvider?.playBeep(800, 40)
+        beepProvider?.playBeep(1200, 30)
+
+        hapticProvider?.let {
+            if (it.hasVibrator()) {
+                it.vibrate(50, 180) // Strong haptic pulse
+            }
+        }
+    }
+
     override fun dispose() {
         clickSound?.dispose()
         clickSound = null

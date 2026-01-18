@@ -30,6 +30,10 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var speedLineTimer = 0f
     private var speedEffectTurnOffset = 0f  // Horizontal offset based on turning
 
+    // Near miss notification state
+    private var nearMissTimer = 0f
+    private val nearMissDisplayDuration = 1.5f  // How long to show "Near miss!" text
+
     // Speed line data class - radial lines from edges toward center (tunnel effect)
     private data class SpeedLine(
         val edgeX: Float,    // Position on screen edge (0-1 normalized)
@@ -160,6 +164,15 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
             drawWarningBadge("PWM $pwmPercent%", warningColor, warningBaseY + 140f * scale)
+        }
+
+        // Near miss notification
+        if (nearMissTimer > 0f) {
+            nearMissTimer -= Gdx.graphics.deltaTime
+            val alpha = (nearMissTimer / nearMissDisplayDuration).coerceIn(0f, 1f)
+            val pulse = UITheme.Anim.pulse(8f, 0.8f, 1f)
+            val nearMissColor = UITheme.withAlpha(UITheme.accent, alpha * pulse)
+            drawWarningBadge("NEAR MISS!", nearMissColor, warningBaseY + 210f * scale)
         }
 
         // FPS counter (top-left, visible but unobtrusive)
@@ -596,6 +609,14 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         speedLineTimer = 0f
         speedEffectTurnOffset = 0f
         pwmSmooth = 0f
+        nearMissTimer = 0f
+    }
+
+    /**
+     * Trigger near miss notification when player passes close to pedestrian.
+     */
+    fun triggerNearMiss() {
+        nearMissTimer = nearMissDisplayDuration
     }
 
     fun resize(width: Int, height: Int) {

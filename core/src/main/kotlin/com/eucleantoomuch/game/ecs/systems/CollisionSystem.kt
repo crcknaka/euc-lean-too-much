@@ -21,6 +21,10 @@ class CollisionSystem : EntitySystem(5) {
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
 
     var onCollision: ((ObstacleType, Boolean) -> Unit)? = null  // Type, causesGameOver
+    var onNearMiss: (() -> Unit)? = null  // Called when player passes close to pedestrian
+
+    // Near miss tracking - distance threshold for "close call"
+    private val nearMissThreshold = 1.2f  // Distance in meters for near miss detection
 
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)
@@ -69,6 +73,16 @@ class CollisionSystem : EntitySystem(5) {
             // Simple AABB collision check
             if (checkAABBCollision(playerCollider, obstacleCollider)) {
                 handleCollision(playerComponent, eucComponent, obstacleComponent)
+            } else if (obstacleComponent.type == ObstacleType.PEDESTRIAN && !obstacleComponent.nearMissTriggered) {
+                // Near miss detection for pedestrians only
+                // Check if player just passed the pedestrian (Z behind player) and was close in X
+                if (zDist < 0f && zDist > -2f) {
+                    val xDist = abs(playerTransform.position.x - obstacleTransform.position.x)
+                    if (xDist < nearMissThreshold) {
+                        obstacleComponent.nearMissTriggered = true
+                        onNearMiss?.invoke()
+                    }
+                }
             }
         }
     }

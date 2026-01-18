@@ -146,6 +146,12 @@ class EucGame(
                 handlePlayerFall()
             }
         }
+        collisionSystem.onNearMiss = {
+            // Trigger near miss feedback (visual + sound + haptic)
+            hud.triggerNearMiss()
+            UIFeedback.nearMiss()
+            session.nearMisses++
+        }
 
         engine.addSystem(eucPhysicsSystem)
         engine.addSystem(MovementSystem())
@@ -303,7 +309,7 @@ class EucGame(
         musicManager.playMenuMusic()
         musicManager.update(Gdx.graphics.deltaTime)
 
-        when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance)) {
+        when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance, highScoreManager.maxNearMisses)) {
             MenuRenderer.ButtonClicked.PLAY -> {
                 // Go to wheel selection first
                 stateManager.transition(GameState.WheelSelection)

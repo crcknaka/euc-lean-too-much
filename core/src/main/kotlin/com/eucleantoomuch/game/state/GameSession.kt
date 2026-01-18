@@ -10,6 +10,7 @@ class GameSession {
     var maxSpeed: Float = 0f
         private set
     var obstaclesAvoided: Int = 0
+    var nearMisses: Int = 0
     var startTime: Long = System.currentTimeMillis()
         private set
 
@@ -32,6 +33,7 @@ class GameSession {
         currentSpeed = 0f
         maxSpeed = 0f
         obstaclesAvoided = 0
+        nearMisses = 0
         startTime = System.currentTimeMillis()
     }
 }

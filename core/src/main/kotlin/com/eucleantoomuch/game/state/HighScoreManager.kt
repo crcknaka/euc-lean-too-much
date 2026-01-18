@@ -12,6 +12,7 @@ class HighScoreManager {
         private const val KEY_HIGH_SCORE = "highScore"
         private const val KEY_MAX_DISTANCE = "maxDistance"
         private const val KEY_GAMES_PLAYED = "gamesPlayed"
+        private const val KEY_MAX_NEAR_MISSES = "maxNearMisses"
         private const val KEY_CALIBRATION_X = "calibrationX"
         private const val KEY_CALIBRATION_Y = "calibrationY"
     }
@@ -37,10 +38,20 @@ class HighScoreManager {
     val gamesPlayed: Int
         get() = prefs.getInteger(KEY_GAMES_PLAYED, 0)
 
+    var maxNearMisses: Int
+        get() = prefs.getInteger(KEY_MAX_NEAR_MISSES, 0)
+        set(value) {
+            if (value > maxNearMisses) {
+                prefs.putInteger(KEY_MAX_NEAR_MISSES, value)
+                prefs.flush()
+            }
+        }
+
     fun recordGame(session: GameSession): Boolean {
         val isNewHighScore = session.score > highScore
         highScore = session.score
         maxDistance = session.distanceTraveled
+        maxNearMisses = session.nearMisses
         prefs.putInteger(KEY_GAMES_PLAYED, gamesPlayed + 1)
         prefs.flush()
         return isNewHighScore

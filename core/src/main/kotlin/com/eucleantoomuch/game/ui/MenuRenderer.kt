@@ -51,7 +51,7 @@ class MenuRenderer : Disposable {
         NONE, PLAY, CALIBRATE, SETTINGS, EXIT
     }
 
-    fun render(highScore: Int, maxDistance: Float): ButtonClicked {
+    fun render(highScore: Int, maxDistance: Float, maxNearMisses: Int): ButtonClicked {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
 
@@ -169,18 +169,26 @@ class MenuRenderer : Disposable {
         ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.body, UITheme.textPrimary)
         ui.textCentered("EXIT", exitRect.x + exitRect.width / 2, exitRect.y + exitRect.height / 2, UIFonts.body, UITheme.textPrimary)
 
-        // Stats with improved layout
+        // Stats with improved layout - 3 columns
         val statsLabelY = 90f * scale
         val statsValueY = statsLabelY - 35f * scale
-        val sideMargin = 80f * scale
+        val sideMargin = 60f * scale
 
         // High score (left)
         UIFonts.caption.color = UITheme.textSecondary
-        ui.layout.setText(UIFonts.caption, "HIGH SCORE")
         UIFonts.caption.draw(ui.batch, "HIGH SCORE", sideMargin, statsLabelY)
 
         UIFonts.heading.color = UITheme.accent
         UIFonts.heading.draw(ui.batch, highScore.toString(), sideMargin, statsValueY)
+
+        // Near misses record (left of center, closer to HIGH SCORE)
+        val nearMissX = sideMargin + 180f * scale
+        UIFonts.caption.color = UITheme.textSecondary
+        UIFonts.caption.draw(ui.batch, "NEAR MISSES", nearMissX, statsLabelY)
+
+        val nearMissColor = if (maxNearMisses > 0) UITheme.accent else UITheme.textPrimary
+        UIFonts.heading.color = nearMissColor
+        UIFonts.heading.draw(ui.batch, maxNearMisses.toString(), nearMissX, statsValueY)
 
         // Best distance (right)
         UIFonts.caption.color = UITheme.textSecondary
