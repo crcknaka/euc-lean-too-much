@@ -266,6 +266,10 @@ class MenuRenderer : Disposable {
         enterAnimProgress = 0f
     }
 
+    fun recreate() {
+        ui.recreate()
+    }
+
     override fun dispose() {
         ui.dispose()
     }

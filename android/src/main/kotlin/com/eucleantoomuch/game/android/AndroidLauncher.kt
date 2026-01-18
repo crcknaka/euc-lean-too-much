@@ -113,11 +113,12 @@ class AndroidLauncher : AndroidApplication() {
             surfaceView?.holder?.addCallback(object : SurfaceHolder.Callback {
                 override fun surfaceCreated(holder: SurfaceHolder) {
                     // Set frame rate when surface is actually ready
-                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                    // Use FIXED_SOURCE to force high refresh rate
+                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
                 }
                 override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
                     // Also try setting when surface changes
-                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                    holder.surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
                 }
                 override fun surfaceDestroyed(holder: SurfaceHolder) {}
             })
@@ -125,7 +126,7 @@ class AndroidLauncher : AndroidApplication() {
             // Also try immediate set if surface already exists
             surfaceView?.holder?.surface?.let { surface ->
                 if (surface.isValid) {
-                    surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                    surface.setFrameRate(120f, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
                 }
             }
         }

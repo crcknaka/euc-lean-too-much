@@ -35,6 +35,7 @@ import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
 import com.eucleantoomuch.game.ui.PauseRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
+import com.eucleantoomuch.game.ui.UIFonts
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -80,8 +81,8 @@ class EucGame(
     // Fall animation controller
     private lateinit var fallAnimationController: FallAnimationController
 
-    // FPS limiting
-    private var lastFrameTime = 0L
+    // FPS limiting (using nanoTime for precision)
+    private var lastFrameTimeNanos = 0L
     private var currentMaxFps = 0  // 0 = unlimited
 
     override fun create() {
@@ -89,7 +90,8 @@ class EucGame(
 
         // Disable libGDX foreground FPS limit to allow high refresh rates (120Hz+)
         // By default libGDX limits to 60 FPS on Android
-        Gdx.graphics.setForegroundFPS(0)  // 0 = unlimited
+        // Note: 0 means "use default" in libGDX, so we set a high value instead
+        Gdx.graphics.setForegroundFPS(240)
 
         // Initialize state manager
         stateManager = GameStateManager()
@@ -195,21 +197,28 @@ class EucGame(
             currentMaxFps = settingMaxFps
         }
 
-        // Apply FPS limit (0 = unlimited)
+        // Apply FPS limit only if explicitly set (0 = unlimited, let VSync handle it)
         if (currentMaxFps > 0) {
-            val targetFrameTime = 1000L / currentMaxFps
-            val currentTime = System.currentTimeMillis()
-            val elapsed = currentTime - lastFrameTime
+            val targetFrameTimeNanos = 1_000_000_000L / currentMaxFps
+            val currentTimeNanos = System.nanoTime()
+            val elapsedNanos = currentTimeNanos - lastFrameTimeNanos
 
-            if (elapsed < targetFrameTime) {
+            if (elapsedNanos < targetFrameTimeNanos) {
+                val sleepNanos = targetFrameTimeNanos - elapsedNanos
+                val sleepMillis = sleepNanos / 1_000_000L
+                val sleepNanosRemainder = (sleepNanos % 1_000_000L).toInt()
+
                 try {
-                    Thread.sleep(targetFrameTime - elapsed)
+                    if (sleepMillis > 0 || sleepNanosRemainder > 0) {
+                        Thread.sleep(sleepMillis, sleepNanosRemainder)
+                    }
                 } catch (e: InterruptedException) {
                     // Ignore
                 }
             }
+            lastFrameTimeNanos = System.nanoTime()
         }
-        lastFrameTime = System.currentTimeMillis()
+        // When unlimited (0), don't track time - let VSync/display handle frame pacing
     }
 
     override fun render() {
@@ -272,6 +281,8 @@ class EucGame(
             }
             MenuRenderer.ButtonClicked.EXIT -> {
                 Gdx.app.exit()
+                // Force kill the process on Android (Gdx.app.exit() only minimizes)
+                System.exit(0)
             }
             MenuRenderer.ButtonClicked.NONE -> {}
         }
@@ -816,6 +827,22 @@ class EucGame(
         pauseRenderer.resize(width, height)
         calibrationRenderer.resize(width, height)
         settingsRenderer.resize(width, height)
+    }
+
+    override fun resume() {
+        // Re-enable high FPS on resume (Android may reset this)
+        Gdx.graphics.setForegroundFPS(240)
+
+        // Force font and UI reinitialization on resume (GL context may have been lost on Android)
+        UIFonts.dispose()
+
+        // Recreate all UI renderer resources (SpriteBatch, ShapeRenderer)
+        hud.recreate()
+        menuRenderer.recreate()
+        gameOverRenderer.recreate()
+        pauseRenderer.recreate()
+        calibrationRenderer.recreate()
+        settingsRenderer.recreate()
     }
 
     override fun dispose() {

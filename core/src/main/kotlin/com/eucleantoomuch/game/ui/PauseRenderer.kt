@@ -147,6 +147,10 @@ class PauseRenderer : Disposable {
         ui.resize(width, height)
     }
 
+    fun recreate() {
+        ui.recreate()
+    }
+
     override fun dispose() {
         ui.dispose()
     }

@@ -467,6 +467,10 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         enterAnimProgress = 0f
     }
 
+    fun recreate() {
+        ui.recreate()
+    }
+
     override fun dispose() {
         ui.dispose()
     }

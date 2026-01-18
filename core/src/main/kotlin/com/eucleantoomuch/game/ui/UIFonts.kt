@@ -16,6 +16,7 @@ object UIFonts : Disposable {
     private val fonts = mutableMapOf<FontStyle, BitmapFont>()
     private var initialized = false
     private var generator: FreeTypeFontGenerator? = null
+    private var lastGlContext = 0  // Track GL context changes
 
     enum class FontStyle {
         DISPLAY,     // Extra large - Big titles, countdown
@@ -44,6 +45,16 @@ object UIFonts : Disposable {
             "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
     fun initialize() {
+        // Check if GL context was recreated (happens on Android resume)
+        // We detect this by checking if any font texture became invalid
+        val contextLost = initialized && fonts.isNotEmpty() &&
+            fonts.values.any { !it.region.texture.isManaged || it.region.texture.textureObjectHandle == 0 }
+
+        if (contextLost) {
+            Gdx.app.log("UIFonts", "GL context lost, reinitializing fonts")
+            disposeInternal()
+        }
+
         if (initialized) return
         initialized = true
 
@@ -122,11 +133,19 @@ object UIFonts : Disposable {
     val caption: BitmapFont get() = get(FontStyle.CAPTION)
     val tiny: BitmapFont get() = get(FontStyle.TINY)
 
-    override fun dispose() {
-        fonts.values.forEach { it.dispose() }
+    private fun disposeInternal() {
+        fonts.values.forEach {
+            try { it.dispose() } catch (e: Exception) { /* ignore */ }
+        }
         fonts.clear()
-        generator?.dispose()
+        generator?.let {
+            try { it.dispose() } catch (e: Exception) { /* ignore */ }
+        }
         generator = null
         initialized = false
+    }
+
+    override fun dispose() {
+        disposeInternal()
     }
 }

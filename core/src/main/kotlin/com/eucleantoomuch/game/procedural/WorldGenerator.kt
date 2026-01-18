@@ -53,8 +53,8 @@ class WorldGenerator(
     private val cloudModels = mutableListOf<ModelInstance>()
 
     // Pigeon models (walking and flying)
-    private lateinit var pigeonWalkingModel: ModelInstance
-    private lateinit var pigeonFlyingModel: ModelInstance
+    private var pigeonWalkingModel: ModelInstance
+    private var pigeonFlyingModel: ModelInstance
 
     // Track pigeon flock ID for group behavior
     private var nextFlockId = 0
@@ -165,7 +165,6 @@ class WorldGenerator(
     }
 
     fun update(playerZ: Float, totalDistance: Float) {
-        val currentChunk = (playerZ / Constants.CHUNK_LENGTH).toInt()
         // Start from behind the camera (which is at -8 from player), add extra buffer
         val startChunk = ((playerZ - 50f) / Constants.CHUNK_LENGTH).toInt()
         val endChunk = ((playerZ + renderDistance) / Constants.CHUNK_LENGTH).toInt()
@@ -970,6 +969,7 @@ class WorldGenerator(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun createTreeEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
         val entity = engine.createEntity()
 

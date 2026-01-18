@@ -6,7 +6,6 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.g2d.GlyphLayout
 import com.badlogic.gdx.graphics.g2d.SpriteBatch
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer
-import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import kotlin.math.cos
@@ -16,8 +15,10 @@ import kotlin.math.sin
  * Modern UI renderer with advanced drawing capabilities
  */
 class UIRenderer : Disposable {
-    val batch = SpriteBatch()
-    val shapes = ShapeRenderer()
+    var batch = SpriteBatch()
+        private set
+    var shapes = ShapeRenderer()
+        private set
     val layout = GlyphLayout()
 
     var screenWidth = Gdx.graphics.width.toFloat()
@@ -25,11 +26,21 @@ class UIRenderer : Disposable {
     var screenHeight = Gdx.graphics.height.toFloat()
         private set
 
-    private val tempColor = Color()
-
     fun resize(width: Int, height: Int) {
         screenWidth = width.toFloat()
         screenHeight = height.toFloat()
+        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        shapes.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+    }
+
+    /** Force recreation of batch and shapes - call after GL context loss */
+    @Suppress("TooGenericExceptionCaught")
+    fun recreate() {
+        Gdx.app.log("UIRenderer", "Recreating batch and shapes after context loss")
+        try { batch.dispose() } catch (_: Exception) { /* ignore */ }
+        try { shapes.dispose() } catch (_: Exception) { /* ignore */ }
+        batch = SpriteBatch()
+        shapes = ShapeRenderer()
         batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
         shapes.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
     }
@@ -71,6 +82,7 @@ class UIRenderer : Disposable {
     }
 
     /** Draw a rounded rectangle with gradient (top to bottom) */
+    @Suppress("unused")
     fun roundedRectGradient(
         x: Float, y: Float, width: Float, height: Float, radius: Float,
         topColor: Color, bottomColor: Color
@@ -86,16 +98,20 @@ class UIRenderer : Disposable {
             val color = UITheme.lerp(bottomColor, topColor, t)
             shapes.color = color
 
-            if (i == 0) {
-                // Bottom strip with rounded corners
-                shapes.rect(x + r, stripY, width - 2 * r, stripHeight)
-                shapes.rect(x, stripY + r.coerceAtMost(stripHeight), width, (stripHeight - r).coerceAtLeast(0f))
-            } else if (i == segments - 1) {
-                // Top strip with rounded corners
-                shapes.rect(x + r, stripY, width - 2 * r, stripHeight)
-                shapes.rect(x, stripY, width, (stripHeight - r).coerceAtLeast(0f))
-            } else {
-                shapes.rect(x, stripY, width, stripHeight)
+            when (i) {
+                0 -> {
+                    // Bottom strip with rounded corners
+                    shapes.rect(x + r, stripY, width - 2 * r, stripHeight)
+                    shapes.rect(x, stripY + r.coerceAtMost(stripHeight), width, (stripHeight - r).coerceAtLeast(0f))
+                }
+                segments - 1 -> {
+                    // Top strip with rounded corners
+                    shapes.rect(x + r, stripY, width - 2 * r, stripHeight)
+                    shapes.rect(x, stripY, width, (stripHeight - r).coerceAtLeast(0f))
+                }
+                else -> {
+                    shapes.rect(x, stripY, width, stripHeight)
+                }
             }
         }
 
@@ -221,6 +237,7 @@ class UIRenderer : Disposable {
     }
 
     /** Draw a circular gauge/indicator */
+    @Suppress("unused")
     fun gauge(
         cx: Float, cy: Float, radius: Float,
         value: Float, // 0-1
@@ -266,6 +283,7 @@ class UIRenderer : Disposable {
     }
 
     /** Draw a progress bar */
+    @Suppress("unused")
     fun progressBar(
         x: Float, y: Float, width: Float, height: Float,
         progress: Float, // 0-1
@@ -296,6 +314,7 @@ class UIRenderer : Disposable {
     }
 
     /** Draw text with shadow */
+    @Suppress("unused")
     fun textWithShadow(
         text: String,
         x: Float, y: Float,

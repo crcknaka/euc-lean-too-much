@@ -245,6 +245,10 @@ class CalibrationRenderer : Disposable {
         enterAnim = 0f
     }
 
+    fun recreate() {
+        ui.recreate()
+    }
+
     override fun dispose() {
         ui.dispose()
     }
