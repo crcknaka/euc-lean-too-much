@@ -246,8 +246,8 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                 // === BASE FREQUENCY ===
                 val motorBaseFreq = when {
                     isElectric -> {
-                        // Electric: 120 Hz at idle, up to 600 Hz at max speed (higher pitch whine)
-                        120.0 + speedNorm * 480.0
+                        // Electric: 80 Hz at idle, up to 350 Hz at max speed (lower, more muffled)
+                        80.0 + speedNorm * 270.0
                     }
                     isV8 -> {
                         // V8: Lower rumble, 35 Hz idle (idle burble), up to 180 Hz at max
@@ -262,17 +262,17 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
                 // === VOLUME ===
                 val baseVolume = when {
-                    isElectric -> 0.08f
+                    isElectric -> 0.04f  // Quieter base
                     isV8 -> 0.2f  // V8 is loud
                     else -> 0.15f
                 }
                 val speedVolume = when {
-                    isElectric -> 0.25f
+                    isElectric -> 0.12f  // Less volume increase with speed
                     isV8 -> 0.35f
                     else -> 0.4f
                 }
                 val pwmVolume = when {
-                    isElectric -> 0.1f
+                    isElectric -> 0.05f  // Less PWM-related volume
                     isV8 -> 0.15f
                     else -> 0.2f
                 }
@@ -285,12 +285,12 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                 val harmonic5Freq = motorBaseFreq * 5.0  // Extra for V8
 
                 val harmonic2Vol = when {
-                    isElectric -> motorVolume * 0.1f
+                    isElectric -> motorVolume * 0.05f  // Reduced harmonics for softer sound
                     isV8 -> motorVolume * 0.5f  // V8 has strong 2nd harmonic
                     else -> motorVolume * 0.3f
                 }
                 val harmonic3Vol = when {
-                    isElectric -> motorVolume * 0.05f * (0.5f + pwm * 0.3f)
+                    isElectric -> motorVolume * 0.02f  // Almost no high harmonics - more muffled
                     isV8 -> motorVolume * 0.35f  // V8 rich harmonics
                     else -> motorVolume * 0.15f * (0.5f + pwm * 0.5f)
                 }
@@ -300,7 +300,7 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
                 // === PWM STRAIN / ACCELERATION SOUND ===
                 val strainVol = when {
-                    isElectric -> (pwm - 0.6f).coerceIn(0f, 0.4f) * 0.15f
+                    isElectric -> (pwm - 0.7f).coerceIn(0f, 0.3f) * 0.08f  // Minimal strain sound
                     isV8 -> (pwm - 0.4f).coerceIn(0f, 0.6f) * 0.2f  // V8 growls under load
                     else -> (pwm - 0.5f).coerceIn(0f, 0.5f) * 0.4f
                 }
@@ -355,7 +355,7 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
                     // Convert to 16-bit PCM
                     val masterVolume = when {
-                        isElectric -> 0.5f
+                        isElectric -> 0.35f  // Quieter, softer sound
                         isV8 -> 0.7f  // V8 is louder
                         else -> 0.6f
                     }

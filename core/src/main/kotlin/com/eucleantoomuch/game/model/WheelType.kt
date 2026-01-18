@@ -55,7 +55,7 @@ sealed class WheelType(
         deceleration = 10f,
         criticalLean = 1.05f,       // Harder to cutout (more stable)
         pwmSensitivity = 0.95f,     // Lower sensitivity = more stable at high speeds
-        turnResponsiveness = 4.0f,  // Agile, but less than Street Runner
+        turnResponsiveness = 3.5f,  // Less agile than Street Runner
         wheelRadius = 0.25f,
         bodyColor = Color(0.6f, 0.15f, 0.15f, 1f),  // Dark red
         accentColor = Color(1f, 0.3f, 0.1f, 1f)     // Orange accent

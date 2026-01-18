@@ -44,7 +44,8 @@ class SettingsManager {
             "60%" to 60,
             "70%" to 70,
             "80%" to 80,
-            "90%" to 90
+            "90%" to 90,
+            "95%" to 95  // Dangerous - very late warning
         )
 
         // AVAS (Acoustic Vehicle Alerting System) sound options

@@ -402,9 +402,10 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             pwmWarningRightButton.y + pwmWarningRightButton.height / 2,
             UIFonts.heading, UITheme.textPrimary)
 
-        // PWM Current value
+        // PWM Current value (red if 95% - dangerous)
         val pwmCurrentName = settingsManager.getPwmWarningName()
-        ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, UITheme.accent)
+        val pwmTextColor = if (settingsManager.pwmWarning == 95) UITheme.danger else UITheme.accent
+        ui.textCentered(pwmCurrentName, centerX, pwmSettingY, UIFonts.body, pwmTextColor)
 
         // AVAS label
         val avasLabelY = avasSettingY + 70f * scale
