@@ -33,6 +33,10 @@ class CameraController(private val camera: PerspectiveCamera) {
     private var forwardOffset = 0f  // Moves camera forward (toward player)
     private var rollAngle = 0f      // Camera tilt/roll effect
 
+    // Wobble shake effect (continuous during wobble)
+    private var wobbleShakeX = 0f
+    private var wobbleShakeY = 0f
+
     fun initialize(playerPosition: Vector3) {
         currentPosition.set(playerPosition).add(offset)
         currentLookAt.set(playerPosition).add(lookAheadOffset)
@@ -102,6 +106,11 @@ class CameraController(private val camera: PerspectiveCamera) {
             camera.position.add(shakeX, shakeY, shakeZ)
         }
 
+        // Apply wobble shake (smoother than fall shake)
+        if (wobbleShakeX != 0f || wobbleShakeY != 0f) {
+            camera.position.add(wobbleShakeX * 0.02f, wobbleShakeY * 0.02f, 0f)
+        }
+
         camera.lookAt(currentLookAt)
 
         // Apply roll (tilt) effect - rotate the up vector
@@ -141,5 +150,10 @@ class CameraController(private val camera: PerspectiveCamera) {
 
     fun setRoll(angle: Float) {
         rollAngle = angle
+    }
+
+    fun setWobbleShake(x: Float, y: Float) {
+        wobbleShakeX = x
+        wobbleShakeY = y
     }
 }

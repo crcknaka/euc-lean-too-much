@@ -28,6 +28,14 @@ class EucComponent : Component, Pool.Poolable {
     // PWM (motor load) - 0 to 1, at 1.0 = cutout/fall
     var pwm: Float = 0f
 
+    // Speed wobble (колебания при резком торможении)
+    var wobbleIntensity: Float = 0f       // Current wobble strength (0-1)
+    var wobblePhase: Float = 0f           // Current phase of oscillation
+    var wobbleFrequency: Float = 12f      // Oscillations per second (Hz)
+    var previousSpeed: Float = 0f         // For detecting deceleration
+    var wobbleTimer: Float = 0f           // Time spent wobbling (fall after 3 seconds)
+    var isWobbling: Boolean = false       // Currently in wobble state (for UI)
+
     override fun reset() {
         forwardLean = 0f
         sideLean = 0f
@@ -43,6 +51,12 @@ class EucComponent : Component, Pool.Poolable {
         visualForwardLean = 0f
         visualSideLean = 0f
         pwm = 0f
+        wobbleIntensity = 0f
+        wobblePhase = 0f
+        wobbleFrequency = 12f
+        previousSpeed = 0f
+        wobbleTimer = 0f
+        isWobbling = false
     }
 
     fun getTotalLean(): Float {

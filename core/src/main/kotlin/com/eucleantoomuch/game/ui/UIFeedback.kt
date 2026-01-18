@@ -175,6 +175,24 @@ object UIFeedback : Disposable {
         }
     }
 
+    /**
+     * Wobble haptic feedback - continuous vibration while wobbling.
+     * Intensity based on wobble strength (0-1).
+     * Should be called every frame while wobbling.
+     */
+    fun wobble(intensity: Float) {
+        if (!enabled) return
+        if (intensity < 0.05f) return
+
+        hapticProvider?.let {
+            if (it.hasVibrator()) {
+                // Short pulse proportional to intensity
+                val amplitude = (40 + intensity * 100).toInt().coerceIn(40, 140)
+                it.vibrate(16, amplitude) // ~60Hz vibration pulses
+            }
+        }
+    }
+
     override fun dispose() {
         clickSound?.dispose()
         clickSound = null

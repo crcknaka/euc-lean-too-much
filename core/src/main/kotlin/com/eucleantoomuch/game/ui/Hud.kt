@@ -34,6 +34,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var nearMissTimer = 0f
     private val nearMissDisplayDuration = 1.5f  // How long to show "Near miss!" text
 
+    // Wobble screen shake state
+    private var wobbleShakeX = 0f
+    private var wobbleShakeY = 0f
+    private var wobbleShakePhase = 0f
+
     // Speed line data class - radial lines from edges toward center (tunnel effect)
     private data class SpeedLine(
         val edgeX: Float,    // Position on screen edge (0-1 normalized)
@@ -51,6 +56,18 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val sw = ui.screenWidth
         val sh = ui.screenHeight
         val scale = UITheme.Dimensions.scale()
+
+        // Update wobble screen shake
+        if (euc.isWobbling && euc.wobbleIntensity > 0.01f) {
+            wobbleShakePhase += Gdx.graphics.deltaTime * 25f  // Fast shake
+            val shakeIntensity = euc.wobbleIntensity * 8f * scale  // Max 8 pixels shake
+            wobbleShakeX = MathUtils.sin(wobbleShakePhase * 1.3f) * shakeIntensity
+            wobbleShakeY = MathUtils.sin(wobbleShakePhase * 1.7f) * shakeIntensity * 0.7f
+        } else {
+            // Decay shake when not wobbling
+            wobbleShakeX *= 0.85f
+            wobbleShakeY *= 0.85f
+        }
 
         // Score pop animation
         if (session.score != lastScore) {
@@ -173,6 +190,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val pulse = UITheme.Anim.pulse(8f, 0.8f, 1f)
             val nearMissColor = UITheme.withAlpha(UITheme.accent, alpha * pulse)
             drawWarningBadge("NEAR MISS!", nearMissColor, warningBaseY + 210f * scale)
+        }
+
+        // Wobbling warning - show when wobbling is active
+        if (euc.isWobbling) {
+            val wobbleProgress = (euc.wobbleTimer / 3f).coerceIn(0f, 1f)  // 0-1 over 3 seconds
+            val urgencyPulse = UITheme.Anim.pulse(6f + wobbleProgress * 8f, 0.7f, 1f)  // Faster pulse as time runs out
+            // Color shifts from warning yellow to danger red as time runs out
+            val wobbleColor = UITheme.lerp(UITheme.warning, UITheme.danger, wobbleProgress)
+            val timeLeft = (3f - euc.wobbleTimer).coerceAtLeast(0f)
+            val displayText = if (timeLeft < 1f) "WOBBLING!" else "WOBBLING"
+            drawWarningBadge(displayText, UITheme.withAlpha(wobbleColor, urgencyPulse), warningBaseY + 280f * scale)
         }
 
         // FPS counter (top-left, visible but unobtrusive)
@@ -610,6 +638,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         speedEffectTurnOffset = 0f
         pwmSmooth = 0f
         nearMissTimer = 0f
+        wobbleShakeX = 0f
+        wobbleShakeY = 0f
+        wobbleShakePhase = 0f
     }
 
     /**
@@ -618,6 +649,12 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     fun triggerNearMiss() {
         nearMissTimer = nearMissDisplayDuration
     }
+
+    /**
+     * Get current screen shake offset for camera.
+     * Returns Pair(x, y) offset in screen pixels.
+     */
+    fun getScreenShake(): Pair<Float, Float> = Pair(wobbleShakeX, wobbleShakeY)
 
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)

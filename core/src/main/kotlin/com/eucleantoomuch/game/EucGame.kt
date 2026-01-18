@@ -505,6 +505,10 @@ class EucGame(
         // Render HUD
         if (eucComponent != null) {
             hud.render(session, eucComponent, speedWarningManager.isActive())
+
+            // Apply wobble screen shake to camera
+            val (shakeX, shakeY) = hud.getScreenShake()
+            renderer.cameraController.setWobbleShake(shakeX, shakeY)
         }
     }
 
@@ -515,6 +519,8 @@ class EucGame(
         motorSoundManager.stop()
         // Pause music
         musicManager.pause()
+        // Reset wobble shake
+        renderer.cameraController.setWobbleShake(0f, 0f)
 
         // Render frozen game state
         renderer.render()
@@ -740,6 +746,7 @@ class EucGame(
             renderer.cameraController.setDropOffset(0f)
             renderer.cameraController.setForwardOffset(0f)
             renderer.cameraController.setRoll(0f)
+            renderer.cameraController.setWobbleShake(0f, 0f)
 
             // Reset fall animation
             fallAnimationController.reset()
