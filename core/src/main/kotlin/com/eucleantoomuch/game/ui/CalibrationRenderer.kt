@@ -233,19 +233,23 @@ class CalibrationRenderer : Disposable {
         // === Input ===
         if (Gdx.input.justTouched()) {
             if (calibrateButton.contains(touchX, touchY)) {
+                UIFeedback.clickHeavy()
                 successFlash = 1f
                 return Action.CALIBRATE
             }
             if (skipButton.contains(touchX, touchY)) {
+                UIFeedback.click()
                 return Action.SKIP
             }
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+            UIFeedback.clickHeavy()
             successFlash = 1f
             return Action.CALIBRATE
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+            UIFeedback.click()
             return Action.SKIP
         }
 

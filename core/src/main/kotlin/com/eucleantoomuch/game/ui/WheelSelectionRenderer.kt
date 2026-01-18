@@ -372,16 +372,20 @@ class WheelSelectionRenderer(
         if (Gdx.input.justTouched()) {
             when {
                 leftButton.contains(touchX, touchY) -> {
+                    UIFeedback.swipe()
                     currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
                 }
                 rightButton.contains(touchX, touchY) -> {
+                    UIFeedback.swipe()
                     currentIndex = (currentIndex + 1) % wheels.size
                 }
                 startButton.contains(touchX, touchY) -> {
+                    UIFeedback.clickHeavy()
                     settingsManager.selectedWheelId = wheels[currentIndex].id
                     return Action.START
                 }
                 backButton.contains(touchX, touchY) -> {
+                    UIFeedback.click()
                     return Action.BACK
                 }
             }
@@ -390,16 +394,20 @@ class WheelSelectionRenderer(
         // Keyboard shortcuts
         when {
             Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A) -> {
+                UIFeedback.swipe()
                 currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
             }
             Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D) -> {
+                UIFeedback.swipe()
                 currentIndex = (currentIndex + 1) % wheels.size
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE) -> {
+                UIFeedback.clickHeavy()
                 settingsManager.selectedWheelId = wheels[currentIndex].id
                 return Action.START
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK) -> {
+                UIFeedback.click()
                 return Action.BACK
             }
         }

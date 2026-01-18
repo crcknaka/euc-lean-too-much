@@ -114,24 +114,40 @@ class PauseRenderer : Disposable {
 
         // === Input ===
         if (Gdx.input.justTouched()) {
-            if (resumeButton.contains(touchX, touchY)) return ButtonClicked.RESUME
-            if (restartButton.contains(touchX, touchY)) return ButtonClicked.RESTART
-            if (settingsButton.contains(touchX, touchY)) return ButtonClicked.SETTINGS
-            if (menuButton.contains(touchX, touchY)) return ButtonClicked.MENU
+            if (resumeButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.RESUME
+            }
+            if (restartButton.contains(touchX, touchY)) {
+                UIFeedback.clickHeavy()
+                return ButtonClicked.RESTART
+            }
+            if (settingsButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.SETTINGS
+            }
+            if (menuButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.MENU
+            }
         }
 
         // Keyboard shortcuts
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.P) ||
             Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK)) {
+            UIFeedback.click()
             return ButtonClicked.RESUME
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            UIFeedback.clickHeavy()
             return ButtonClicked.RESTART
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+            UIFeedback.click()
             return ButtonClicked.SETTINGS
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.M)) {
+            UIFeedback.click()
             return ButtonClicked.MENU
         }
 

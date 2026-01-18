@@ -211,14 +211,22 @@ class GameOverRenderer : Disposable {
 
         // === Input ===
         if (Gdx.input.justTouched()) {
-            if (retryButton.contains(touchX, touchY)) return ButtonClicked.RETRY
-            if (menuButton.contains(touchX, touchY)) return ButtonClicked.MENU
+            if (retryButton.contains(touchX, touchY)) {
+                UIFeedback.clickHeavy()
+                return ButtonClicked.RETRY
+            }
+            if (menuButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.MENU
+            }
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            UIFeedback.clickHeavy()
             return ButtonClicked.RETRY
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.M)) {
+            UIFeedback.click()
             return ButtonClicked.MENU
         }
 

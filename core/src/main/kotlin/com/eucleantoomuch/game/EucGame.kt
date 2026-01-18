@@ -15,6 +15,7 @@ import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
 import com.eucleantoomuch.game.feedback.FallAnimationController
 import com.eucleantoomuch.game.feedback.MotorSoundManager
+import com.eucleantoomuch.game.feedback.MusicManager
 import com.eucleantoomuch.game.feedback.SpeedWarningManager
 import com.eucleantoomuch.game.input.AccelerometerInput
 import com.eucleantoomuch.game.input.GameInput
@@ -35,6 +36,7 @@ import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
 import com.eucleantoomuch.game.ui.PauseRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
+import com.eucleantoomuch.game.ui.UIFeedback
 import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 
@@ -82,6 +84,9 @@ class EucGame(
 
     // Fall animation controller
     private lateinit var fallAnimationController: FallAnimationController
+
+    // Background music manager
+    private lateinit var musicManager: MusicManager
 
     // FPS limiting (using nanoTime for precision)
     private var lastFrameTimeNanos = 0L
@@ -174,6 +179,25 @@ class EucGame(
         // Initialize fall animation controller
         fallAnimationController = FallAnimationController(platformServices)
 
+        // Initialize music manager
+        musicManager = MusicManager()
+        musicManager.initialize()
+        musicManager.setEnabled(settingsManager.musicEnabled)
+
+        // Initialize UI feedback (sounds and haptics)
+        UIFeedback.initialize()
+        UIFeedback.hapticProvider = object : UIFeedback.HapticProvider {
+            override fun vibrate(durationMs: Long, amplitude: Int) {
+                platformServices.vibrate(durationMs, amplitude)
+            }
+            override fun hasVibrator(): Boolean = platformServices.hasVibrator()
+        }
+        UIFeedback.beepProvider = object : UIFeedback.BeepProvider {
+            override fun playBeep(frequencyHz: Int, durationMs: Int) {
+                platformServices.playBeep(frequencyHz, durationMs)
+            }
+        }
+
         // Start at menu
         stateManager.transition(GameState.Menu)
     }
@@ -192,6 +216,10 @@ class EucGame(
 
     private fun applyAvasSetting() {
         motorSoundManager.avasMode = settingsManager.avasMode
+    }
+
+    private fun applyMusicSetting() {
+        musicManager.setEnabled(settingsManager.musicEnabled)
     }
 
     private fun applyFpsLimit() {
@@ -254,6 +282,7 @@ class EucGame(
                 (Gdx.input.justTouched() && Gdx.input.isTouched(1))  // Two fingers touched
 
             if (shouldPause) {
+                UIFeedback.pauseOpen()
                 val playingState = stateManager.current() as GameState.Playing
                 pauseRenderer.reset()
                 stateManager.transition(GameState.Paused(playingState.session))
@@ -269,6 +298,10 @@ class EucGame(
     private fun renderMenu() {
         Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        // Play menu music
+        musicManager.playMenuMusic()
+        musicManager.update(Gdx.graphics.deltaTime)
 
         when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance)) {
             MenuRenderer.ButtonClicked.PLAY -> {
@@ -294,6 +327,9 @@ class EucGame(
         Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
+        // Continue menu music during wheel selection
+        musicManager.update(Gdx.graphics.deltaTime)
+
         when (wheelSelectionRenderer.render()) {
             WheelSelectionRenderer.Action.START -> {
                 // Proceed to calibration or game
@@ -314,12 +350,16 @@ class EucGame(
         Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
+        // Continue music during settings
+        musicManager.update(Gdx.graphics.deltaTime)
+
         when (settingsRenderer.render()) {
             SettingsRenderer.Action.BACK -> {
                 // Apply settings
                 applyRenderDistance()
                 applyPwmWarningThreshold()
                 applyAvasSetting()
+                applyMusicSetting()
                 // Return to previous state (Menu or Paused)
                 val settingsState = stateManager.current() as GameState.Settings
                 stateManager.transition(settingsState.returnTo)
@@ -331,6 +371,9 @@ class EucGame(
     private fun renderCalibration() {
         accelerometerInput.update(Gdx.graphics.deltaTime)
         val (rawX, rawY) = accelerometerInput.getRawValues()
+
+        // Continue menu music during calibration
+        musicManager.update(Gdx.graphics.deltaTime)
 
         when (calibrationRenderer.render(rawX, rawY)) {
             CalibrationRenderer.Action.CALIBRATE -> {
@@ -353,6 +396,10 @@ class EucGame(
     }
 
     private fun renderCountdown(delta: Float) {
+        // Transition to gameplay music during countdown
+        musicManager.playGameplayMusic()
+        musicManager.update(delta)
+
         // Render the game world in background
         updateGameWorld(delta, processInput = false)
 
@@ -443,6 +490,9 @@ class EucGame(
             motorSoundManager.update(eucComponent.speed, eucComponent.pwm, delta)
         }
 
+        // Update music fade
+        musicManager.update(delta)
+
         // Render
         renderer.render()
 
@@ -457,6 +507,8 @@ class EucGame(
         speedWarningManager.stop()
         // Stop motor sound when paused
         motorSoundManager.stop()
+        // Pause music
+        musicManager.pause()
 
         // Render frozen game state
         renderer.render()
@@ -467,6 +519,8 @@ class EucGame(
                 val pausedState = stateManager.current() as GameState.Paused
                 // Resume motor sound
                 motorSoundManager.start()
+                // Resume music
+                musicManager.resume()
                 stateManager.transition(GameState.Playing(pausedState.session))
             }
             PauseRenderer.ButtonClicked.RESTART -> {
@@ -487,6 +541,9 @@ class EucGame(
 
     private fun renderGameOver() {
         val state = stateManager.current() as GameState.GameOver
+
+        // Continue music fade update
+        musicManager.update(Gdx.graphics.deltaTime)
 
         // Render frozen game state
         renderer.render()
@@ -606,6 +663,10 @@ class EucGame(
     private fun renderFalling(delta: Float) {
         val state = stateManager.current() as GameState.Falling
 
+        // Fade out music during fall
+        musicManager.fadeOut()
+        musicManager.update(delta)
+
         // Update fall animation
         fallAnimationController.update(delta)
 
@@ -716,6 +777,8 @@ class EucGame(
     override fun dispose() {
         renderer.dispose()
         models.dispose()
+        musicManager.dispose()
+        UIFeedback.dispose()
         hud.dispose()
         menuRenderer.dispose()
         gameOverRenderer.dispose()

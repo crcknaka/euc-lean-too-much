@@ -17,6 +17,7 @@ class SettingsManager {
         private const val KEY_AVAS_MODE = "avasMode"
         private const val KEY_MAX_FPS = "maxFps"
         private const val KEY_SELECTED_WHEEL = "selectedWheel"
+        private const val KEY_MUSIC_ENABLED = "musicEnabled"
 
         // Max FPS options (0 = unlimited/120+)
         val MAX_FPS_OPTIONS = listOf(
@@ -85,6 +86,14 @@ class SettingsManager {
         get() = prefs.getBoolean(KEY_BEEPS_ENABLED, true)  // Default on
         set(value) {
             prefs.putBoolean(KEY_BEEPS_ENABLED, value)
+            prefs.flush()
+        }
+
+    // Music on/off
+    var musicEnabled: Boolean
+        get() = prefs.getBoolean(KEY_MUSIC_ENABLED, true)  // Default on
+        set(value) {
+            prefs.putBoolean(KEY_MUSIC_ENABLED, value)
             prefs.flush()
         }
 

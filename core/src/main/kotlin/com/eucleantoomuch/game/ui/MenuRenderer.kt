@@ -201,29 +201,37 @@ class MenuRenderer : Disposable {
         // === Handle Input ===
         if (Gdx.input.justTouched()) {
             if (playButton.contains(touchX, touchY)) {
+                UIFeedback.clickHeavy()
                 return ButtonClicked.PLAY
             }
             if (calibrateButton.contains(touchX, touchY)) {
+                UIFeedback.click()
                 return ButtonClicked.CALIBRATE
             }
             if (settingsButton.contains(touchX, touchY)) {
+                UIFeedback.click()
                 return ButtonClicked.SETTINGS
             }
             if (exitButton.contains(touchX, touchY)) {
+                UIFeedback.click()
                 return ButtonClicked.EXIT
             }
         }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.ENTER)) {
+            UIFeedback.clickHeavy()
             return ButtonClicked.PLAY
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.C)) {
+            UIFeedback.click()
             return ButtonClicked.CALIBRATE
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
+            UIFeedback.click()
             return ButtonClicked.SETTINGS
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            UIFeedback.click()
             return ButtonClicked.EXIT
         }
 
