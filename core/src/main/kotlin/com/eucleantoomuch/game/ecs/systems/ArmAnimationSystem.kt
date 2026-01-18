@@ -84,40 +84,49 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
 
     private fun calculateRelaxedPose(arm: ArmComponent, euc: EucComponent) {
         // Relaxed pose: arms hanging down naturally, swaying with turns
-        // armYaw = 0 means arms pointing down
+        // armYaw = how far out to the side (0=down, 90=horizontal)
 
         val baseYaw = 15f  // Slightly outward from body
 
-        // Sway with turns - when turning/leaning, arms swing slightly
-        val turnSway = euc.visualSideLean * 15f
+        // Minimal idle sway - very subtle
+        val swingTime = arm.balanceTime * 1.2f
+        val idleSway = MathUtils.sin(swingTime) * 3f  // Very small idle movement
 
-        // Left arm
-        arm.leftArmYaw = baseYaw + turnSway
-        arm.leftArmPitch = 5f  // Slightly forward (natural hang)
+        // Turn response - BOTH arms swing in SAME direction (inertia effect)
+        val turnSwing = -euc.visualSideLean * 40f
+
+        // Both arms move together in same direction
+        arm.leftArmYaw = baseYaw + idleSway + turnSwing
+        arm.leftArmPitch = 0f
         arm.leftArmRoll = 0f
-        arm.leftForearmBend = 15f  // Slight natural bend
+        arm.leftForearmBend = 10f
 
-        // Right arm
-        arm.rightArmYaw = baseYaw - turnSway
-        arm.rightArmPitch = 5f
+        arm.rightArmYaw = baseYaw + idleSway + turnSwing  // Same direction as left
+        arm.rightArmPitch = 0f
         arm.rightArmRoll = 0f
-        arm.rightForearmBend = 15f
+        arm.rightForearmBend = 10f
     }
 
-    private fun calculateBehindBackPose(arm: ArmComponent) {
+    private fun calculateBehindBackPose(arm: ArmComponent, euc: EucComponent) {
         // Arms behind the back - common EUC riding pose at speed
-        // Arms rotated back, forearms bent, hands meeting behind back
+
+        // Minimal idle sway
+        val swingTime = arm.balanceTime * 1f
+        val idleSway = MathUtils.sin(swingTime) * 2f  // Very subtle
+
+        // Turn response - both arms shift together
+        val turnResponse = euc.visualSideLean * 15f
 
         // Left arm
-        arm.leftArmYaw = 30f  // Slightly outward
-        arm.leftArmPitch = 45f  // Rotated backward (positive = back)
-        arm.leftArmRoll = -20f  // Twisted inward
-        arm.leftForearmBend = 90f  // Bent at elbow
+        arm.leftArmYaw = 25f + idleSway + turnResponse
+        arm.leftArmPitch = 50f
+        arm.leftArmRoll = -15f
+        arm.leftForearmBend = 90f
 
-        // Right arm (mirror)
-        arm.rightArmYaw = 30f
-        arm.rightArmPitch = 45f
-        arm.rightArmRoll = 20f  // Opposite twist
+        // Right arm - same turn direction
+        arm.rightArmYaw = 25f + idleSway + turnResponse
+        arm.rightArmPitch = 50f
+        arm.rightArmRoll = 15f
         arm.rightForearmBend = 90f
     }
 
@@ -135,7 +144,7 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         when (lowerPose) {
             POSE_BALANCE -> calculateBalancePose(arm, euc)
             POSE_RELAXED -> calculateRelaxedPose(arm, euc)
-            else -> calculateBehindBackPose(arm)
+            else -> calculateBehindBackPose(arm, euc)
         }
 
         // If we need to blend, store values and calculate upper pose
@@ -152,7 +161,7 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
             // Calculate upper pose
             when (upperPose) {
                 POSE_RELAXED -> calculateRelaxedPose(arm, euc)
-                POSE_BEHIND_BACK -> calculateBehindBackPose(arm)
+                POSE_BEHIND_BACK -> calculateBehindBackPose(arm, euc)
                 else -> calculateBalancePose(arm, euc)
             }
 

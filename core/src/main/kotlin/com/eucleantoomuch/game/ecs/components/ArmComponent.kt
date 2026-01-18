@@ -39,9 +39,9 @@ class ArmComponent : Component, Pool.Poolable {
 
     companion object {
         // Speed thresholds in m/s (game uses m/s internally)
-        const val BALANCE_SPEED_THRESHOLD = 4.17f  // ~15 km/h - below this, arms balance
-        const val RELAXED_SPEED_THRESHOLD = 9.72f  // ~35 km/h - above this, arms go behind back
-        const val TRANSITION_SPEED = 3f            // How fast to blend between poses (per second)
+        const val BALANCE_SPEED_THRESHOLD = 4.17f   // ~15 km/h - below this, arms balance
+        const val RELAXED_SPEED_THRESHOLD = 19.44f  // ~70 km/h - above this, arms go behind back
+        const val TRANSITION_SPEED = 3f             // How fast to blend between poses (per second)
     }
 
     override fun reset() {

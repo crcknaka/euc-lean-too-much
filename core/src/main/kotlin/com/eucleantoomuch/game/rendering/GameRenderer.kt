@@ -209,18 +209,18 @@ class GameRenderer(
 
         // Apply arm rotation (relative to shoulder)
         // The arm model points DOWN (-Y) by default
-        // To raise arm to the side (horizontal), we rotate around Z axis
-        // armYaw = 90 means arm horizontal (pointing outward from body)
-        // armPitch controls up/down tilt of the raised arm
+        // Coordinate system after rider transforms:
+        // X = left/right, Y = up/down, Z = forward/back
 
-        // First: rotate around Z to lift arm outward
-        // Left arm needs negative Z rotation to go left, right arm needs positive to go right
+        // armPitch: swing forward/back (rotate around X axis)
+        // Positive = arm swings forward, negative = backward
+        // This is visible from behind camera
+        matrix.rotate(1f, 0f, 0f, armPitch)
+
+        // armYaw: lift arm outward to side (rotate around Z axis)
+        // armYaw = 0 means arm pointing down, 90 = horizontal to side
         val liftDirection = if (isLeft) -1f else 1f
         matrix.rotate(0f, 0f, 1f, armYaw * liftDirection)
-
-        // Then: rotate around X for forward/back tilt (pitch)
-        // When arm is raised, this becomes up/down motion
-        matrix.rotate(1f, 0f, 0f, armPitch)
     }
 
     fun resize(width: Int, height: Int) {
