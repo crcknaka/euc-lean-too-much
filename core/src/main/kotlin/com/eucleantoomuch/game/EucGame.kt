@@ -572,49 +572,32 @@ class EucGame(
         }
 
         // Position arm at shoulder level relative to rider body (not wheel)
+        // Arms are attached to the body at shoulder position - lean rotation is applied
+        // in the renderer, so we only need to set the shoulder attachment point here
         val shoulderOffsetX = if (isLeft) -0.25f else 0.25f
         val shoulderHeight = 1.75f  // Shoulder height on rider
 
-        // Calculate shoulder position accounting for body lean rotation
-        // Body rotates around its base, so shoulders move when leaning
-        val forwardLean = riderEuc?.visualForwardLean ?: eucComponent.visualForwardLean
-        val sideLean = riderEuc?.visualSideLean ?: eucComponent.visualSideLean
-
-        // Forward lean angle in radians (same formula as in GameRenderer: visualForwardLean * 20f degrees)
-        val forwardAngleRad = forwardLean * 20f * com.badlogic.gdx.math.MathUtils.degreesToRadians
-        val sideAngleRad = sideLean * 15f * com.badlogic.gdx.math.MathUtils.degreesToRadians
-
-        // When body rotates forward, shoulder moves forward by sin(angle)*height and down by (1-cos(angle))*height
-        val shoulderForwardOffset = kotlin.math.sin(forwardAngleRad) * shoulderHeight
-        val shoulderDownOffset = (1f - kotlin.math.cos(forwardAngleRad)) * shoulderHeight
-
-        // Side lean also affects shoulder position (in local space)
-        val shoulderSideOffset = kotlin.math.sin(sideAngleRad) * shoulderHeight * (if (isLeft) 1f else -1f)
-
-        // Get yaw for rotating local offsets to world space (negated to match visual direction)
+        // Get yaw for rotating shoulder offset to world space
         val yaw = riderTransform?.yaw ?: playerTransform.yaw
         val yawRad = -yaw * com.badlogic.gdx.math.MathUtils.degreesToRadians
 
-        // Calculate local offsets (relative to body orientation)
-        val localX = shoulderOffsetX + shoulderSideOffset
-        val localZ = shoulderForwardOffset
-
-        // Rotate local offsets by yaw to get world offsets
+        // Rotate shoulder offset by yaw to get world offset
+        // Only apply the base shoulder offset - lean movements are handled by renderer
         val cosYaw = kotlin.math.cos(yawRad)
         val sinYaw = kotlin.math.sin(yawRad)
-        val worldOffsetX = localX * cosYaw - localZ * sinYaw
-        val worldOffsetZ = localX * sinYaw + localZ * cosYaw
+        val worldOffsetX = shoulderOffsetX * cosYaw
+        val worldOffsetZ = shoulderOffsetX * sinYaw
 
         // Use rider position if available, otherwise fall back to player position with offset
         if (riderTransform != null) {
             armTransform.position.set(riderTransform.position)
-            armTransform.position.y += shoulderHeight - shoulderDownOffset
+            armTransform.position.y += shoulderHeight
             armTransform.position.x += worldOffsetX
             armTransform.position.z += worldOffsetZ
             armTransform.yaw = riderTransform.yaw
         } else {
             armTransform.position.set(playerTransform.position)
-            armTransform.position.y += 0.7f + shoulderHeight - shoulderDownOffset
+            armTransform.position.y += 0.7f + shoulderHeight
             armTransform.position.x += worldOffsetX
             armTransform.position.z += worldOffsetZ
             armTransform.yaw = playerTransform.yaw
