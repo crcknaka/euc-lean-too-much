@@ -32,7 +32,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     // Near miss notification state
     private var nearMissTimer = 0f
-    private val nearMissDisplayDuration = 1.5f  // How long to show "Near miss!" text
+    private val nearMissDisplayDuration = 0.7f  // How long to show "Near miss!" text
 
     // Wobble screen shake state
     private var wobbleShakeX = 0f
@@ -132,20 +132,6 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // === Lean Indicator (bottom right) ===
         drawLeanIndicator(euc)
 
-        // === Warning Overlay ===
-        if (warningFlash > 0.1f) {
-            val flashAlpha = (MathUtils.sin(warningFlash * 3f) * 0.5f + 0.5f) * 0.18f
-            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha)
-            ui.shapes.rect(0f, 0f, sw, sh)
-
-            // Red vignette at edges
-            val vignetteWidth = 28f * scale
-            ui.shapes.color = UITheme.withAlpha(UITheme.danger, flashAlpha * 2.2f)
-            ui.shapes.rect(0f, 0f, vignetteWidth, sh)
-            ui.shapes.rect(sw - vignetteWidth, 0f, vignetteWidth, sh)
-            ui.shapes.rect(0f, 0f, sw, vignetteWidth)
-            ui.shapes.rect(0f, sh - vignetteWidth, sw, vignetteWidth)
-        }
 
         ui.endShapes()
 
@@ -170,10 +156,6 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             drawWarningBadge("SLIPPERY!", UITheme.cyan, warningBaseY + 70f * scale)
         }
 
-        if (euc.isAboutToFall()) {
-            val dangerPulse = UITheme.Anim.pulse(6f, 0.7f, 1f)
-            drawWarningBadge("!! DANGER !!", UITheme.lerp(UITheme.danger, UITheme.warningBright, dangerPulse), warningBaseY)
-        }
 
         // PWM warning indicator
         if (pwmWarningFlash > 0.1f) {
@@ -192,7 +174,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             drawWarningBadge("NEAR MISS!", nearMissColor, warningBaseY + 210f * scale)
         }
 
-        // Wobbling warning - show when wobbling is active
+        // Wobbling warning - show when wobbling is active (at top position where DANGER was)
         if (euc.isWobbling) {
             val wobbleProgress = (euc.wobbleTimer / 3f).coerceIn(0f, 1f)  // 0-1 over 3 seconds
             val urgencyPulse = UITheme.Anim.pulse(6f + wobbleProgress * 8f, 0.7f, 1f)  // Faster pulse as time runs out
@@ -200,7 +182,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val wobbleColor = UITheme.lerp(UITheme.warning, UITheme.danger, wobbleProgress)
             val timeLeft = (3f - euc.wobbleTimer).coerceAtLeast(0f)
             val displayText = if (timeLeft < 1f) "WOBBLING!" else "WOBBLING"
-            drawWarningBadge(displayText, UITheme.withAlpha(wobbleColor, urgencyPulse), warningBaseY + 280f * scale)
+            drawWarningBadge(displayText, UITheme.withAlpha(wobbleColor, urgencyPulse), warningBaseY)
         }
 
         // FPS counter (top-left, visible but unobtrusive)

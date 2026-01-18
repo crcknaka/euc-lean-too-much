@@ -440,8 +440,11 @@ class EucGame(
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta)
         }
 
-        // No motion blur during countdown
+        // Reset all post-processing effects during countdown
         renderer.postProcessing.blurStrength = 0f
+        renderer.postProcessing.dangerTint = 0f
+        renderer.postProcessing.vignetteDanger = 0f
+        renderer.postProcessing.chromaticAberration = 0f
 
         renderer.render()
 
@@ -498,11 +501,33 @@ class EucGame(
             // Update motor sound (pitch/volume based on speed and PWM)
             motorSoundManager.update(eucComponent.speed, eucComponent.pwm, delta)
 
-            // Update motion blur based on speed (starts at 40 km/h, max at 80 km/h)
+            // Update post-processing effects
             val speedKmh = eucComponent.speed * 3.6f
-            val blurStart = 40f
-            val blurMax = 80f
-            renderer.postProcessing.blurStrength = ((speedKmh - blurStart) / (blurMax - blurStart)).coerceIn(0f, 0.4f)
+
+            // Motion blur based on speed (starts at 30 km/h, max at 70 km/h)
+            val blurStart = 30f
+            val blurMax = 70f
+            renderer.postProcessing.blurStrength = ((speedKmh - blurStart) / (blurMax - blurStart)).coerceIn(0f, 0.5f)
+
+            // Blur direction: mostly vertical with slight horizontal from turning
+            val turnFactor = eucComponent.sideLean * 0.3f
+            renderer.postProcessing.blurDirection = turnFactor to -1f
+
+            // Danger effects based on PWM
+            // Vignette: starts at 80%, max at 98%
+            val vignetteStart = 0.8f
+            val vignetteMax = 0.98f
+            val vignetteLevel = ((eucComponent.pwm - vignetteStart) / (vignetteMax - vignetteStart)).coerceIn(0f, 1f)
+            renderer.postProcessing.vignetteDanger = vignetteLevel
+
+            // Red tint: starts at 90%, max at 98%
+            val tintStart = 0.9f
+            val tintMax = 0.98f
+            val tintLevel = ((eucComponent.pwm - tintStart) / (tintMax - tintStart)).coerceIn(0f, 1f)
+            renderer.postProcessing.dangerTint = tintLevel
+
+            // Chromatic aberration during wobble
+            renderer.postProcessing.chromaticAberration = eucComponent.wobbleIntensity * 1.5f
         }
 
         // Update music fade
