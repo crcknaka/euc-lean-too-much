@@ -56,6 +56,17 @@ class WorldGenerator(
     private var pigeonWalkingModel: ModelInstance
     private var pigeonFlyingModel: ModelInstance
 
+    // Shadow models for different entity sizes
+    private val pedestrianShadowModel by lazy { models.createBlobShadowModel(0.5f, 0.4f) }
+    private val carShadowModel by lazy { models.createBlobShadowModel(1.2f, 2.5f) }
+    private val pigeonShadowModel by lazy { models.createBlobShadowModel(0.18f, 0.15f) }
+    private val treeShadowModel by lazy { models.createBlobShadowModel(1.5f, 1.5f) }
+    private val lampPostShadowModel by lazy { models.createBlobShadowModel(0.6f, 0.6f) }
+    private val benchShadowModel by lazy { models.createBlobShadowModel(0.4f, 0.9f) }
+    private val trashCanShadowModel by lazy { models.createBlobShadowModel(0.4f, 0.4f) }
+    // Building shadow - slightly larger than building (width=6, depth=8)
+    private val buildingShadowModel by lazy { models.createBuildingShadowModel(Constants.BUILDING_WIDTH + 2f, Constants.BUILDING_DEPTH + 2f) }
+
     // Track pigeon flock ID for group behavior
     private var nextFlockId = 0
 
@@ -392,6 +403,12 @@ class WorldGenerator(
             this.chunkIndex = chunkIndex
         })
 
+        // Add shadow for crossing pedestrian
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(pedestrianShadowModel)
+            scale = 1f
+        })
+
         engine.addEntity(entity)
         return entity
     }
@@ -474,6 +491,12 @@ class WorldGenerator(
             this.chunkIndex = chunkIndex
         })
 
+        // Add shadow for sidewalk pedestrian
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(pedestrianShadowModel)
+            scale = 1f
+        })
+
         engine.addEntity(entity)
         return entity
     }
@@ -503,6 +526,7 @@ class WorldGenerator(
             stateTimer = 0f
         })
         entity1.add(GroundComponent().apply { type = GroundType.ROAD; this.chunkIndex = chunkIndex })
+        entity1.add(ShadowComponent().apply { shadowInstance = ModelInstance(pedestrianShadowModel); scale = 1f })
         engine.addEntity(entity1)
         entities.add(entity1)
 
@@ -527,6 +551,7 @@ class WorldGenerator(
             stateTimer = 0f
         })
         entity2.add(GroundComponent().apply { type = GroundType.ROAD; this.chunkIndex = chunkIndex })
+        entity2.add(ShadowComponent().apply { shadowInstance = ModelInstance(pedestrianShadowModel); scale = 1f })
         engine.addEntity(entity2)
         entities.add(entity2)
 
@@ -614,7 +639,8 @@ class WorldGenerator(
                 heightL,
                 ModelInstance(detailedL.model),
                 ModelInstance(simpleL.model),
-                chunkIndex
+                chunkIndex,
+                isLeftSide = true
             ))
 
             // Right side building
@@ -630,7 +656,8 @@ class WorldGenerator(
                 heightR,
                 ModelInstance(detailedR.model),
                 ModelInstance(simpleR.model),
-                chunkIndex
+                chunkIndex,
+                isLeftSide = false
             ))
 
             z += buildingSpacing + MathUtils.random(-3f, 3f)
@@ -639,13 +666,15 @@ class WorldGenerator(
         return entities
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun createBuildingEntity(
         x: Float,
         z: Float,
         height: Float,
         detailedModel: ModelInstance,
         simpleModel: ModelInstance,
-        chunkIndex: Int
+        chunkIndex: Int,
+        isLeftSide: Boolean  // Kept for potential future directional shadows
     ): Entity {
         val entity = engine.createEntity()
 
@@ -675,6 +704,13 @@ class WorldGenerator(
         entity.add(ObstacleComponent().apply {
             type = ObstacleType.CURB  // Reuse type for buildings
             causesGameOver = true
+        })
+
+        // Add building shadow - directly under building on grass
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(buildingShadowModel)
+            scale = 1f
+            xOffset = 0f
         })
 
         engine.addEntity(entity)
@@ -914,6 +950,12 @@ class WorldGenerator(
             this.chunkIndex = chunkIndex
         })
 
+        // Add small shadow for pigeon
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(pigeonShadowModel)
+            scale = 1f
+        })
+
         // No collider - pigeons are small and fly away, not an obstacle
 
         engine.addEntity(entity)
@@ -1003,6 +1045,12 @@ class WorldGenerator(
             causesGameOver = true
         })
 
+        // Add shadow for tree (scale > 1 renders at sidewalk height)
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(treeShadowModel)
+            scale = 1.5f
+        })
+
         engine.addEntity(entity)
         return entity
     }
@@ -1057,6 +1105,12 @@ class WorldGenerator(
             causesGameOver = true
         })
 
+        // Add shadow for bench
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(benchShadowModel)
+            scale = 1f
+        })
+
         engine.addEntity(entity)
         return entity
     }
@@ -1086,6 +1140,12 @@ class WorldGenerator(
         entity.add(ObstacleComponent().apply {
             type = ObstacleType.CURB
             causesGameOver = true
+        })
+
+        // Add shadow for trash can
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(trashCanShadowModel)
+            scale = 1f
         })
 
         engine.addEntity(entity)
@@ -1148,6 +1208,12 @@ class WorldGenerator(
         entity.add(ObstacleComponent().apply {
             type = ObstacleType.CURB
             causesGameOver = true
+        })
+
+        // Add shadow for lamp post (scale > 1 renders at sidewalk height)
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(lampPostShadowModel)
+            scale = 1.2f
         })
 
         engine.addEntity(entity)
@@ -1317,6 +1383,12 @@ class WorldGenerator(
             maxX = Constants.ROAD_WIDTH / 2 + 2f
         })
 
+        // Add shadow for pedestrian
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(pedestrianShadowModel)
+            scale = 1f
+        })
+
         engine.addEntity(entity)
         return entity
     }
@@ -1354,6 +1426,12 @@ class WorldGenerator(
             speed = difficultyScaler.getCarSpeed(totalDistance)
             this.lane = if (lane == 1) 1 else 0
             this.direction = direction
+        })
+
+        // Add shadow for car
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(carShadowModel)
+            scale = 1f
         })
 
         engine.addEntity(entity)

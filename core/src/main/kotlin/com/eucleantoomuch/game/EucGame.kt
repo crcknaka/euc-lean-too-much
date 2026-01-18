@@ -141,7 +141,7 @@ class EucGame(
         eucPhysicsSystem.onPlayerFall = { handlePlayerFall() }
 
         collisionSystem = CollisionSystem()
-        collisionSystem.onCollision = { type, causesGameOver ->
+        collisionSystem.onCollision = { _, causesGameOver ->
             if (causesGameOver) {
                 handlePlayerFall()
             }
@@ -262,7 +262,7 @@ class EucGame(
         // Update input
         gameInput.update(delta)
 
-        when (val state = stateManager.current()) {
+        when (stateManager.current()) {
             is GameState.Loading -> renderLoading()
             is GameState.Menu -> renderMenu()
             is GameState.WheelSelection -> renderWheelSelection()

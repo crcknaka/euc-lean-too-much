@@ -10,6 +10,7 @@ import com.eucleantoomuch.game.ecs.components.CollisionGroups
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
+import com.eucleantoomuch.game.ecs.components.ShadowComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.components.VelocityComponent
 import com.eucleantoomuch.game.model.WheelType
@@ -24,6 +25,9 @@ class EntityFactory(
     private val riderModel by lazy { models.createRiderModel() }
     private val leftArmModel by lazy { models.createArmModel(isLeft = true) }
     private val rightArmModel by lazy { models.createArmModel(isLeft = false) }
+
+    // Shadow model for player/rider (silhouette shape)
+    private val playerShadowModel by lazy { models.createPlayerShadowModel() }
 
     fun createPlayer(wheelType: WheelType = WheelType.Standard): Entity {
         val entity = engine.createEntity()
@@ -66,6 +70,12 @@ class EntityFactory(
             deceleration = wheelType.deceleration
             pwmSensitivity = wheelType.pwmSensitivity
             turnResponsiveness = wheelType.turnResponsiveness
+        })
+
+        // Add shadow for wheel
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(playerShadowModel)
+            scale = 1.5f
         })
 
         engine.addEntity(entity)

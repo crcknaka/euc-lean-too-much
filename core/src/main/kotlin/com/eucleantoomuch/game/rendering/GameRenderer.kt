@@ -19,7 +19,9 @@ import com.eucleantoomuch.game.ecs.components.ArmTagComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
 import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
+import com.eucleantoomuch.game.ecs.components.ShadowComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
+import com.eucleantoomuch.game.util.Constants
 
 class GameRenderer(
     private val engine: Engine,
@@ -45,8 +47,10 @@ class GameRenderer(
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
     private val armTagMapper = ComponentMapper.getFor(ArmTagComponent::class.java)
     private val armMapper = ComponentMapper.getFor(ArmComponent::class.java)
+    private val shadowMapper = ComponentMapper.getFor(ShadowComponent::class.java)
 
     private val tempMatrix = Matrix4()
+    private val shadowMatrix = Matrix4()
 
     // Reference to rider entity for arm rendering (set externally)
     var riderEntity: com.badlogic.ashley.core.Entity? = null
@@ -81,7 +85,40 @@ class GameRenderer(
 
         modelBatch.begin(camera)
 
-        // Render all entities with ModelComponent
+        // First pass: render shadows (with blending, no cull face for flat surfaces)
+        Gdx.gl.glEnable(GL20.GL_BLEND)
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+        Gdx.gl.glDisable(GL20.GL_CULL_FACE)  // Shadows are flat, don't cull
+        Gdx.gl.glDepthMask(false)  // Don't write to depth buffer
+
+        for (entity in engine.getEntitiesFor(Families.renderable)) {
+            val shadow = shadowMapper.get(entity) ?: continue
+            val transform = transformMapper.get(entity) ?: continue
+
+            if (shadow.visible && shadow.shadowInstance != null) {
+                val shadowX = transform.position.x + shadow.xOffset
+
+                // All shadows render at sidewalk height (0.11f) so they're visible on all surfaces
+                val groundY = 0.11f
+
+                shadowMatrix.idt()
+                shadowMatrix.translate(shadowX, groundY, transform.position.z)
+                // Apply yaw rotation for directional shadows (buildings)
+                if (transform.yaw != 0f) {
+                    shadowMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                }
+                shadowMatrix.scale(shadow.scale, 1f, shadow.scale)
+
+                shadow.shadowInstance!!.transform.set(shadowMatrix)
+                modelBatch.render(shadow.shadowInstance!!)
+            }
+        }
+
+        // Restore state for regular rendering
+        Gdx.gl.glDepthMask(true)
+        Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+
+        // Second pass: render all entities with ModelComponent
         for (entity in engine.getEntitiesFor(Families.renderable)) {
             val model = modelMapper.get(entity)
             val transform = transformMapper.get(entity)

@@ -84,6 +84,9 @@ class ProceduralModels : Disposable {
     // Fog wall color (matches sky for seamless blend)
     private val fogWallColor = Color(0.5f, 0.7f, 0.9f, 1f)  // Same as sky
 
+    // Shadow color (semi-transparent dark)
+    private val shadowColor = Color(0f, 0f, 0f, 0.15f)
+
     // Building detail colors
     private val windowColor = Color(0.6f, 0.75f, 0.9f, 1f)       // Light blue glass
     private val windowLitColor = Color(0.95f, 0.9f, 0.7f, 1f)    // Warm yellow lit window
@@ -238,6 +241,9 @@ class ProceduralModels : Disposable {
         val roadMaterial = Material(ColorAttribute.createDiffuse(roadColor))
         val sidewalkMaterial = Material(ColorAttribute.createDiffuse(sidewalkColor))
         val lineMaterial = Material(ColorAttribute.createDiffuse(roadLineColor))
+        val grassMaterial = Material(ColorAttribute.createDiffuse(grassColor))
+        // Darker grass for variation
+        val grassDarkMaterial = Material(ColorAttribute.createDiffuse(Color(0.28f, 0.45f, 0.2f, 1f)))
 
         // Road surface
         val roadPart = modelBuilder.part("road", GL20.GL_TRIANGLES, attributes, roadMaterial)
@@ -302,6 +308,63 @@ class ProceduralModels : Disposable {
             Constants.ROAD_WIDTH / 2, curbHeight, 0f,
             -1f, 0f, 0f  // Normal pointing left (towards road center)
         )
+
+        // Grass areas (between sidewalk and buildings)
+        val sidewalkEdge = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH  // 7f
+        val grassWidth = Constants.BUILDING_OFFSET_X - sidewalkEdge + 5f  // Extend past buildings
+
+        // Left grass - main area
+        val leftGrass = modelBuilder.part("grass_left", GL20.GL_TRIANGLES, attributes, grassMaterial)
+        leftGrass.rect(
+            -sidewalkEdge - grassWidth, 0f, 0f,
+            -sidewalkEdge - grassWidth, 0f, chunkLength,
+            -sidewalkEdge, 0f, chunkLength,
+            -sidewalkEdge, 0f, 0f,
+            0f, 1f, 0f
+        )
+
+        // Right grass - main area
+        val rightGrass = modelBuilder.part("grass_right", GL20.GL_TRIANGLES, attributes, grassMaterial)
+        rightGrass.rect(
+            sidewalkEdge, 0f, 0f,
+            sidewalkEdge, 0f, chunkLength,
+            sidewalkEdge + grassWidth, 0f, chunkLength,
+            sidewalkEdge + grassWidth, 0f, 0f,
+            0f, 1f, 0f
+        )
+
+        // Add grass variation patches (darker spots)
+        val patchSize = 3f
+        var patchZ = 2f
+        var patchIndex = 0
+        while (patchZ < chunkLength - patchSize) {
+            // Left side patches - randomish pattern
+            if ((patchIndex + 1) % 3 == 0) {
+                val leftPatch = modelBuilder.part("grass_patch_l_$patchIndex", GL20.GL_TRIANGLES, attributes, grassDarkMaterial)
+                val patchX = -sidewalkEdge - 2f - (patchIndex % 5) * 1.5f
+                leftPatch.rect(
+                    patchX - patchSize / 2, 0.005f, patchZ,
+                    patchX - patchSize / 2, 0.005f, patchZ + patchSize,
+                    patchX + patchSize / 2, 0.005f, patchZ + patchSize,
+                    patchX + patchSize / 2, 0.005f, patchZ,
+                    0f, 1f, 0f
+                )
+            }
+            // Right side patches
+            if ((patchIndex + 2) % 4 == 0) {
+                val rightPatch = modelBuilder.part("grass_patch_r_$patchIndex", GL20.GL_TRIANGLES, attributes, grassDarkMaterial)
+                val patchX = sidewalkEdge + 3f + (patchIndex % 4) * 1.2f
+                rightPatch.rect(
+                    patchX - patchSize / 2, 0.005f, patchZ,
+                    patchX - patchSize / 2, 0.005f, patchZ + patchSize,
+                    patchX + patchSize / 2, 0.005f, patchZ + patchSize,
+                    patchX + patchSize / 2, 0.005f, patchZ,
+                    0f, 1f, 0f
+                )
+            }
+            patchZ += 5f
+            patchIndex++
+        }
 
         return modelBuilder.end().also { models.add(it) }
     }
@@ -1219,6 +1282,96 @@ class ProceduralModels : Disposable {
 
     fun getRandomBackgroundBuildingColor(): Color {
         return listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).random()
+    }
+
+    /**
+     * Create a player shadow model - simple circle for the wheel.
+     */
+    fun createPlayerShadowModel(): Model {
+        // Simple round shadow under the wheel only
+        return createBlobShadowModel(0.25f, 0.25f)
+    }
+
+    /**
+     * Create a rectangular shadow model for buildings.
+     * Shadow is centered around origin and extends in all directions.
+     * @param width shadow width (along X axis)
+     * @param depth shadow depth (along Z axis)
+     */
+    fun createBuildingShadowModel(width: Float, depth: Float): Model {
+        modelBuilder.begin()
+
+        val material = Material(
+            ColorAttribute.createDiffuse(shadowColor),
+            com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+        )
+
+        val shadow = modelBuilder.part("shadow", GL20.GL_TRIANGLES, attributes, material)
+
+        val y = 0f  // At origin, will be positioned by renderer
+        val halfW = width / 2
+        val halfD = depth / 2
+
+        // Centered rectangle - counter-clockwise winding for upward-facing normal
+        shadow.triangle(
+            com.badlogic.gdx.math.Vector3(-halfW, y, halfD),
+            com.badlogic.gdx.math.Vector3(halfW, y, halfD),
+            com.badlogic.gdx.math.Vector3(halfW, y, -halfD)
+        )
+        shadow.triangle(
+            com.badlogic.gdx.math.Vector3(-halfW, y, halfD),
+            com.badlogic.gdx.math.Vector3(halfW, y, -halfD),
+            com.badlogic.gdx.math.Vector3(-halfW, y, -halfD)
+        )
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Create a blob shadow model - a flat ellipse that renders on the ground
+     * @param radiusX horizontal radius (width/2)
+     * @param radiusZ depth radius (length/2)
+     */
+    fun createBlobShadowModel(radiusX: Float = 0.5f, radiusZ: Float = 0.4f): Model {
+        modelBuilder.begin()
+
+        // Use blending for semi-transparency
+        val material = Material(
+            ColorAttribute.createDiffuse(shadowColor),
+            com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+        )
+
+        // Create flat ellipse on the ground (XZ plane, Y = 0)
+        val shadow = modelBuilder.part("shadow", GL20.GL_TRIANGLES, attributes, material)
+
+        // Create ellipse with segments
+        val segments = 16
+        val angleStep = MathUtils.PI2 / segments
+
+        // Center vertex
+        val centerX = 0f
+        val centerY = 0.01f  // Slightly above ground to avoid z-fighting
+        val centerZ = 0f
+
+        // Build triangles from center to edge
+        for (i in 0 until segments) {
+            val angle1 = i * angleStep
+            val angle2 = (i + 1) * angleStep
+
+            val x1 = MathUtils.cos(angle1) * radiusX
+            val z1 = MathUtils.sin(angle1) * radiusZ
+            val x2 = MathUtils.cos(angle2) * radiusX
+            val z2 = MathUtils.sin(angle2) * radiusZ
+
+            // Triangle with normal pointing up (counter-clockwise when viewed from above)
+            shadow.triangle(
+                com.badlogic.gdx.math.Vector3(x2, centerY, z2),
+                com.badlogic.gdx.math.Vector3(x1, centerY, z1),
+                com.badlogic.gdx.math.Vector3(centerX, centerY, centerZ)
+            )
+        }
+
+        return modelBuilder.end().also { models.add(it) }
     }
 
     override fun dispose() {

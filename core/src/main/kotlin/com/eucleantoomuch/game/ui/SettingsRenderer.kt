@@ -180,24 +180,24 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             avasLeftButtonHover, avasRightButtonHover
         )
 
-        // Checkboxes row positions
+        // Checkboxes row positions - centered in right column
         val checkboxRowY = avasY - rowHeight
         val checkboxLabelOffset = checkboxSize + 16f * scale
+        val checkboxTotalWidth = checkboxSize + checkboxLabelOffset + 80f * scale  // checkbox + gap + label width estimate
+        val checkboxStartX = rightColCenterX - checkboxTotalWidth / 2
 
         // Music Checkbox
-        val musicCheckboxX = rightColumnX + 20f * scale
-        musicCheckbox.set(musicCheckboxX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+        musicCheckbox.set(checkboxStartX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
         renderCheckbox(musicCheckbox, musicCheckboxHover, settingsManager.musicEnabled)
 
         // Beeps Checkbox
-        val beepsCheckboxX = rightColumnX + 20f * scale
         val beepsY = checkboxRowY - 70f * scale
-        beepsCheckbox.set(beepsCheckboxX, beepsY - checkboxSize / 2, checkboxSize, checkboxSize)
+        beepsCheckbox.set(checkboxStartX, beepsY - checkboxSize / 2, checkboxSize, checkboxSize)
         renderCheckbox(beepsCheckbox, beepsCheckboxHover, settingsManager.beepsEnabled)
 
         // FPS Checkbox
         val fpsY = beepsY - 70f * scale
-        fpsCheckbox.set(beepsCheckboxX, fpsY - checkboxSize / 2, checkboxSize, checkboxSize)
+        fpsCheckbox.set(checkboxStartX, fpsY - checkboxSize / 2, checkboxSize, checkboxSize)
         renderCheckbox(fpsCheckbox, fpsCheckboxHover, settingsManager.showFps)
 
         // Back button
