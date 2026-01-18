@@ -24,6 +24,22 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var pwmWarningFlash = 0f
     private var pwmSmooth = 0f
 
+    // Speed effect state
+    private var speedEffectIntensity = 0f
+    private val speedLines = mutableListOf<SpeedLine>()
+    private var speedLineTimer = 0f
+    private var speedEffectTurnOffset = 0f  // Horizontal offset based on turning
+
+    // Speed line data class - radial lines from edges toward center (tunnel effect)
+    private data class SpeedLine(
+        val edgeX: Float,    // Position on screen edge (0-1 normalized)
+        val edgeY: Float,    // Position on screen edge (0-1 normalized)
+        var progress: Float, // 0 = at edge, 1 = reached center area
+        val speed: Float,    // How fast it moves (progress per second)
+        val alpha: Float,    // Base transparency
+        val side: Int        // 0=top, 1=right, 2=bottom, 3=left
+    )
+
     fun render(session: GameSession, euc: EucComponent, pwmWarningActive: Boolean = false) {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
@@ -60,7 +76,24 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             pwmWarningFlash = UITheme.Anim.ease(pwmWarningFlash, 0f, 5f)
         }
 
+        // Speed effect - starts at 70 km/h, full intensity at 100+ km/h
+        val speedKmh = euc.speed * 3.6f
+        val targetIntensity = ((speedKmh - 70f) / 30f).coerceIn(0f, 1f)
+        speedEffectIntensity = UITheme.Anim.ease(speedEffectIntensity, targetIntensity, 4f)
+
+        // Speed effect turns with rider - sideLean affects center offset
+        val targetTurnOffset = euc.sideLean * 0.15f  // Max 15% screen offset
+        speedEffectTurnOffset = UITheme.Anim.ease(speedEffectTurnOffset, targetTurnOffset, 6f)
+
+        // Update speed lines
+        updateSpeedLines(sw, sh, scale)
+
         ui.beginShapes()
+
+        // === Speed Lines Effect ===
+        if (speedEffectIntensity > 0.01f) {
+            drawSpeedLines(sw, sh, scale)
+        }
 
         // === Top Score Panel ===
         val topPanelWidth = 320f * scale
@@ -453,12 +486,115 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.endBatch()
     }
 
+    private fun updateSpeedLines(sw: Float, sh: Float, scale: Float) {
+        val delta = Gdx.graphics.deltaTime
+
+        // Spawn new lines based on intensity
+        if (speedEffectIntensity > 0.01f) {
+            speedLineTimer += delta * speedEffectIntensity * 60f  // More lines at higher speed
+
+            while (speedLineTimer > 1f) {
+                speedLineTimer -= 1f
+
+                // Spawn lines on all 4 edges, but more on left/right
+                val side = when (MathUtils.random(0, 9)) {
+                    in 0..3 -> 3  // Left (40%)
+                    in 4..7 -> 1  // Right (40%)
+                    8 -> 0        // Top (10%)
+                    else -> 2     // Bottom (10%)
+                }
+
+                // Position along that edge (0-1)
+                val edgePos = MathUtils.random(0.1f, 0.9f)
+
+                // Calculate actual edge coordinates based on side
+                val (edgeX, edgeY) = when (side) {
+                    0 -> Pair(edgePos, 1f)  // Top edge
+                    1 -> Pair(1f, edgePos)  // Right edge
+                    2 -> Pair(edgePos, 0f)  // Bottom edge
+                    else -> Pair(0f, edgePos)  // Left edge
+                }
+
+                speedLines.add(SpeedLine(
+                    edgeX = edgeX,
+                    edgeY = edgeY,
+                    progress = 0f,
+                    speed = MathUtils.random(0.8f, 1.5f) * (0.7f + speedEffectIntensity * 0.5f),
+                    alpha = MathUtils.random(0.4f, 0.8f) * speedEffectIntensity,
+                    side = side
+                ))
+            }
+        }
+
+        // Update existing lines - move toward center
+        val iterator = speedLines.iterator()
+        while (iterator.hasNext()) {
+            val line = iterator.next()
+            line.progress += line.speed * delta
+
+            // Remove lines that reached center area
+            if (line.progress > 0.7f) {
+                iterator.remove()
+            }
+        }
+
+        // Limit max lines
+        while (speedLines.size > 100) {
+            speedLines.removeAt(0)
+        }
+    }
+
+    private fun drawSpeedLines(sw: Float, sh: Float, scale: Float) {
+        // Center shifts based on turning direction
+        val centerX = sw / 2f + sw * speedEffectTurnOffset
+        val centerY = sh / 2f
+
+        // Lines start at 40% from center (not from center itself)
+        val startOffset = 0.4f
+
+        for (line in speedLines) {
+            // Convert edge position to screen coordinates
+            val edgeX = line.edgeX * sw
+            val edgeY = line.edgeY * sh
+
+            // Calculate direction from center toward edge
+            val dirX = edgeX - centerX
+            val dirY = edgeY - centerY
+
+            // Remap progress: 0 = at startOffset, 1 = at edge
+            val mappedProgress = startOffset + line.progress * (1f - startOffset)
+            val mappedTailProgress = startOffset + (line.progress - 0.15f).coerceAtLeast(0f) * (1f - startOffset)
+
+            // Current position along the path
+            val currentX = centerX + dirX * mappedProgress
+            val currentY = centerY + dirY * mappedProgress
+
+            // Line tail is behind
+            val tailX = centerX + dirX * mappedTailProgress
+            val tailY = centerY + dirY * mappedTailProgress
+
+            // Fade: brighten as approaching edge
+            val fadeAlpha = line.progress / 0.7f
+            val alpha = line.alpha * fadeAlpha
+
+            // Line gets thicker as it approaches edge (perspective effect)
+            val thickness = (1.5f + line.progress * 4f) * scale
+
+            ui.shapes.color = UITheme.withAlpha(Color.WHITE, alpha)
+            ui.shapes.rectLine(tailX, tailY, currentX, currentY, thickness)
+        }
+    }
+
     fun reset() {
         scorePopScale = 1f
         lastScore = 0
         warningFlash = 0f
         speedBarSmooth = 0f
         pwmWarningFlash = 0f
+        speedEffectIntensity = 0f
+        speedLines.clear()
+        speedLineTimer = 0f
+        speedEffectTurnOffset = 0f
         pwmSmooth = 0f
     }
 
