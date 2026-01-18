@@ -47,7 +47,7 @@ class WorldGenerator(
     private var benchModel: ModelInstance
     private var trashCanModel: ModelInstance
     private var bushModel: ModelInstance
-    private var flowerBedModel: ModelInstance
+    private val flowerBedModels = mutableListOf<ModelInstance>()  // Multiple lengths (3-6 segments)
 
     // Cloud models
     private val cloudModels = mutableListOf<ModelInstance>()
@@ -126,7 +126,13 @@ class WorldGenerator(
         benchModel = ModelInstance(models.createBenchModel())
         trashCanModel = ModelInstance(models.createTrashCanModel())
         bushModel = ModelInstance(models.createBushModel())
-        flowerBedModel = ModelInstance(models.createFlowerBedModel())
+
+        // Create flower beds with varying lengths (3-6 segments) and widths (2-4 rows)
+        for (segments in 3..6) {
+            for (rows in 2..4) {
+                flowerBedModels.add(ModelInstance(models.createFlowerBedModel(segments, rows)))
+            }
+        }
 
         // Create cloud variants
         for (i in 0..4) {
@@ -1089,12 +1095,18 @@ class WorldGenerator(
     private fun createFlowerBedEntity(x: Float, z: Float, chunkIndex: Int): Entity {
         val entity = engine.createEntity()
 
+        // Pick a random flower bed model (different lengths)
+        val randomFlowerBed = flowerBedModels[MathUtils.random(flowerBedModels.size - 1)]
+
         entity.add(TransformComponent().apply {
             position.set(x, 0f, z)
+            // Rotate 90 degrees so flower bed runs parallel to road (along Z axis)
+            yaw = 90f
+            updateRotationFromYaw()
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(flowerBedModel.model)
+            modelInstance = ModelInstance(randomFlowerBed.model)
         })
 
         entity.add(GroundComponent().apply {

@@ -91,7 +91,7 @@ class GameOverRenderer : Disposable {
 
         // Panel dimensions with scale animation - wider panel
         val panelWidth = 640f * scale * panelScale
-        val panelHeight = 580f * scale * panelScale  // Compact height with side-by-side stats
+        val panelHeight = 680f * scale * panelScale  // Taller to fit all stats and buttons
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
@@ -118,7 +118,7 @@ class GameOverRenderer : Disposable {
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
         val buttonSpacing = 32f * scale
         val totalWidth = buttonWidth * 2 + buttonSpacing
-        val buttonsY = panelY + 70f * scale  // Lower position for buttons
+        val buttonsY = panelY + 50f * scale  // Lower position for buttons
 
         retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)

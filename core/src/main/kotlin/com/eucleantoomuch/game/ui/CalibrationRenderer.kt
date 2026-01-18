@@ -10,7 +10,7 @@ import com.badlogic.gdx.utils.Disposable
 
 /**
  * Modern calibration screen with large touch targets.
- * Features a clear visual indicator for device orientation.
+ * Shows device tilt and lets user set current position as neutral.
  */
 class CalibrationRenderer : Disposable {
     private val ui = UIRenderer()
@@ -27,6 +27,7 @@ class CalibrationRenderer : Disposable {
     private var calibrateHover = 0f
     private var skipHover = 0f
     private var successFlash = 0f
+    private var readyTimer = 0f  // Time the dot has been stable
 
     enum class Action {
         NONE, CALIBRATE, SKIP
@@ -52,7 +53,7 @@ class CalibrationRenderer : Disposable {
         calibrateHover = UITheme.Anim.ease(calibrateHover, if (calibrateButton.contains(touchX, touchY)) 1f else 0f, 10f)
         skipHover = UITheme.Anim.ease(skipHover, if (skipButton.contains(touchX, touchY)) 1f else 0f, 10f)
 
-        // Update dot trail
+        // Update dot trail and check stability
         trailTimer += Gdx.graphics.deltaTime
         if (trailTimer > 0.04f) {
             trailTimer = 0f
@@ -64,6 +65,15 @@ class CalibrationRenderer : Disposable {
             dotTrailY[trailIndex] = -normalizedX
         }
 
+        // Check if device is stable (not moving much)
+        val recentMovement = calculateRecentMovement()
+        if (recentMovement < 0.15f) {
+            readyTimer += Gdx.graphics.deltaTime
+        } else {
+            readyTimer = 0f
+        }
+        val isStable = readyTimer > 0.5f  // Stable for 0.5 seconds
+
         ui.beginShapes()
 
         // Gradient background
@@ -74,32 +84,33 @@ class CalibrationRenderer : Disposable {
             ui.shapes.rect(0f, stripY, sw, sh / 20f + 1)
         }
 
-        // Panel with enter animation
-        val panelWidth = 580f * scale * enterAnim
-        val panelHeight = 560f * scale * enterAnim
+        // Panel with enter animation - larger for more breathing room
+        val panelWidth = 620f * scale * enterAnim
+        val panelHeight = 620f * scale * enterAnim
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             backgroundColor = UITheme.surface)
 
-        // Tilt indicator - larger for better visibility
-        val indicatorSize = 220f * scale * enterAnim
-        val indicatorCenterY = centerY + 50f * scale
+        // Tilt indicator - shows current device orientation (moved down for more space from text)
+        val indicatorSize = 180f * scale * enterAnim
+        val indicatorCenterY = centerY + 20f * scale
 
         // Indicator shadow
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.35f)
         ui.shapes.circle(centerX + 4, indicatorCenterY - 4, indicatorSize / 2 + 4)
 
-        // Indicator background
-        ui.shapes.color = UITheme.surfaceLight
+        // Indicator background - changes color when stable
+        ui.shapes.color = if (isStable) UITheme.withAlpha(UITheme.accent, 0.15f) else UITheme.surfaceLight
         ui.shapes.circle(centerX, indicatorCenterY, indicatorSize / 2)
 
-        // Concentric grid circles
-        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.12f)
-        for (r in listOf(0.33f, 0.66f, 1f)) {
+        // Outer ring - glows when stable
+        if (isStable) {
+            val glowPulse = UITheme.Anim.pulse(2f, 0.4f, 0.7f)
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, glowPulse * 0.5f)
             val segments = 36
-            val radius = indicatorSize / 2 * r - 6
+            val radius = indicatorSize / 2
             for (i in 0 until segments) {
                 val angle1 = (i.toFloat() / segments) * MathUtils.PI2
                 val angle2 = ((i + 1).toFloat() / segments) * MathUtils.PI2
@@ -108,24 +119,26 @@ class CalibrationRenderer : Disposable {
                     indicatorCenterY + radius * MathUtils.sin(angle1),
                     centerX + radius * MathUtils.cos(angle2),
                     indicatorCenterY + radius * MathUtils.sin(angle2),
-                    1.5f
+                    4f
                 )
             }
         }
 
-        // Crosshair
-        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.25f)
-        ui.shapes.rectLine(centerX - indicatorSize / 2 + 12, indicatorCenterY,
-            centerX + indicatorSize / 2 - 12, indicatorCenterY, 2f)
-        ui.shapes.rectLine(centerX, indicatorCenterY - indicatorSize / 2 + 12,
-            centerX, indicatorCenterY + indicatorSize / 2 - 12, 2f)
-
-        // Target zone (center) with pulsing effect
-        val targetPulse = UITheme.Anim.pulse(2f, 0.4f, 0.65f)
-        ui.shapes.color = UITheme.withAlpha(UITheme.accent, targetPulse * 0.35f)
-        ui.shapes.circle(centerX, indicatorCenterY, 38f * scale)
-        ui.shapes.color = UITheme.withAlpha(UITheme.accent, targetPulse * 0.6f)
-        ui.shapes.circle(centerX, indicatorCenterY, 20f * scale)
+        // Simple grid - just one circle
+        ui.shapes.color = UITheme.withAlpha(UITheme.textMuted, 0.15f)
+        val segments = 36
+        val radius = indicatorSize / 2 * 0.5f
+        for (i in 0 until segments) {
+            val angle1 = (i.toFloat() / segments) * MathUtils.PI2
+            val angle2 = ((i + 1).toFloat() / segments) * MathUtils.PI2
+            ui.shapes.rectLine(
+                centerX + radius * MathUtils.cos(angle1),
+                indicatorCenterY + radius * MathUtils.sin(angle1),
+                centerX + radius * MathUtils.cos(angle2),
+                indicatorCenterY + radius * MathUtils.sin(angle2),
+                1.5f
+            )
+        }
 
         // Dot trail with larger dots
         for (i in dotTrailX.indices) {
@@ -144,23 +157,19 @@ class CalibrationRenderer : Disposable {
         val dotX = centerX + normalizedY * indicatorSize / 2 * 0.8f
         val dotY = indicatorCenterY - normalizedX * indicatorSize / 2 * 0.8f
 
-        // Is centered?
-        val distFromCenter = Vector2.dst(dotX, dotY, centerX, indicatorCenterY)
-        val isCentered = distFromCenter < 30f * scale
-
         // Dot shadow
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.45f)
         ui.shapes.circle(dotX + 3, dotY - 3, 16f * scale)
 
-        // Dot glow when centered
-        if (isCentered) {
+        // Dot glow when stable
+        if (isStable) {
             val glowPulse = UITheme.Anim.pulse(4f, 0.35f, 0.7f)
             ui.shapes.color = UITheme.withAlpha(UITheme.accent, glowPulse)
             ui.shapes.circle(dotX, dotY, 26f * scale)
         }
 
-        // Main dot - larger for visibility
-        val dotColor = if (isCentered) UITheme.accent else UITheme.cyan
+        // Main dot - color shows stability
+        val dotColor = if (isStable) UITheme.accent else UITheme.cyan
         ui.shapes.color = dotColor
         ui.shapes.circle(dotX, dotY, 14f * scale)
 
@@ -184,7 +193,7 @@ class CalibrationRenderer : Disposable {
         calibrateButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
         skipButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
 
-        ui.button(calibrateButton, UITheme.accent, glowIntensity = calibrateHover * 0.7f + (if (isCentered) 0.35f else 0f))
+        ui.button(calibrateButton, UITheme.accent, glowIntensity = calibrateHover * 0.7f + (if (isStable) 0.35f else 0f))
         ui.button(skipButton, UITheme.surfaceLight, glowIntensity = skipHover * 0.4f)
 
         ui.endShapes()
@@ -193,17 +202,20 @@ class CalibrationRenderer : Disposable {
         ui.beginBatch()
 
         // Title
-        val titleY = panelY + panelHeight - 50f * scale
+        val titleY = panelY + panelHeight - 55f * scale
         ui.textCentered("CALIBRATION", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
-        // Instructions
-        val instrY = titleY - 60f * scale
-        ui.textCentered("Hold device in playing position", centerX, instrY, UIFonts.body, UITheme.textSecondary)
+        // Instructions - clearer explanation with more spacing
+        val instrY = titleY - 70f * scale
+        ui.textCentered("Hold phone as you will during gameplay", centerX, instrY, UIFonts.body, UITheme.textSecondary)
 
-        val instrY2 = instrY - 40f * scale
-        val hintColor = if (isCentered) UITheme.accent else UITheme.textMuted
-        val hintText = if (isCentered) "Centered! Tap CALIBRATE" else "Center the dot, then tap CALIBRATE"
-        ui.textCentered(hintText, centerX, instrY2, UIFonts.caption, hintColor)
+        val instrY2 = instrY - 50f * scale
+        ui.textCentered("This position = neutral (no lean)", centerX, instrY2, UIFonts.caption, UITheme.textMuted)
+
+        val instrY3 = instrY2 - 55f * scale
+        val hintColor = if (isStable) UITheme.accent else UITheme.textMuted
+        val hintText = if (isStable) "Ready! Tap CALIBRATE" else "Hold steady..."
+        ui.textCentered(hintText, centerX, instrY3, UIFonts.body, hintColor)
 
         // Accelerometer values
         val valuesY = indicatorCenterY - indicatorSize / 2 - 30f * scale
@@ -251,5 +263,26 @@ class CalibrationRenderer : Disposable {
 
     override fun dispose() {
         ui.dispose()
+    }
+
+    /**
+     * Calculate how much the device has moved recently by analyzing the trail.
+     * Returns a value representing movement magnitude (0 = perfectly still).
+     */
+    private fun calculateRecentMovement(): Float {
+        if (dotTrailX.size < 2) return 0f
+
+        var totalMovement = 0f
+        // Compare recent trail positions to detect movement
+        for (i in 0 until dotTrailX.size - 1) {
+            val idx1 = (trailIndex - i + dotTrailX.size) % dotTrailX.size
+            val idx2 = (trailIndex - i - 1 + dotTrailX.size) % dotTrailX.size
+
+            val dx = dotTrailX[idx1] - dotTrailX[idx2]
+            val dy = dotTrailY[idx1] - dotTrailY[idx2]
+            totalMovement += kotlin.math.sqrt(dx * dx + dy * dy)
+        }
+
+        return totalMovement
     }
 }

@@ -723,29 +723,57 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createFlowerBedModel(): Model {
+    /**
+     * Create a flower bed with variable length and width.
+     * @param segments Number of segments along length (3-6)
+     * @param rows Number of flower rows for width (2-4)
+     */
+    fun createFlowerBedModel(segments: Int = 4, rows: Int = 2): Model {
         modelBuilder.begin()
 
         val dirtMaterial = Material(ColorAttribute.createDiffuse(dirtColor))
 
-        // Dirt bed
+        // Each segment is ~0.8m wide, total length based on segment count
+        val segmentWidth = 0.8f
+        val rowSpacing = 0.3f  // Space between flower rows
+        val totalLength = segmentWidth * segments
+        val totalDepth = rowSpacing * (rows - 1) + 0.3f  // Extra padding
+        val startX = -totalLength / 2 + segmentWidth / 2
+
+        // Dirt bed - full size
         val bedPart = modelBuilder.part("bed", GL20.GL_TRIANGLES, attributes, dirtMaterial)
         bedPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.05f, 0f))
-        bedPart.box(1.5f, 0.1f, 0.8f)
+        bedPart.box(totalLength, 0.1f, totalDepth)
 
-        // Some simple flowers (small colored spheres)
+        // Flower colors
         val flowerColors = listOf(
             Color(0.9f, 0.3f, 0.3f, 1f),  // Red
             Color(0.9f, 0.9f, 0.3f, 1f),  // Yellow
             Color(0.9f, 0.5f, 0.8f, 1f),  // Pink
+            Color(0.6f, 0.3f, 0.9f, 1f),  // Purple
+            Color(1.0f, 0.6f, 0.2f, 1f),  // Orange
         )
+
+        // Calculate Z positions for flower rows
+        val rowPositions = mutableListOf<Float>()
+        val startZ = -totalDepth / 2 + 0.15f
+        for (r in 0 until rows) {
+            rowPositions.add(startZ + r * rowSpacing)
+        }
+
+        // Add flowers to each segment and row
         var flowerIndex = 0
-        for (x in listOf(-0.4f, 0f, 0.4f)) {
-            for (z in listOf(-0.2f, 0.2f)) {
+        for (seg in 0 until segments) {
+            val segCenterX = startX + seg * segmentWidth
+
+            for (z in rowPositions) {
+                // Slight random offset within segment
+                val offsetX = (seg % 2) * 0.1f - 0.05f
+                val offsetZ = ((seg + flowerIndex) % 2) * 0.05f - 0.025f
                 val flowerMaterial = Material(ColorAttribute.createDiffuse(flowerColors[flowerIndex % flowerColors.size]))
                 val flowerPart = modelBuilder.part("flower_$flowerIndex", GL20.GL_TRIANGLES, attributes, flowerMaterial)
-                flowerPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(x, 0.2f, z))
-                flowerPart.sphere(0.12f, 0.12f, 0.12f, 6, 6)
+                flowerPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(segCenterX + offsetX, 0.18f, z + offsetZ))
+                flowerPart.sphere(0.1f, 0.1f, 0.1f, 6, 6)
                 flowerIndex++
             }
         }

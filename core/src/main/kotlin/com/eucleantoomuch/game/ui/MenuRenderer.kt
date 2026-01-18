@@ -102,37 +102,6 @@ class MenuRenderer : Disposable {
             ui.shapes.circle(p.x * sw, p.y * sh, p.size * scale)
         }
 
-        // Decorative EUC wheel silhouette (left side)
-        val wheelX = centerX - 280 * scale * enterAnimProgress
-        val wheelY = centerY + 20 * scale
-        val wheelRadius = 140f * scale * enterAnimProgress
-
-        // Outer wheel rim
-        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.25f)
-        ui.shapes.circle(wheelX, wheelY, wheelRadius)
-        // Inner wheel
-        ui.shapes.color = UITheme.background
-        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.75f)
-        // Hub
-        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.3f)
-        ui.shapes.circle(wheelX, wheelY, wheelRadius * 0.2f)
-
-        // Animated spokes
-        ui.shapes.color = UITheme.withAlpha(UITheme.surfaceLight, 0.2f)
-        val spokeTime = UITheme.Anim.time() * 0.4f
-        for (i in 0 until 8) {
-            val angle = (i * 45f + spokeTime * 25f) * MathUtils.degreesToRadians
-            val innerR = wheelRadius * 0.22f
-            val outerR = wheelRadius * 0.72f
-            ui.shapes.rectLine(
-                wheelX + innerR * MathUtils.cos(angle),
-                wheelY + innerR * MathUtils.sin(angle),
-                wheelX + outerR * MathUtils.cos(angle),
-                wheelY + outerR * MathUtils.sin(angle),
-                4f * scale
-            )
-        }
-
         // === Buttons ===
         val buttonWidth = 480f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeight
