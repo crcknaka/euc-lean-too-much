@@ -36,7 +36,7 @@ class ProceduralModels : Disposable {
     private val roadLineColor = Color(1f, 1f, 1f, 1f)            // White
     private val manholeColor = Color(0.15f, 0.15f, 0.15f, 1f)    // Very dark
     private val puddleColor = Color(0.3f, 0.4f, 0.6f, 0.7f)      // Blue-ish
-    private val curbColor = Color(0.5f, 0.5f, 0.5f, 1f)          // Gray
+    private val curbColor = Color(0.65f, 0.63f, 0.60f, 1f)       // Light beige-gray (distinct from sidewalk)
     private val potholeColor = Color(0.1f, 0.1f, 0.1f, 1f)       // Black
     private val pedestrianColor = Color(0.8f, 0.4f, 0.3f, 1f)    // Reddish
     private val carColor1 = Color(0.8f, 0.2f, 0.2f, 1f)          // Red

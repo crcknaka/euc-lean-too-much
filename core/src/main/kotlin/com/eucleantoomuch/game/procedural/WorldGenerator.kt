@@ -44,8 +44,10 @@ class WorldGenerator(
     private val carModels = mutableListOf<ModelInstance>()
     private var carGlbAsset: SceneAsset? = null
     private var taxiGlbAsset: SceneAsset? = null
+    private var sportscarGlbAsset: SceneAsset? = null
     private var carGlbScale = 1f  // Scale factor for GLB model to match game units
     private var taxiGlbScale = 1f  // Scale factor for taxi GLB model
+    private var sportscarGlbScale = 1f  // Scale factor for sportscar GLB model
     private var useGlbCars = false  // Flag to track if GLB cars are being used
 
     // Track skyscraper cluster state
@@ -105,8 +107,8 @@ class WorldGenerator(
         // Create zebra crossing model
         zebraCrossingModel = ModelInstance(models.createZebraCrossingModel())
 
-        // Create curb models of varying lengths (3-8 segments, each ~2m)
-        for (segments in 3..8) {
+        // Create curb models of varying lengths (3-20 segments, each ~2m)
+        for (segments in 3..20) {
             val length = segments * 2f
             curbModels[segments] = models.createCurbModel(length)
         }
@@ -157,8 +159,20 @@ class WorldGenerator(
             taxiGlbAsset = null
         }
 
+        // Load sportscar GLB model
+        try {
+            val sportscarFile = Gdx.files.internal("sportscar.glb")
+            sportscarGlbAsset = GLBLoader().load(sportscarFile)
+            val boundingBox = sportscarGlbAsset!!.scene.model.calculateBoundingBox(com.badlogic.gdx.math.collision.BoundingBox())
+            sportscarGlbScale = Constants.CAR_LENGTH / maxOf(boundingBox.depth, boundingBox.width, 0.01f)
+            Gdx.app.log("WorldGenerator", "Sportscar GLB loaded, scale: $sportscarGlbScale")
+        } catch (e: Exception) {
+            Gdx.app.log("WorldGenerator", "sportscar.glb not loaded: ${e.message}")
+            sportscarGlbAsset = null
+        }
+
         // Use GLB cars if at least one model loaded
-        useGlbCars = carGlbAsset != null || taxiGlbAsset != null
+        useGlbCars = carGlbAsset != null || taxiGlbAsset != null || sportscarGlbAsset != null
 
         // Create fallback procedural car models
         for (i in 0..3) {
@@ -1381,11 +1395,10 @@ class WorldGenerator(
                 val staticRoll = MathUtils.random()
                 val x = getRandomLaneX()
                 when {
-                    staticRoll < 0.20f -> createManholeEntity(x, z)
-                    staticRoll < 0.35f -> createPuddleEntity(x, z)
-                    staticRoll < 0.50f -> createPotholeEntity(x, z)
-                    staticRoll < 0.90f -> createCurbEntity(z)  // Curbs are more common (40% chance)
-                    else -> createManholeEntity(x, z)  // Default to manhole
+                    staticRoll < 0.10f -> createManholeEntity(x, z)
+                    staticRoll < 0.15f -> createPuddleEntity(x, z)
+                    staticRoll < 0.20f -> createPotholeEntity(x, z)
+                    else -> createCurbEntity(z)  // Curbs are very common (80% chance)
                 }
             }
         }
@@ -1470,14 +1483,14 @@ class WorldGenerator(
     private fun createCurbEntity(z: Float): Entity {
         val entity = engine.createEntity()
 
-        // Random length 3-8 segments (each segment ~2m)
-        val segments = MathUtils.random(3, 8)
+        // Random length 3-20 segments (each segment ~2m, so 6-40 meters)
+        val segments = MathUtils.random(3, 20)
         val length = segments * 2f
         val curbModel = curbModels[segments]!!
 
         // Place curb at edge of road
         val side = if (MathUtils.randomBoolean()) -1 else 1
-        val x = side * (Constants.ROAD_WIDTH / 2 - 0.3f)
+        val x = side * (Constants.ROAD_WIDTH / 2 - 0.1f)
 
         // Center the curb at z position (so it extends forward and backward)
         entity.add(TransformComponent().apply { position.set(x, 0f, z + length / 2f) })
@@ -1545,10 +1558,15 @@ class WorldGenerator(
         // If opposite direction, start further ahead so player can see them coming
         val startZ = if (direction == 1) z + 30f else z + 80f
 
-        // Randomly choose between car1 and taxi GLB models
-        val useTaxi = taxiGlbAsset != null && (carGlbAsset == null || MathUtils.randomBoolean())
-        val chosenAsset = if (useTaxi) taxiGlbAsset else carGlbAsset
-        val chosenScale = if (useTaxi) taxiGlbScale else carGlbScale
+        // Randomly choose between car1, taxi, and sportscar GLB models
+        val availableAssets = mutableListOf<Triple<SceneAsset, Float, String>>()
+        carGlbAsset?.let { availableAssets.add(Triple(it, carGlbScale, "car")) }
+        taxiGlbAsset?.let { availableAssets.add(Triple(it, taxiGlbScale, "taxi")) }
+        sportscarGlbAsset?.let { availableAssets.add(Triple(it, sportscarGlbScale, "sportscar")) }
+
+        val chosen = if (availableAssets.isNotEmpty()) availableAssets.random() else null
+        val chosenAsset = chosen?.first
+        val chosenScale = chosen?.second ?: 1f
 
         // Apply scale for GLB model (100x bigger for testing)
         entity.add(TransformComponent().apply {
@@ -1621,5 +1639,6 @@ class WorldGenerator(
     fun dispose() {
         carGlbAsset?.dispose()
         taxiGlbAsset?.dispose()
+        sportscarGlbAsset?.dispose()
     }
 }
