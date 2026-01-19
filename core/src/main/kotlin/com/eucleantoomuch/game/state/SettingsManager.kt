@@ -18,6 +18,14 @@ class SettingsManager {
         private const val KEY_MAX_FPS = "maxFps"
         private const val KEY_SELECTED_WHEEL = "selectedWheel"
         private const val KEY_MUSIC_ENABLED = "musicEnabled"
+        private const val KEY_GRAPHICS_PRESET = "graphicsPreset"
+        private const val KEY_SHADOWS_ENABLED = "shadowsEnabled"
+
+        // Graphics presets: 0 = Normal (no post-processing), 1 = High (all effects)
+        val GRAPHICS_PRESET_OPTIONS = listOf(
+            "Normal" to 0,
+            "High" to 1
+        )
 
         // Max FPS options (0 = unlimited/120+)
         val MAX_FPS_OPTIONS = listOf(
@@ -182,4 +190,37 @@ class SettingsManager {
     fun getRenderDistanceName(): String {
         return RENDER_DISTANCE_OPTIONS.getOrNull(getRenderDistanceIndex())?.first ?: "Medium"
     }
+
+    // Graphics preset (0 = Normal, 1 = High)
+    var graphicsPreset: Int
+        get() = prefs.getInteger(KEY_GRAPHICS_PRESET, 1)  // Default to High
+        set(value) {
+            prefs.putInteger(KEY_GRAPHICS_PRESET, value)
+            prefs.flush()
+        }
+
+    fun getGraphicsPresetIndex(): Int {
+        val current = graphicsPreset
+        return GRAPHICS_PRESET_OPTIONS.indexOfFirst { it.second == current }.takeIf { it >= 0 } ?: 1  // Default to High
+    }
+
+    fun setGraphicsPresetByIndex(index: Int) {
+        if (index in GRAPHICS_PRESET_OPTIONS.indices) {
+            graphicsPreset = GRAPHICS_PRESET_OPTIONS[index].second
+        }
+    }
+
+    fun getGraphicsPresetName(): String {
+        return GRAPHICS_PRESET_OPTIONS.getOrNull(getGraphicsPresetIndex())?.first ?: "High"
+    }
+
+    fun isPostProcessingEnabled(): Boolean = graphicsPreset == 1
+
+    // Shadows on/off
+    var shadowsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SHADOWS_ENABLED, true)  // Default on
+        set(value) {
+            prefs.putBoolean(KEY_SHADOWS_ENABLED, value)
+            prefs.flush()
+        }
 }

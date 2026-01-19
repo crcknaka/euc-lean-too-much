@@ -7,47 +7,61 @@ import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.state.SettingsManager
 
 /**
- * Modern settings screen with large, touch-friendly controls.
- * Two-column layout for better space usage.
+ * Modern settings screen with tab-based navigation.
+ * Graphics tab: Render Distance, Max FPS, Show FPS
+ * Gameplay tab: AVAS, Music, Beeps
  */
 class SettingsRenderer(private val settingsManager: SettingsManager) : Disposable {
     private val ui = UIRenderer()
 
+    // Tabs
+    private var currentTab = 0  // 0 = Graphics, 1 = Gameplay
+    private val graphicsTabButton = Rectangle()
+    private val gameplayTabButton = Rectangle()
+
+    // Back button
     private val backButton = Rectangle()
 
-    // Left column controls
+    // Graphics tab controls
+    private val graphicsPresetLeftButton = Rectangle()
+    private val graphicsPresetRightButton = Rectangle()
     private val renderDistanceLeftButton = Rectangle()
     private val renderDistanceRightButton = Rectangle()
     private val maxFpsLeftButton = Rectangle()
     private val maxFpsRightButton = Rectangle()
-    private val pwmWarningLeftButton = Rectangle()
-    private val pwmWarningRightButton = Rectangle()
-
-    // Right column controls
-    private val avasLeftButton = Rectangle()
-    private val avasRightButton = Rectangle()
-    private val beepsCheckbox = Rectangle()
-    private val musicCheckbox = Rectangle()
+    private val shadowsCheckbox = Rectangle()
     private val fpsCheckbox = Rectangle()
 
+    // Gameplay tab controls
+    private val avasLeftButton = Rectangle()
+    private val avasRightButton = Rectangle()
+    private val musicCheckbox = Rectangle()
+    private val beepsCheckbox = Rectangle()
+
+    // Footer links
     private val privacyPolicyButton = Rectangle()
     private val termsButton = Rectangle()
 
-    // Hover states - left column
+    // Hover states
     private var backButtonHover = 0f
+    private var graphicsTabHover = 0f
+    private var gameplayTabHover = 0f
+
+    // Graphics tab hovers
+    private var presetLeftButtonHover = 0f
+    private var presetRightButtonHover = 0f
     private var renderLeftButtonHover = 0f
     private var renderRightButtonHover = 0f
     private var maxFpsLeftButtonHover = 0f
     private var maxFpsRightButtonHover = 0f
-    private var pwmLeftButtonHover = 0f
-    private var pwmRightButtonHover = 0f
+    private var shadowsCheckboxHover = 0f
+    private var fpsCheckboxHover = 0f
 
-    // Hover states - right column
+    // Gameplay tab hovers
     private var avasLeftButtonHover = 0f
     private var avasRightButtonHover = 0f
-    private var beepsCheckboxHover = 0f
     private var musicCheckboxHover = 0f
-    private var fpsCheckboxHover = 0f
+    private var beepsCheckboxHover = 0f
 
     private var privacyButtonHover = 0f
     private var termsButtonHover = 0f
@@ -78,36 +92,49 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val touchX = Gdx.input.x.toFloat()
         val touchY = sh - Gdx.input.y.toFloat()
 
-        // Update all hover states
+        // Update hover states
         val backHovered = backButton.contains(touchX, touchY)
-        val renderLeftHovered = renderDistanceLeftButton.contains(touchX, touchY)
-        val renderRightHovered = renderDistanceRightButton.contains(touchX, touchY)
-        val maxFpsLeftHovered = maxFpsLeftButton.contains(touchX, touchY)
-        val maxFpsRightHovered = maxFpsRightButton.contains(touchX, touchY)
-        val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
-        val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
-        val avasLeftHovered = avasLeftButton.contains(touchX, touchY)
-        val avasRightHovered = avasRightButton.contains(touchX, touchY)
-        val beepsHovered = beepsCheckbox.contains(touchX, touchY)
-        val musicHovered = musicCheckbox.contains(touchX, touchY)
-        val fpsHovered = fpsCheckbox.contains(touchX, touchY)
+        val graphicsTabHovered = graphicsTabButton.contains(touchX, touchY)
+        val gameplayTabHovered = gameplayTabButton.contains(touchX, touchY)
         val privacyHovered = privacyPolicyButton.contains(touchX, touchY)
         val termsHovered = termsButton.contains(touchX, touchY)
 
         backButtonHover = UITheme.Anim.ease(backButtonHover, if (backHovered) 1f else 0f, 10f)
-        renderLeftButtonHover = UITheme.Anim.ease(renderLeftButtonHover, if (renderLeftHovered) 1f else 0f, 10f)
-        renderRightButtonHover = UITheme.Anim.ease(renderRightButtonHover, if (renderRightHovered) 1f else 0f, 10f)
-        maxFpsLeftButtonHover = UITheme.Anim.ease(maxFpsLeftButtonHover, if (maxFpsLeftHovered) 1f else 0f, 10f)
-        maxFpsRightButtonHover = UITheme.Anim.ease(maxFpsRightButtonHover, if (maxFpsRightHovered) 1f else 0f, 10f)
-        pwmLeftButtonHover = UITheme.Anim.ease(pwmLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 10f)
-        pwmRightButtonHover = UITheme.Anim.ease(pwmRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
-        avasLeftButtonHover = UITheme.Anim.ease(avasLeftButtonHover, if (avasLeftHovered) 1f else 0f, 10f)
-        avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
-        beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
-        musicCheckboxHover = UITheme.Anim.ease(musicCheckboxHover, if (musicHovered) 1f else 0f, 10f)
-        fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 10f)
+        graphicsTabHover = UITheme.Anim.ease(graphicsTabHover, if (graphicsTabHovered) 1f else 0f, 10f)
+        gameplayTabHover = UITheme.Anim.ease(gameplayTabHover, if (gameplayTabHovered) 1f else 0f, 10f)
         privacyButtonHover = UITheme.Anim.ease(privacyButtonHover, if (privacyHovered) 1f else 0f, 10f)
         termsButtonHover = UITheme.Anim.ease(termsButtonHover, if (termsHovered) 1f else 0f, 10f)
+
+        // Tab-specific hover updates
+        if (currentTab == 0) {
+            val presetLeftHovered = graphicsPresetLeftButton.contains(touchX, touchY)
+            val presetRightHovered = graphicsPresetRightButton.contains(touchX, touchY)
+            val renderLeftHovered = renderDistanceLeftButton.contains(touchX, touchY)
+            val renderRightHovered = renderDistanceRightButton.contains(touchX, touchY)
+            val maxFpsLeftHovered = maxFpsLeftButton.contains(touchX, touchY)
+            val maxFpsRightHovered = maxFpsRightButton.contains(touchX, touchY)
+            val shadowsHovered = shadowsCheckbox.contains(touchX, touchY)
+            val fpsHovered = fpsCheckbox.contains(touchX, touchY)
+
+            presetLeftButtonHover = UITheme.Anim.ease(presetLeftButtonHover, if (presetLeftHovered) 1f else 0f, 10f)
+            presetRightButtonHover = UITheme.Anim.ease(presetRightButtonHover, if (presetRightHovered) 1f else 0f, 10f)
+            renderLeftButtonHover = UITheme.Anim.ease(renderLeftButtonHover, if (renderLeftHovered) 1f else 0f, 10f)
+            renderRightButtonHover = UITheme.Anim.ease(renderRightButtonHover, if (renderRightHovered) 1f else 0f, 10f)
+            maxFpsLeftButtonHover = UITheme.Anim.ease(maxFpsLeftButtonHover, if (maxFpsLeftHovered) 1f else 0f, 10f)
+            maxFpsRightButtonHover = UITheme.Anim.ease(maxFpsRightButtonHover, if (maxFpsRightHovered) 1f else 0f, 10f)
+            shadowsCheckboxHover = UITheme.Anim.ease(shadowsCheckboxHover, if (shadowsHovered) 1f else 0f, 10f)
+            fpsCheckboxHover = UITheme.Anim.ease(fpsCheckboxHover, if (fpsHovered) 1f else 0f, 10f)
+        } else {
+            val avasLeftHovered = avasLeftButton.contains(touchX, touchY)
+            val avasRightHovered = avasRightButton.contains(touchX, touchY)
+            val musicHovered = musicCheckbox.contains(touchX, touchY)
+            val beepsHovered = beepsCheckbox.contains(touchX, touchY)
+
+            avasLeftButtonHover = UITheme.Anim.ease(avasLeftButtonHover, if (avasLeftHovered) 1f else 0f, 10f)
+            avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
+            musicCheckboxHover = UITheme.Anim.ease(musicCheckboxHover, if (musicHovered) 1f else 0f, 10f)
+            beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
+        }
 
         // === Draw Background ===
         ui.beginShapes()
@@ -123,122 +150,146 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             ui.shapes.rect(0f, stripY, sw, stripHeight)
         }
 
-        // Main settings panel - wider for two columns
-        val panelWidth = 900f * scale * enterAnimProgress
-        val panelHeight = 700f * scale * enterAnimProgress
+        // Main settings panel
+        val panelWidth = 620f * scale * enterAnimProgress
+        val panelHeight = 850f * scale * enterAnimProgress
         val panelX = centerX - panelWidth / 2
-        val panelY = sh / 2 - panelHeight / 2 + 80f * scale
+        val panelY = sh / 2 - panelHeight / 2 + 30f * scale
 
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             radius = UITheme.Dimensions.panelRadius,
             backgroundColor = UITheme.surface)
 
-        // Column dimensions
-        val columnWidth = panelWidth / 2 - 30f * scale
-        val leftColumnX = panelX + 30f * scale
-        val rightColumnX = centerX + 15f * scale
-        val rowHeight = 110f * scale
+        // === Tab Bar ===
+        val tabBarY = panelY + panelHeight - 150f * scale
+        val tabWidth = (panelWidth - 80f * scale) / 2
+        val tabHeight = 54f * scale
+        val tabStartX = panelX + 40f * scale
+
+        // Graphics tab
+        graphicsTabButton.set(tabStartX, tabBarY, tabWidth, tabHeight)
+        val graphicsTabColor = if (currentTab == 0) UITheme.accent else UITheme.surfaceLight
+        val graphicsTabGlow = if (currentTab == 0) 0.3f else graphicsTabHover * 0.2f
+        ui.roundedRect(graphicsTabButton.x, graphicsTabButton.y, graphicsTabButton.width, graphicsTabButton.height,
+            12f * scale, graphicsTabColor)
+        if (graphicsTabGlow > 0.01f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, graphicsTabGlow)
+            ui.roundedRect(graphicsTabButton.x - 2f, graphicsTabButton.y - 2f,
+                graphicsTabButton.width + 4f, graphicsTabButton.height + 4f, 14f * scale, ui.shapes.color)
+        }
+
+        // Gameplay tab
+        gameplayTabButton.set(tabStartX + tabWidth + 16f * scale, tabBarY, tabWidth, tabHeight)
+        val gameplayTabColor = if (currentTab == 1) UITheme.accent else UITheme.surfaceLight
+        val gameplayTabGlow = if (currentTab == 1) 0.3f else gameplayTabHover * 0.2f
+        ui.roundedRect(gameplayTabButton.x, gameplayTabButton.y, gameplayTabButton.width, gameplayTabButton.height,
+            12f * scale, gameplayTabColor)
+        if (gameplayTabGlow > 0.01f) {
+            ui.shapes.color = UITheme.withAlpha(UITheme.accent, gameplayTabGlow)
+            ui.roundedRect(gameplayTabButton.x - 2f, gameplayTabButton.y - 2f,
+                gameplayTabButton.width + 4f, gameplayTabButton.height + 4f, 14f * scale, ui.shapes.color)
+        }
+
+        // === Tab Content Area ===
+        val contentStartY = tabBarY - 70f * scale
+        val contentCenterX = panelX + panelWidth / 2
+        val rowHeight = 130f * scale
         val arrowButtonSize = UITheme.Dimensions.arrowButtonSize
-        val valueBoxWidth = 180f * scale
+        val valueBoxWidth = 160f * scale
         val checkboxSize = UITheme.Dimensions.checkboxSize
 
-        // === LEFT COLUMN ===
-        val leftColCenterX = leftColumnX + columnWidth / 2
+        if (currentTab == 0) {
+            // === GRAPHICS TAB ===
 
-        // Render Distance Setting (more space from SETTINGS title)
-        val renderDistanceY = panelY + panelHeight - 220f * scale
-        renderSelectorSetting(
-            leftColCenterX, renderDistanceY, valueBoxWidth, arrowButtonSize,
-            renderDistanceLeftButton, renderDistanceRightButton,
-            renderLeftButtonHover, renderRightButtonHover
-        )
+            // Graphics Preset (Normal / High)
+            val graphicsPresetY = contentStartY - 50f * scale
+            renderSelectorSetting(
+                contentCenterX, graphicsPresetY, valueBoxWidth, arrowButtonSize,
+                graphicsPresetLeftButton, graphicsPresetRightButton,
+                presetLeftButtonHover, presetRightButtonHover
+            )
 
-        // Max FPS Setting
-        val maxFpsY = renderDistanceY - rowHeight
-        renderSelectorSetting(
-            leftColCenterX, maxFpsY, valueBoxWidth, arrowButtonSize,
-            maxFpsLeftButton, maxFpsRightButton,
-            maxFpsLeftButtonHover, maxFpsRightButtonHover
-        )
+            // Render Distance
+            val renderDistanceY = graphicsPresetY - rowHeight
+            renderSelectorSetting(
+                contentCenterX, renderDistanceY, valueBoxWidth, arrowButtonSize,
+                renderDistanceLeftButton, renderDistanceRightButton,
+                renderLeftButtonHover, renderRightButtonHover
+            )
 
-        // PWM Warning Setting
-        val pwmY = maxFpsY - rowHeight
-        renderSelectorSetting(
-            leftColCenterX, pwmY, valueBoxWidth, arrowButtonSize,
-            pwmWarningLeftButton, pwmWarningRightButton,
-            pwmLeftButtonHover, pwmRightButtonHover
-        )
+            // Max FPS
+            val maxFpsY = renderDistanceY - rowHeight
+            renderSelectorSetting(
+                contentCenterX, maxFpsY, valueBoxWidth, arrowButtonSize,
+                maxFpsLeftButton, maxFpsRightButton,
+                maxFpsLeftButtonHover, maxFpsRightButtonHover
+            )
 
-        // === RIGHT COLUMN ===
-        val rightColCenterX = rightColumnX + columnWidth / 2
+            // Shadows & Show FPS Checkboxes (same row)
+            val checkboxRowY = maxFpsY - rowHeight
+            val checkboxLeftX = panelX + 60f * scale  // Shadows on left
+            val checkboxRightX = contentCenterX + 40f * scale  // Show FPS on right
 
-        // AVAS Setting (more space from SETTINGS title)
-        val avasY = panelY + panelHeight - 220f * scale
-        renderSelectorSetting(
-            rightColCenterX, avasY, valueBoxWidth, arrowButtonSize,
-            avasLeftButton, avasRightButton,
-            avasLeftButtonHover, avasRightButtonHover
-        )
+            shadowsCheckbox.set(checkboxLeftX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+            renderCheckbox(shadowsCheckbox, shadowsCheckboxHover, settingsManager.shadowsEnabled)
 
-        // Checkboxes row positions - centered in right column
-        val checkboxRowY = avasY - rowHeight
-        val checkboxLabelOffset = checkboxSize + 16f * scale
-        val checkboxTotalWidth = checkboxSize + checkboxLabelOffset + 80f * scale  // checkbox + gap + label width estimate
-        val checkboxStartX = rightColCenterX - checkboxTotalWidth / 2
+            fpsCheckbox.set(checkboxRightX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+            renderCheckbox(fpsCheckbox, fpsCheckboxHover, settingsManager.showFps)
 
-        // Music Checkbox
-        musicCheckbox.set(checkboxStartX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
-        renderCheckbox(musicCheckbox, musicCheckboxHover, settingsManager.musicEnabled)
+        } else {
+            // === GAMEPLAY TAB ===
 
-        // Beeps Checkbox
-        val beepsY = checkboxRowY - 70f * scale
-        beepsCheckbox.set(checkboxStartX, beepsY - checkboxSize / 2, checkboxSize, checkboxSize)
-        renderCheckbox(beepsCheckbox, beepsCheckboxHover, settingsManager.beepsEnabled)
+            // AVAS
+            val avasY = contentStartY - 50f * scale
+            renderSelectorSetting(
+                contentCenterX, avasY, valueBoxWidth, arrowButtonSize,
+                avasLeftButton, avasRightButton,
+                avasLeftButtonHover, avasRightButtonHover
+            )
 
-        // FPS Checkbox
-        val fpsY = beepsY - 70f * scale
-        fpsCheckbox.set(checkboxStartX, fpsY - checkboxSize / 2, checkboxSize, checkboxSize)
-        renderCheckbox(fpsCheckbox, fpsCheckboxHover, settingsManager.showFps)
+            // Music & Beeps Checkboxes (same row)
+            val checkboxRowY = avasY - rowHeight
+            val checkboxLeftX = panelX + 60f * scale  // Music on left
+            val checkboxRightX = contentCenterX + 40f * scale  // Beeps on right
 
-        // Privacy Policy and Terms buttons (inside panel, above back button)
-        val privacyButtonWidth = 190f * scale  // Wider for "Privacy Policy" text
-        val termsButtonWidth = 120f * scale
-        val linkButtonHeight = 40f * scale
-        val linkButtonY = panelY + 50f * scale  // Inside panel near bottom
-        val linkButtonSpacing = 20f * scale
+            musicCheckbox.set(checkboxLeftX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+            renderCheckbox(musicCheckbox, musicCheckboxHover, settingsManager.musicEnabled)
+
+            beepsCheckbox.set(checkboxRightX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+            renderCheckbox(beepsCheckbox, beepsCheckboxHover, settingsManager.beepsEnabled)
+        }
+
+        // === Footer Links (Privacy & Terms) ===
+        val linkButtonHeight = 38f * scale
+        val linkButtonY = panelY + 30f * scale
+        val privacyButtonWidth = 150f * scale
+        val termsButtonWidth = 100f * scale
+        val linkSpacing = 16f * scale
 
         privacyPolicyButton.set(
-            centerX - privacyButtonWidth - linkButtonSpacing / 2,
+            contentCenterX - privacyButtonWidth - linkSpacing / 2,
             linkButtonY,
             privacyButtonWidth,
             linkButtonHeight
         )
-        ui.panel(
-            privacyPolicyButton.x, privacyPolicyButton.y,
-            privacyPolicyButton.width, privacyPolicyButton.height,
-            radius = 8f * scale,
-            backgroundColor = UITheme.surfaceLight,
-            shadowOffset = 0f
-        )
+        val privacyBgColor = if (privacyButtonHover > 0.5f) UITheme.surfaceBorder else UITheme.surfaceLight
+        ui.roundedRect(privacyPolicyButton.x, privacyPolicyButton.y,
+            privacyPolicyButton.width, privacyPolicyButton.height, 8f * scale, privacyBgColor)
 
         termsButton.set(
-            centerX + linkButtonSpacing / 2,
+            contentCenterX + linkSpacing / 2,
             linkButtonY,
             termsButtonWidth,
             linkButtonHeight
         )
-        ui.panel(
-            termsButton.x, termsButton.y,
-            termsButton.width, termsButton.height,
-            radius = 8f * scale,
-            backgroundColor = UITheme.surfaceLight,
-            shadowOffset = 0f
-        )
+        val termsBgColor = if (termsButtonHover > 0.5f) UITheme.surfaceBorder else UITheme.surfaceLight
+        ui.roundedRect(termsButton.x, termsButton.y,
+            termsButton.width, termsButton.height, 8f * scale, termsBgColor)
 
         // Back button (below panel)
-        val buttonWidth = 340f * scale
+        val buttonWidth = 300f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 30f * scale, buttonWidth, buttonHeight)
+        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 35f * scale, buttonWidth, buttonHeight)
         ui.button(backButton, UITheme.accent, glowIntensity = backButtonHover * 0.8f)
 
         ui.endShapes()
@@ -246,127 +297,161 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // === Draw Text ===
         ui.beginBatch()
 
-        // Title (more space above)
-        val titleY = panelY + panelHeight - 80f * scale
+        // Title
+        val titleY = panelY + panelHeight - 60f * scale
         ui.textCentered("SETTINGS", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
-        // === LEFT COLUMN TEXT ===
+        // Tab labels
+        val tabTextColor = UITheme.textPrimary
+        ui.textCentered("Graphics", graphicsTabButton.x + graphicsTabButton.width / 2,
+            graphicsTabButton.y + graphicsTabButton.height / 2, UIFonts.body, tabTextColor)
+        ui.textCentered("Gameplay", gameplayTabButton.x + gameplayTabButton.width / 2,
+            gameplayTabButton.y + gameplayTabButton.height / 2, UIFonts.body, tabTextColor)
 
-        // Render Distance
-        ui.textCentered("Render Distance", leftColCenterX, renderDistanceY + 55f * scale, UIFonts.body, UITheme.textSecondary)
-        renderArrowText(renderDistanceLeftButton, renderDistanceRightButton)
-        ui.textCentered(settingsManager.getRenderDistanceName(), leftColCenterX, renderDistanceY, UIFonts.body, UITheme.accent)
+        // Tab content text
+        val checkboxLabelOffset = checkboxSize + 16f * scale
 
-        // Max FPS
-        ui.textCentered("Max FPS", leftColCenterX, maxFpsY + 55f * scale, UIFonts.body, UITheme.textSecondary)
-        renderArrowText(maxFpsLeftButton, maxFpsRightButton)
-        ui.textCentered(settingsManager.getMaxFpsName(), leftColCenterX, maxFpsY, UIFonts.body, UITheme.accent)
+        if (currentTab == 0) {
+            // === GRAPHICS TAB TEXT ===
+            val graphicsPresetY = contentStartY - 50f * scale
+            ui.textCentered("Graphics Quality", contentCenterX, graphicsPresetY + 50f * scale, UIFonts.body, UITheme.textSecondary)
+            renderArrowText(graphicsPresetLeftButton, graphicsPresetRightButton)
+            ui.textCentered(settingsManager.getGraphicsPresetName(), contentCenterX, graphicsPresetY, UIFonts.body, UITheme.accent)
 
-        // PWM Warning
-        ui.textCentered("PWM Warning", leftColCenterX, pwmY + 55f * scale, UIFonts.body, UITheme.textSecondary)
-        renderArrowText(pwmWarningLeftButton, pwmWarningRightButton)
-        val pwmTextColor = if (settingsManager.pwmWarning == 95) UITheme.danger else UITheme.accent
-        ui.textCentered(settingsManager.getPwmWarningName(), leftColCenterX, pwmY, UIFonts.body, pwmTextColor)
+            val renderDistanceY = graphicsPresetY - rowHeight
+            ui.textCentered("Render Distance", contentCenterX, renderDistanceY + 50f * scale, UIFonts.body, UITheme.textSecondary)
+            renderArrowText(renderDistanceLeftButton, renderDistanceRightButton)
+            ui.textCentered(settingsManager.getRenderDistanceName(), contentCenterX, renderDistanceY, UIFonts.body, UITheme.accent)
 
-        // === RIGHT COLUMN TEXT ===
+            val maxFpsY = renderDistanceY - rowHeight
+            ui.textCentered("Max FPS", contentCenterX, maxFpsY + 50f * scale, UIFonts.body, UITheme.textSecondary)
+            renderArrowText(maxFpsLeftButton, maxFpsRightButton)
+            ui.textCentered(settingsManager.getMaxFpsName(), contentCenterX, maxFpsY, UIFonts.body, UITheme.accent)
 
-        // AVAS
-        ui.textCentered("AVAS", rightColCenterX, avasY + 55f * scale, UIFonts.body, UITheme.textSecondary)
-        renderArrowText(avasLeftButton, avasRightButton)
-        ui.textCentered(settingsManager.getAvasModeName(), rightColCenterX, avasY, UIFonts.body, UITheme.accent)
+            // Shadows & Show FPS labels (same row)
+            UIFonts.body.color = UITheme.textPrimary
+            UIFonts.body.draw(ui.batch, "Shadows", shadowsCheckbox.x + checkboxLabelOffset,
+                shadowsCheckbox.y + shadowsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+            UIFonts.body.draw(ui.batch, "Show FPS", fpsCheckbox.x + checkboxLabelOffset,
+                fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
 
-        // Checkbox labels
-        UIFonts.body.color = UITheme.textPrimary
-        UIFonts.body.draw(ui.batch, "Music", musicCheckbox.x + checkboxLabelOffset,
-            musicCheckbox.y + musicCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+        } else {
+            // === GAMEPLAY TAB TEXT ===
+            val avasY = contentStartY - 50f * scale
+            ui.textCentered("AVAS Sound", contentCenterX, avasY + 50f * scale, UIFonts.body, UITheme.textSecondary)
+            renderArrowText(avasLeftButton, avasRightButton)
+            ui.textCentered(settingsManager.getAvasModeName(), contentCenterX, avasY, UIFonts.body, UITheme.accent)
 
-        UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + checkboxLabelOffset,
-            beepsCheckbox.y + beepsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+            // Music & Beeps labels (same row)
+            UIFonts.body.color = UITheme.textPrimary
+            UIFonts.body.draw(ui.batch, "Music", musicCheckbox.x + checkboxLabelOffset,
+                musicCheckbox.y + musicCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+            UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + checkboxLabelOffset,
+                beepsCheckbox.y + beepsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+        }
 
-        UIFonts.body.draw(ui.batch, "Show FPS", fpsCheckbox.x + checkboxLabelOffset,
-            fpsCheckbox.y + fpsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+        // Footer link text
+        val linkTextColor = UITheme.textMuted
+        ui.textCentered("Privacy Policy",
+            privacyPolicyButton.x + privacyPolicyButton.width / 2,
+            privacyPolicyButton.y + privacyPolicyButton.height / 2,
+            UIFonts.caption, if (privacyButtonHover > 0.5f) UITheme.accent else linkTextColor)
+        ui.textCentered("Terms",
+            termsButton.x + termsButton.width / 2,
+            termsButton.y + termsButton.height / 2,
+            UIFonts.caption, if (termsButtonHover > 0.5f) UITheme.accent else linkTextColor)
 
         // Back button text
         ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2,
             UIFonts.button, UITheme.textPrimary)
 
-        // Privacy Policy and Terms link text
-        val linkTextColor = if (privacyButtonHover > 0.5f) UITheme.accent else UITheme.textMuted
-        val termsTextColor = if (termsButtonHover > 0.5f) UITheme.accent else UITheme.textMuted
-        ui.textCentered("Privacy Policy",
-            privacyPolicyButton.x + privacyPolicyButton.width / 2,
-            privacyPolicyButton.y + privacyPolicyButton.height / 2,
-            UIFonts.caption, linkTextColor)
-        ui.textCentered("Terms",
-            termsButton.x + termsButton.width / 2,
-            termsButton.y + termsButton.height / 2,
-            UIFonts.caption, termsTextColor)
-
         ui.endBatch()
 
         // === Handle Input ===
         if (Gdx.input.justTouched()) {
+            // Tab switching
+            if (graphicsTabButton.contains(touchX, touchY)) {
+                UIFeedback.tap()
+                currentTab = 0
+            }
+            if (gameplayTabButton.contains(touchX, touchY)) {
+                UIFeedback.tap()
+                currentTab = 1
+            }
+
+            // Back button
             if (backButton.contains(touchX, touchY)) {
                 UIFeedback.click()
                 return Action.BACK
             }
 
-            // Left column - Render Distance
-            val rdIndex = settingsManager.getRenderDistanceIndex()
-            if (renderDistanceLeftButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setRenderDistanceByIndex((rdIndex - 1).coerceAtLeast(0))
-            }
-            if (renderDistanceRightButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setRenderDistanceByIndex((rdIndex + 1).coerceAtMost(SettingsManager.RENDER_DISTANCE_OPTIONS.size - 1))
-            }
+            // Tab-specific input
+            if (currentTab == 0) {
+                // Graphics tab
 
-            // Left column - Max FPS
-            val fpsIndex = settingsManager.getMaxFpsIndex()
-            if (maxFpsLeftButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setMaxFpsByIndex((fpsIndex - 1).coerceAtLeast(0))
-            }
-            if (maxFpsRightButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setMaxFpsByIndex((fpsIndex + 1).coerceAtMost(SettingsManager.MAX_FPS_OPTIONS.size - 1))
-            }
+                // Graphics Preset
+                val presetIndex = settingsManager.getGraphicsPresetIndex()
+                if (graphicsPresetLeftButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setGraphicsPresetByIndex((presetIndex - 1).coerceAtLeast(0))
+                }
+                if (graphicsPresetRightButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setGraphicsPresetByIndex((presetIndex + 1).coerceAtMost(SettingsManager.GRAPHICS_PRESET_OPTIONS.size - 1))
+                }
 
-            // Left column - PWM Warning
-            val pwmIndex = settingsManager.getPwmWarningIndex()
-            if (pwmWarningLeftButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setPwmWarningByIndex((pwmIndex - 1).coerceAtLeast(0))
-            }
-            if (pwmWarningRightButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setPwmWarningByIndex((pwmIndex + 1).coerceAtMost(SettingsManager.PWM_WARNING_OPTIONS.size - 1))
-            }
+                // Render Distance
+                val rdIndex = settingsManager.getRenderDistanceIndex()
+                if (renderDistanceLeftButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setRenderDistanceByIndex((rdIndex - 1).coerceAtLeast(0))
+                }
+                if (renderDistanceRightButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setRenderDistanceByIndex((rdIndex + 1).coerceAtMost(SettingsManager.RENDER_DISTANCE_OPTIONS.size - 1))
+                }
 
-            // Right column - AVAS
-            val avasIndex = settingsManager.getAvasModeIndex()
-            if (avasLeftButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setAvasModeByIndex((avasIndex - 1).coerceAtLeast(0))
-            }
-            if (avasRightButton.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.setAvasModeByIndex((avasIndex + 1).coerceAtMost(SettingsManager.AVAS_OPTIONS.size - 1))
-            }
+                // Max FPS
+                val fpsIndex = settingsManager.getMaxFpsIndex()
+                if (maxFpsLeftButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setMaxFpsByIndex((fpsIndex - 1).coerceAtLeast(0))
+                }
+                if (maxFpsRightButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setMaxFpsByIndex((fpsIndex + 1).coerceAtMost(SettingsManager.MAX_FPS_OPTIONS.size - 1))
+                }
 
-            // Right column - Checkboxes
-            if (musicCheckbox.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.musicEnabled = !settingsManager.musicEnabled
-            }
-            if (beepsCheckbox.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.beepsEnabled = !settingsManager.beepsEnabled
-            }
-            if (fpsCheckbox.contains(touchX, touchY)) {
-                UIFeedback.tap()
-                settingsManager.showFps = !settingsManager.showFps
+                if (shadowsCheckbox.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.shadowsEnabled = !settingsManager.shadowsEnabled
+                }
+
+                if (fpsCheckbox.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.showFps = !settingsManager.showFps
+                }
+
+            } else {
+                // Gameplay tab
+                val avasIndex = settingsManager.getAvasModeIndex()
+                if (avasLeftButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setAvasModeByIndex((avasIndex - 1).coerceAtLeast(0))
+                }
+                if (avasRightButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setAvasModeByIndex((avasIndex + 1).coerceAtMost(SettingsManager.AVAS_OPTIONS.size - 1))
+                }
+
+                if (musicCheckbox.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.musicEnabled = !settingsManager.musicEnabled
+                }
+                if (beepsCheckbox.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.beepsEnabled = !settingsManager.beepsEnabled
+                }
             }
 
             // Links
@@ -384,6 +469,12 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK)) {
             UIFeedback.click()
             return Action.BACK
+        }
+
+        // Tab switching with keyboard
+        if (Gdx.input.isKeyJustPressed(Input.Keys.TAB)) {
+            UIFeedback.tap()
+            currentTab = (currentTab + 1) % 2
         }
 
         return Action.NONE
@@ -415,9 +506,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // Value box
         ui.panel(
             centerX - valueBoxWidth / 2,
-            y - 35f * scale,
+            y - 32f * scale,
             valueBoxWidth,
-            70f * scale,
+            64f * scale,
             radius = 12f * scale,
             backgroundColor = UITheme.surfaceLight,
             shadowOffset = 0f

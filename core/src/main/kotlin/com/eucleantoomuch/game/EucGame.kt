@@ -246,6 +246,12 @@ class EucGame(
         // Apply saved render distance setting
         applyRenderDistance()
 
+        // Apply graphics preset (post-processing on/off)
+        applyGraphicsPreset()
+
+        // Apply shadows setting
+        applyShadowsSetting()
+
         // Initialize speed warning system
         speedWarningManager = SpeedWarningManager(platformServices)
         applyPwmWarningThreshold()
@@ -336,6 +342,14 @@ class EucGame(
 
     private fun applyMusicSetting() {
         musicManager.setEnabled(settingsManager.musicEnabled)
+    }
+
+    private fun applyGraphicsPreset() {
+        renderer.postProcessing.setEnabled(settingsManager.isPostProcessingEnabled())
+    }
+
+    private fun applyShadowsSetting() {
+        renderer.shadowsEnabled = settingsManager.shadowsEnabled
     }
 
     private fun applyFpsLimit() {
@@ -538,6 +552,8 @@ class EucGame(
                 applyPwmWarningThreshold()
                 applyAvasSetting()
                 applyMusicSetting()
+                applyGraphicsPreset()
+                applyShadowsSetting()
                 // Return to previous state (Menu or Paused)
                 val settingsState = stateManager.current() as GameState.Settings
                 stateManager.transition(settingsState.returnTo)
@@ -714,33 +730,37 @@ class EucGame(
             // Update motor sound (pitch/volume based on speed and PWM)
             motorSoundManager.update(eucComponent.speed, eucComponent.pwm, delta)
 
-            // Update post-processing effects
-            val speedKmh = eucComponent.speed * 3.6f
+            // Update post-processing effects (only in High graphics preset)
+            if (settingsManager.isPostProcessingEnabled()) {
+                val speedKmh = eucComponent.speed * 3.6f
 
-            // Motion blur based on speed (starts at 30 km/h, max at 70 km/h)
-            val blurStart = 30f
-            val blurMax = 70f
-            renderer.postProcessing.blurStrength = ((speedKmh - blurStart) / (blurMax - blurStart)).coerceIn(0f, 0.5f)
+                // Motion blur based on speed (starts at 30 km/h, max at 70 km/h)
+                val blurStart = 30f
+                val blurMax = 70f
+                renderer.postProcessing.blurStrength = ((speedKmh - blurStart) / (blurMax - blurStart)).coerceIn(0f, 0.5f)
 
-            // Blur direction: mostly vertical with slight horizontal from turning
-            val turnFactor = eucComponent.sideLean * 0.3f
-            renderer.postProcessing.blurDirection = turnFactor to -1f
+                // Blur direction: mostly vertical with slight horizontal from turning
+                val turnFactor = eucComponent.sideLean * 0.3f
+                renderer.postProcessing.blurDirection = turnFactor to -1f
 
-            // Danger effects based on PWM
-            // Vignette: starts at 80%, max at 98%
-            val vignetteStart = 0.8f
-            val vignetteMax = 0.98f
-            val vignetteLevel = ((eucComponent.pwm - vignetteStart) / (vignetteMax - vignetteStart)).coerceIn(0f, 1f)
-            renderer.postProcessing.vignetteDanger = vignetteLevel
+                // Danger effects based on PWM
+                // Vignette: starts at 80%, max at 98%
+                val vignetteStart = 0.8f
+                val vignetteMax = 0.98f
+                val vignetteLevel = ((eucComponent.pwm - vignetteStart) / (vignetteMax - vignetteStart)).coerceIn(0f, 1f)
+                renderer.postProcessing.vignetteDanger = vignetteLevel
 
-            // Red tint: starts at 90%, max at 98%
-            val tintStart = 0.9f
-            val tintMax = 0.98f
-            val tintLevel = ((eucComponent.pwm - tintStart) / (tintMax - tintStart)).coerceIn(0f, 1f)
-            renderer.postProcessing.dangerTint = tintLevel
-
-            // Chromatic aberration disabled
-            // renderer.postProcessing.chromaticAberration = eucComponent.wobbleIntensity * 1.5f
+                // Red tint: starts at 90%, max at 98%
+                val tintStart = 0.9f
+                val tintMax = 0.98f
+                val tintLevel = ((eucComponent.pwm - tintStart) / (tintMax - tintStart)).coerceIn(0f, 1f)
+                renderer.postProcessing.dangerTint = tintLevel
+            } else {
+                // Normal preset: disable all post-processing effects
+                renderer.postProcessing.blurStrength = 0f
+                renderer.postProcessing.vignetteDanger = 0f
+                renderer.postProcessing.dangerTint = 0f
+            }
         }
 
         // Update music fade

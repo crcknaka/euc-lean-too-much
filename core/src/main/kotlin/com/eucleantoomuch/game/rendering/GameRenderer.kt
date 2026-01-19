@@ -67,6 +67,9 @@ class GameRenderer(
     // Flag to hide head during ragdoll (head is rendered by ragdoll system instead)
     var hideHead = false
 
+    // Flag to enable/disable shadow rendering
+    var shadowsEnabled = true
+
     // Ragdoll renderer and physics (set when ragdoll is active)
     var activeRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
     var activeRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
@@ -139,37 +142,39 @@ class GameRenderer(
         modelBatch.begin(camera)
 
         // First pass: render shadows (with blending, no cull face for flat surfaces)
-        Gdx.gl.glEnable(GL20.GL_BLEND)
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
-        Gdx.gl.glDisable(GL20.GL_CULL_FACE)  // Shadows are flat, don't cull
-        Gdx.gl.glDepthMask(false)  // Don't write to depth buffer
+        if (shadowsEnabled) {
+            Gdx.gl.glEnable(GL20.GL_BLEND)
+            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+            Gdx.gl.glDisable(GL20.GL_CULL_FACE)  // Shadows are flat, don't cull
+            Gdx.gl.glDepthMask(false)  // Don't write to depth buffer
 
-        for (entity in engine.getEntitiesFor(Families.renderable)) {
-            val shadow = shadowMapper.get(entity) ?: continue
-            val transform = transformMapper.get(entity) ?: continue
+            for (entity in engine.getEntitiesFor(Families.renderable)) {
+                val shadow = shadowMapper.get(entity) ?: continue
+                val transform = transformMapper.get(entity) ?: continue
 
-            if (shadow.visible && shadow.shadowInstance != null) {
-                val shadowX = transform.position.x + shadow.xOffset
+                if (shadow.visible && shadow.shadowInstance != null) {
+                    val shadowX = transform.position.x + shadow.xOffset
 
-                // All shadows render at sidewalk height (0.11f) so they're visible on all surfaces
-                val groundY = 0.11f
+                    // All shadows render at sidewalk height (0.11f) so they're visible on all surfaces
+                    val groundY = 0.11f
 
-                shadowMatrix.idt()
-                shadowMatrix.translate(shadowX, groundY, transform.position.z)
-                // Apply yaw rotation for directional shadows (buildings)
-                if (transform.yaw != 0f) {
-                    shadowMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                    shadowMatrix.idt()
+                    shadowMatrix.translate(shadowX, groundY, transform.position.z)
+                    // Apply yaw rotation for directional shadows (buildings)
+                    if (transform.yaw != 0f) {
+                        shadowMatrix.rotate(0f, 1f, 0f, transform.yaw)
+                    }
+                    shadowMatrix.scale(shadow.scale, 1f, shadow.scale)
+
+                    shadow.shadowInstance!!.transform.set(shadowMatrix)
+                    modelBatch.render(shadow.shadowInstance!!)
                 }
-                shadowMatrix.scale(shadow.scale, 1f, shadow.scale)
-
-                shadow.shadowInstance!!.transform.set(shadowMatrix)
-                modelBatch.render(shadow.shadowInstance!!)
             }
-        }
 
-        // Restore state for regular rendering
-        Gdx.gl.glDepthMask(true)
-        Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+            // Restore state for regular rendering
+            Gdx.gl.glDepthMask(true)
+            Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+        }
 
         // Second pass: render all entities with ModelComponent
         for (entity in engine.getEntitiesFor(Families.renderable)) {
