@@ -28,6 +28,18 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
         // Update state timer
         pedestrian.stateTimer += deltaTime
 
+        // Update walking animation phase when moving
+        val isWalking = pedestrian.state == PedestrianState.WALKING ||
+                        pedestrian.state == PedestrianState.CROSSING ||
+                        pedestrian.state == PedestrianState.WALKING_TO_CROSSING
+        if (isWalking && !pedestrian.isRagdolling) {
+            // Animation speed scales with walk speed
+            pedestrian.walkAnimPhase += deltaTime * pedestrian.walkAnimSpeed * (pedestrian.walkSpeed / 1.5f)
+            if (pedestrian.walkAnimPhase > 6.28318f) {  // 2 * PI
+                pedestrian.walkAnimPhase -= 6.28318f
+            }
+        }
+
         if (pedestrian.isSidewalkPedestrian) {
             processSidewalkPedestrian(entity, transform, velocity, pedestrian, deltaTime)
         } else {

@@ -45,6 +45,10 @@ class PedestrianComponent : Component, Pool.Poolable {
     var isRagdolling: Boolean = false     // True when ragdoll physics is active
     var ragdollBodyIndex: Int = -1        // Index in RagdollPhysics pedestrian bodies list
 
+    // Walking animation state
+    var walkAnimPhase: Float = 0f         // Animation phase (0 to 2*PI)
+    var walkAnimSpeed: Float = 8f         // Animation speed multiplier
+
     override fun reset() {
         walkSpeed = 1.5f
         direction.set(1f, 0f, 0f)
@@ -64,5 +68,7 @@ class PedestrianComponent : Component, Pool.Poolable {
         chatDuration = 0f
         isRagdolling = false
         ragdollBodyIndex = -1
+        walkAnimPhase = 0f
+        walkAnimSpeed = 8f
     }
 }

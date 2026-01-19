@@ -564,29 +564,135 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
+    /**
+     * Create a detailed articulated pedestrian model with separate body parts.
+     * Structure matches the ragdoll physics bodies for seamless transition.
+     * Body parts are named: head, torso, leftUpperArm, leftLowerArm, rightUpperArm, rightLowerArm,
+     * leftUpperLeg, leftLowerLeg, rightUpperLeg, rightLowerLeg
+     */
     fun createPedestrianModel(shirtColor: Color = pedestrianColor): Model {
         modelBuilder.begin()
-        val scale = 1.4f  // Make pedestrians 40% bigger
+        val scale = 1.0f  // Match ragdoll scale
+
         val shirtMaterial = Material(ColorAttribute.createDiffuse(shirtColor))
-        val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.2f, 0.2f, 0.3f, 1f)))  // Dark pants
+        val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.25f, 0.25f, 0.35f, 1f)))  // Dark pants
+        val skinMaterial = Material(ColorAttribute.createDiffuse(Color(0.85f, 0.65f, 0.55f, 1f)))  // Skin
+        val hairMaterial = Material(ColorAttribute.createDiffuse(Color(0.3f, 0.2f, 0.15f, 1f)))  // Brown hair
 
-        // Legs (pants) - from ground to waist, no overlap with torso
-        val legsPart = modelBuilder.part("legs", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        legsPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.35f * scale, 0f))
-        legsPart.box(Constants.PEDESTRIAN_WIDTH * 0.8f * scale, 0.7f * scale, 0.2f * scale)
+        // Body dimensions (match ragdoll physics)
+        val torsoWidth = 0.15f * scale
+        val torsoHeight = 0.5f * scale
+        val torsoDepth = 0.1f * scale
+        val upperArmWidth = 0.035f * scale
+        val upperArmLength = 0.28f * scale
+        val lowerArmWidth = 0.03f * scale
+        val lowerArmLength = 0.25f * scale
+        val upperLegWidth = 0.05f * scale
+        val upperLegLength = 0.4f * scale
+        val lowerLegWidth = 0.04f * scale
+        val lowerLegLength = 0.4f * scale
 
-        // Torso (shirt) - starts above legs
-        val torsoPart = modelBuilder.part("torso", GL20.GL_TRIANGLES, attributes, shirtMaterial)
-        torsoPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.95f * scale, 0f))
-        torsoPart.box(Constants.PEDESTRIAN_WIDTH * scale, 0.5f * scale, 0.25f * scale)
+        // Base Y positions
+        val hipY = 0.9f * scale
+        val torsoY = hipY + torsoHeight / 2
+        val headY = hipY + torsoHeight + 0.09f * scale * 0.8f
+        val shoulderY = hipY + torsoHeight - 0.05f * scale
+        val shoulderOffset = torsoWidth + 0.02f * scale
+        val hipOffset = 0.08f * scale
 
-        // Head
-        val skinMaterial = Material(ColorAttribute.createDiffuse(riderSkinColor))
+        // Head (face sphere + hair)
         val headPart = modelBuilder.part("head", GL20.GL_TRIANGLES, attributes, skinMaterial)
-        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 1.4f * scale, 0f))
-        headPart.sphere(0.2f * scale, 0.25f * scale, 0.2f * scale, 8, 8)
+        headPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, headY, 0f))
+        headPart.sphere(0.14f * scale, 0.18f * scale, 0.14f * scale, 8, 8)
+
+        // Hair (on top of head)
+        val hairPart = modelBuilder.part("hair", GL20.GL_TRIANGLES, attributes, hairMaterial)
+        hairPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, headY + 0.04f * scale, -0.01f * scale))
+        hairPart.sphere(0.16f * scale, 0.12f * scale, 0.16f * scale, 8, 8, 0f, 360f, 0f, 90f)
+
+        // Torso
+        val torsoPart = modelBuilder.part("torso", GL20.GL_TRIANGLES, attributes, shirtMaterial)
+        torsoPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, torsoY, 0f))
+        torsoPart.box(torsoWidth * 2, torsoHeight, torsoDepth * 2)
+
+        // Left upper arm (shirt color)
+        val leftUpperArmPart = modelBuilder.part("leftUpperArm", GL20.GL_TRIANGLES, attributes, shirtMaterial)
+        leftUpperArmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-shoulderOffset, shoulderY - upperArmLength / 2, 0f))
+        leftUpperArmPart.box(upperArmWidth * 2, upperArmLength, upperArmWidth * 2)
+
+        // Left lower arm (skin color - forearm)
+        val leftLowerArmPart = modelBuilder.part("leftLowerArm", GL20.GL_TRIANGLES, attributes, skinMaterial)
+        leftLowerArmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, 0f))
+        leftLowerArmPart.box(lowerArmWidth * 2, lowerArmLength, lowerArmWidth * 2)
+
+        // Right upper arm
+        val rightUpperArmPart = modelBuilder.part("rightUpperArm", GL20.GL_TRIANGLES, attributes, shirtMaterial)
+        rightUpperArmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(shoulderOffset, shoulderY - upperArmLength / 2, 0f))
+        rightUpperArmPart.box(upperArmWidth * 2, upperArmLength, upperArmWidth * 2)
+
+        // Right lower arm
+        val rightLowerArmPart = modelBuilder.part("rightLowerArm", GL20.GL_TRIANGLES, attributes, skinMaterial)
+        rightLowerArmPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, 0f))
+        rightLowerArmPart.box(lowerArmWidth * 2, lowerArmLength, lowerArmWidth * 2)
+
+        // Left upper leg
+        val leftUpperLegPart = modelBuilder.part("leftUpperLeg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        leftUpperLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-hipOffset, hipY - upperLegLength / 2, 0f))
+        leftUpperLegPart.box(upperLegWidth * 2, upperLegLength, upperLegWidth * 2)
+
+        // Left lower leg
+        val leftLowerLegPart = modelBuilder.part("leftLowerLeg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        leftLowerLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-hipOffset, hipY - upperLegLength - lowerLegLength / 2, 0f))
+        leftLowerLegPart.box(lowerLegWidth * 2, lowerLegLength, lowerLegWidth * 2)
+
+        // Right upper leg
+        val rightUpperLegPart = modelBuilder.part("rightUpperLeg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        rightUpperLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hipOffset, hipY - upperLegLength / 2, 0f))
+        rightUpperLegPart.box(upperLegWidth * 2, upperLegLength, upperLegWidth * 2)
+
+        // Right lower leg
+        val rightLowerLegPart = modelBuilder.part("rightLowerLeg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
+        rightLowerLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(hipOffset, hipY - upperLegLength - lowerLegLength / 2, 0f))
+        rightLowerLegPart.box(lowerLegWidth * 2, lowerLegLength, lowerLegWidth * 2)
 
         return modelBuilder.end().also { models.add(it) }
+    }
+
+    // Cached body part models for articulated pedestrians
+    private val pedBodyPartModels = mutableMapOf<String, Model>()
+
+    /**
+     * Get or create a pedestrian body part model.
+     * These are simple box/sphere models that can be positioned/rotated individually.
+     */
+    fun getPedestrianBodyPartModel(partName: String, shirtColor: Color): Model {
+        val cacheKey = "$partName-${shirtColor.toIntBits()}"
+        return pedBodyPartModels.getOrPut(cacheKey) {
+            createPedestrianBodyPartModel(partName, shirtColor)
+        }
+    }
+
+    private fun createPedestrianBodyPartModel(partName: String, shirtColor: Color): Model {
+        val shirtMaterial = Material(ColorAttribute.createDiffuse(shirtColor))
+        val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.25f, 0.25f, 0.35f, 1f)))
+        val skinMaterial = Material(ColorAttribute.createDiffuse(Color(0.85f, 0.65f, 0.55f, 1f)))
+        val hairMaterial = Material(ColorAttribute.createDiffuse(Color(0.3f, 0.2f, 0.15f, 1f)))
+
+        return when (partName) {
+            "head" -> modelBuilder.createSphere(0.14f, 0.18f, 0.14f, 8, 8, skinMaterial, attributes)
+            "hair" -> {
+                modelBuilder.begin()
+                val part = modelBuilder.part("hair", GL20.GL_TRIANGLES, attributes, hairMaterial)
+                part.sphere(0.16f, 0.12f, 0.16f, 8, 8, 0f, 360f, 0f, 90f)
+                modelBuilder.end()
+            }
+            "torso" -> modelBuilder.createBox(0.30f, 0.5f, 0.20f, shirtMaterial, attributes)
+            "leftUpperArm", "rightUpperArm" -> modelBuilder.createBox(0.07f, 0.28f, 0.07f, shirtMaterial, attributes)
+            "leftLowerArm", "rightLowerArm" -> modelBuilder.createBox(0.06f, 0.25f, 0.06f, skinMaterial, attributes)
+            "leftUpperLeg", "rightUpperLeg" -> modelBuilder.createBox(0.10f, 0.40f, 0.10f, pantsMaterial, attributes)
+            "leftLowerLeg", "rightLowerLeg" -> modelBuilder.createBox(0.08f, 0.40f, 0.08f, pantsMaterial, attributes)
+            else -> modelBuilder.createBox(0.1f, 0.1f, 0.1f, skinMaterial, attributes)
+        }.also { models.add(it) }
     }
 
     // Shirt colors for pedestrians

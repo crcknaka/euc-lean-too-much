@@ -1233,12 +1233,12 @@ class RagdollPhysics : Disposable {
      * Stop the simulation and cleanup bodies.
      */
     fun stop() {
-        cleanup()
+        cleanup(clearPedestrians = true)  // Full cleanup including pedestrians
         isActive = false
         isFrozen = false
     }
 
-    private fun cleanup() {
+    private fun cleanup(clearPedestrians: Boolean = false) {
         // Remove constraints first
         for (constraint in constraints) {
             dynamicsWorld.removeConstraint(constraint)
@@ -1249,8 +1249,11 @@ class RagdollPhysics : Disposable {
         // Cleanup world colliders
         clearWorldColliders()
 
-        // Cleanup pedestrian ragdolls
-        clearPedestrianBodies()
+        // Only cleanup pedestrian ragdolls if explicitly requested
+        // (don't clear them when player ragdoll starts - they should keep falling)
+        if (clearPedestrians) {
+            clearPedestrianBodies()
+        }
 
         // Cleanup EUC
         cleanupBody(eucBody, eucMotionState, eucShape)

@@ -22,6 +22,7 @@ import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.ShadowComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
+import com.eucleantoomuch.game.ecs.components.PedestrianComponent
 import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
 import net.mgsx.gltf.scene3d.scene.SceneManager
 
@@ -51,6 +52,7 @@ class GameRenderer(
     private val armMapper = ComponentMapper.getFor(ArmComponent::class.java)
     private val headMapper = ComponentMapper.getFor(HeadComponent::class.java)
     private val shadowMapper = ComponentMapper.getFor(ShadowComponent::class.java)
+    private val pedestrianMapper = ComponentMapper.getFor(PedestrianComponent::class.java)
 
     private val tempMatrix = Matrix4()
     private val shadowMatrix = Matrix4()
@@ -72,6 +74,9 @@ class GameRenderer(
     // Pedestrian ragdoll renderer (always active for fallen pedestrians during gameplay)
     var pedestrianRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
     var pedestrianRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+
+    // Articulated pedestrian renderer with walking animation
+    val pedestrianRenderer: PedestrianRenderer
 
     // Sky color
     private val skyR = 0.5f
@@ -97,6 +102,9 @@ class GameRenderer(
 
         // Create head model instance for animated rendering
         headInstance = ModelInstance(models.createHeadModel())
+
+        // Create pedestrian renderer for articulated animation
+        pedestrianRenderer = PedestrianRenderer(engine, models)
 
         // Setup SceneManager for PBR rendering
         sceneManager = SceneManager()
@@ -167,6 +175,12 @@ class GameRenderer(
         for (entity in engine.getEntitiesFor(Families.renderable)) {
             val model = modelMapper.get(entity)
             val transform = transformMapper.get(entity)
+
+            // Skip pedestrians - they're rendered separately with articulated animation
+            val pedestrian = pedestrianMapper.get(entity)
+            if (pedestrian != null && !pedestrian.isRagdolling) {
+                continue  // PedestrianRenderer handles these
+            }
 
             if (model.visible && model.modelInstance != null) {
                 // Update LOD state based on distance to camera
@@ -259,6 +273,9 @@ class GameRenderer(
 
         // Render head separately with animation
         renderHead()
+
+        // Render articulated pedestrians with walking animation
+        pedestrianRenderer.render(modelBatch, environment)
 
         // Render ragdoll if active (inside main render pass for correct lighting/post-processing)
         if (activeRagdollPhysics != null && activeRagdollRenderer != null && activeRagdollPhysics!!.isActive()) {
@@ -414,5 +431,6 @@ class GameRenderer(
         modelBatch.dispose()
         sceneManager.dispose()
         postProcessing.dispose()
+        pedestrianRenderer.dispose()
     }
 }

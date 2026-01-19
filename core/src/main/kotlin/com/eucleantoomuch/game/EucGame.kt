@@ -932,6 +932,7 @@ class EucGame(
     private val pedestrianImpactDir = com.badlogic.gdx.math.Vector3()
 
     private fun startPedestrianRagdoll(pedestrianEntity: com.badlogic.ashley.core.Entity) {
+        Gdx.app.log("EucGame", "startPedestrianRagdoll called, useRagdollPhysics=$useRagdollPhysics, ragdollPhysics=${ragdollPhysics != null}")
         if (!useRagdollPhysics || ragdollPhysics == null) return
 
         val pedestrianComponent = pedestrianEntity.getComponent(
@@ -939,7 +940,10 @@ class EucGame(
         ) ?: return
 
         // Don't ragdoll if already ragdolling
-        if (pedestrianComponent.isRagdolling) return
+        if (pedestrianComponent.isRagdolling) {
+            Gdx.app.log("EucGame", "Pedestrian already ragdolling, skipping")
+            return
+        }
 
         val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
@@ -966,6 +970,23 @@ class EucGame(
         pedestrianComponent.isRagdolling = true
         pedestrianComponent.ragdollBodyIndex = bodyIndex
         pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+
+        // Hide the original pedestrian model so only ragdoll is visible
+        val modelComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
+        )
+        if (modelComponent != null) {
+            modelComponent.visible = false
+            Gdx.app.log("EucGame", "Hid pedestrian model for ragdoll")
+        }
+
+        // Also hide the shadow
+        val shadowComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
+        )
+        if (shadowComponent != null) {
+            shadowComponent.visible = false
+        }
 
         Gdx.app.log("EucGame", "Started pedestrian ragdoll, index=$bodyIndex")
     }
