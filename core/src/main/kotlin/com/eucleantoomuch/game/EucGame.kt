@@ -10,6 +10,8 @@ import com.eucleantoomuch.game.ecs.EntityFactory
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.ArmComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
+import com.eucleantoomuch.game.ecs.components.HeadComponent
+import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.ObstacleType
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
@@ -31,12 +33,14 @@ import com.eucleantoomuch.game.state.GameState
 import com.eucleantoomuch.game.state.GameStateManager
 import com.eucleantoomuch.game.state.HighScoreManager
 import com.eucleantoomuch.game.state.SettingsManager
+import com.eucleantoomuch.game.replay.ReplaySystem
 import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.CreditsRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
 import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
 import com.eucleantoomuch.game.ui.PauseRenderer
+import com.eucleantoomuch.game.ui.ReplayRenderer
 import com.eucleantoomuch.game.ui.SettingsRenderer
 import com.eucleantoomuch.game.ui.UIFeedback
 import com.eucleantoomuch.game.ui.UIFonts
@@ -65,6 +69,10 @@ class EucGame(
     private lateinit var settingsRenderer: SettingsRenderer
     private lateinit var creditsRenderer: CreditsRenderer
     private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
+    private lateinit var replayRenderer: ReplayRenderer
+
+    // Replay system
+    private lateinit var replaySystem: ReplaySystem
 
     // Game state
     private var session = GameSession()
@@ -79,6 +87,8 @@ class EucGame(
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
     private lateinit var collisionSystem: CollisionSystem
+    private lateinit var cullingSystem: CullingSystem
+    private lateinit var pigeonSystem: PigeonSystem
 
     // Speed warning system (beeps and vibration at high speed)
     private lateinit var speedWarningManager: SpeedWarningManager
@@ -88,6 +98,11 @@ class EucGame(
 
     // Fall animation controller
     private lateinit var fallAnimationController: FallAnimationController
+
+    // Ragdoll physics for fall animation
+    private var ragdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+    private var ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
+    private var useRagdollPhysics = true  // Toggle for ragdoll vs scripted animation
 
     // Background music manager
     private lateinit var musicManager: MusicManager
@@ -177,15 +192,18 @@ class EucGame(
             session.nearMisses++
         }
 
+        pigeonSystem = PigeonSystem(models, platformServices)
+        cullingSystem = CullingSystem()
+
         engine.addSystem(eucPhysicsSystem)
         engine.addSystem(MovementSystem())
         engine.addSystem(PedestrianAISystem())
         engine.addSystem(CarAISystem())
-        engine.addSystem(PigeonSystem(models, platformServices))
+        engine.addSystem(pigeonSystem)
         engine.addSystem(ArmAnimationSystem())
         engine.addSystem(HeadAnimationSystem())
         engine.addSystem(collisionSystem)
-        engine.addSystem(CullingSystem())
+        engine.addSystem(cullingSystem)
 
         // Initialize UI
         hud = Hud(settingsManager)
@@ -196,6 +214,10 @@ class EucGame(
         settingsRenderer = SettingsRenderer(settingsManager)
         creditsRenderer = CreditsRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
+        replayRenderer = ReplayRenderer()
+
+        // Initialize replay system
+        replaySystem = ReplaySystem()
 
         // Apply saved render distance setting
         applyRenderDistance()
@@ -210,6 +232,16 @@ class EucGame(
 
         // Initialize fall animation controller
         fallAnimationController = FallAnimationController(platformServices)
+
+        // Initialize ragdoll physics and renderer
+        try {
+            ragdollPhysics = com.eucleantoomuch.game.physics.RagdollPhysics()
+            ragdollRenderer = com.eucleantoomuch.game.physics.RagdollRenderer()
+            Gdx.app.log("EucGame", "Ragdoll physics initialized")
+        } catch (e: Exception) {
+            Gdx.app.error("EucGame", "Failed to initialize ragdoll physics: ${e.message}")
+            useRagdollPhysics = false
+        }
 
         // Initialize music manager
         musicManager = MusicManager()
@@ -319,6 +351,7 @@ class EucGame(
             is GameState.Paused -> renderPaused()
             is GameState.Falling -> renderFalling(delta)
             is GameState.GameOver -> renderGameOver()
+            is GameState.Replay -> renderReplay(delta)
         }
 
         // Check for pause - keyboard or two-finger tap (only when playing)
@@ -588,6 +621,9 @@ class EucGame(
             // Update arm positions - attached to rider's shoulders
             updateArmPositions()
 
+            // Record frame for replay
+            recordReplayFrame(delta, playerTransform, eucComponent)
+
             // Update world generation
             worldGenerator.update(playerTransform.position.z, session.distanceTraveled)
 
@@ -701,11 +737,23 @@ class EucGame(
         // Render frozen game state
         renderer.render()
 
+        // Tell game over renderer if replay is available
+        gameOverRenderer.setHasReplayFrames(replaySystem.hasFrames())
+
         // Render game over UI
         when (gameOverRenderer.render(state.session, isNewHighScore)) {
             GameOverRenderer.ButtonClicked.RETRY -> {
                 resetGame()
                 startGame()
+            }
+            GameOverRenderer.ButtonClicked.REPLAY -> {
+                // Start replay playback
+                replayRenderer.reset()
+                replayCameraYaw = 0f
+                replayCameraPitch = 20f
+                replaySystem.startPlayback()
+                motorSoundManager.start()  // Start motor sound for replay
+                stateManager.transition(GameState.Replay(state.session))
             }
             GameOverRenderer.ButtonClicked.MENU -> {
                 resetGame()
@@ -754,6 +802,7 @@ class EucGame(
         session.reset()
         hud.reset()
         isNewHighScore = false
+        replaySystem.reset()  // Clear replay buffer for new game
         stateManager.transition(GameState.Countdown(3))
     }
 
@@ -815,11 +864,29 @@ class EucGame(
                 yaw = playerTransform.yaw,
                 skipSound = true  // All obstacles have their own sounds
             )
+
+            // Start ragdoll physics simulation
+            if (useRagdollPhysics && ragdollPhysics != null) {
+                ragdollPhysics!!.startFall(
+                    eucPosition = playerTransform.position,
+                    eucYaw = playerTransform.yaw,
+                    playerVelocity = eucComponent.speed,
+                    sideLean = eucComponent.sideLean,
+                    forwardLean = eucComponent.forwardLean
+                )
+
+                // Add colliders for nearby world objects
+                addWorldCollidersForRagdoll(playerTransform.position)
+            }
         }
 
         // Transition to falling state (will show animation before game over)
         stateManager.transition(GameState.Falling(session))
     }
+
+    // Temp vectors for ragdoll position extraction
+    private val ragdollEucPos = com.badlogic.gdx.math.Vector3()
+    private val ragdollTorsoPos = com.badlogic.gdx.math.Vector3()
 
     private fun renderFalling(delta: Float) {
         val state = stateManager.current() as GameState.Falling
@@ -828,71 +895,120 @@ class EucGame(
         musicManager.fadeOut()
         musicManager.update(delta)
 
-        // Update fall animation
+        // Update fall animation (for camera effects and timing)
         fallAnimationController.update(delta)
+
+        // Update ragdoll physics if active
+        val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
+        if (ragdollActive) {
+            ragdollPhysics!!.update(delta)
+
+            // Hide original player models during ragdoll - use RagdollRenderer instead
+            playerEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            riderEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            renderer.hideHead = true
+
+            // Use RagdollRenderer to draw physics-driven ragdoll
+            renderer.activeRagdollRenderer = ragdollRenderer
+            renderer.activeRagdollPhysics = ragdollPhysics
+        } else {
+            renderer.activeRagdollRenderer = null
+            renderer.activeRagdollPhysics = null
+        }
 
         // Get base transforms
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
 
         if (playerTransform != null && eucComponent != null) {
-            // Apply camera effects
+            // Apply camera effects (always from scripted animation for consistency)
             renderer.cameraController.setShake(fallAnimationController.cameraShake)
             renderer.cameraController.setFovPunch(fallAnimationController.fovPunch)
             renderer.cameraController.setDropOffset(fallAnimationController.cameraDropOffset)
             renderer.cameraController.setForwardOffset(fallAnimationController.cameraForwardOffset)
             renderer.cameraController.setRoll(fallAnimationController.cameraRoll)
 
-            // Update rider position with fall animation offsets
-            riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
-                riderTransform.position.set(playerTransform.position)
-                riderTransform.position.x -= 0.05f  // Slightly right to center on wheel
+            // Use ragdoll physics for positions if available
+            val usePhysicsPositions = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
 
-                // Compensate Y position for forward pitch - raise rider when leaning forward
-                // so the model doesn't clip through ground
-                val pitchCompensation = (fallAnimationController.riderPitch / 90f) * 0.5f
-                val baseY = 0.7f + fallAnimationController.riderYOffset + pitchCompensation
-                riderTransform.position.y = (playerTransform.position.y + baseY).coerceAtLeast(0.3f)
+            if (usePhysicsPositions) {
+                // Get EUC position from physics
+                ragdollPhysics!!.getEucPosition(ragdollEucPos)
+                playerTransform.position.set(ragdollEucPos)
 
-                riderTransform.position.z += fallAnimationController.riderForwardOffset
+                // Get rotation from physics transform matrix
+                val eucTransform = ragdollPhysics!!.getEucTransform()
+                if (eucTransform != null) {
+                    // Extract rotation and apply to visual lean
+                    // The physics gives us a full transform, we need to convert to lean values
+                    eucComponent.visualSideLean = eucComponent.sideLean + extractRollFromMatrix(eucTransform) / 90f
+                }
 
-                // Apply fall rotation to rider's visual lean
-                riderTransform.yaw = playerTransform.yaw
-                riderTransform.updateRotationFromYaw()
+                // Get torso/rider position from physics
+                ragdollPhysics!!.getTorsoPosition(ragdollTorsoPos)
+                riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
+                    riderTransform.position.set(ragdollTorsoPos)
+                    // Keep Y above ground
+                    riderTransform.position.y = riderTransform.position.y.coerceAtLeast(0.3f)
+                }
+
+                // Get rider rotation from physics
+                val torsoTransform = ragdollPhysics!!.getTorsoTransform()
+                riderEntity?.getComponent(EucComponent::class.java)?.let { riderEuc ->
+                    if (torsoTransform != null) {
+                        riderEuc.visualForwardLean = eucComponent.visualForwardLean + extractPitchFromMatrix(torsoTransform) / 90f
+                        riderEuc.visualSideLean = eucComponent.visualSideLean + extractRollFromMatrix(torsoTransform) / 45f
+                    }
+                }
+            } else {
+                // Fallback to scripted animation
+                // Update rider position with fall animation offsets
+                riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
+                    riderTransform.position.set(playerTransform.position)
+                    riderTransform.position.x -= 0.05f
+
+                    val pitchCompensation = (fallAnimationController.riderPitch / 90f) * 0.5f
+                    val baseY = 0.7f + fallAnimationController.riderYOffset + pitchCompensation
+                    riderTransform.position.y = (playerTransform.position.y + baseY).coerceAtLeast(0.3f)
+
+                    riderTransform.position.z += fallAnimationController.riderForwardOffset
+                    riderTransform.yaw = playerTransform.yaw
+                    riderTransform.updateRotationFromYaw()
+                }
+                riderEntity?.getComponent(EucComponent::class.java)?.let { riderEuc ->
+                    val clampedPitch = fallAnimationController.riderPitch.coerceAtMost(75f)
+                    riderEuc.visualForwardLean = eucComponent.visualForwardLean + clampedPitch / 90f
+                    riderEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
+                }
+
+                // Update EUC position with fall animation
+                playerTransform.position.y = fallAnimationController.eucYOffset
+                playerTransform.position.z += fallAnimationController.eucForwardOffset * delta
+                playerTransform.position.x += fallAnimationController.eucSideOffset * delta
+                eucComponent.visualSideLean = eucComponent.sideLean + fallAnimationController.eucRoll / 90f
             }
-            riderEntity?.getComponent(EucComponent::class.java)?.let { riderEuc ->
-                // Apply fall pitch/roll to visual lean (converts rotation to lean values)
-                // Clamp pitch to 75 degrees max to prevent model going underground
-                val clampedPitch = fallAnimationController.riderPitch.coerceAtMost(75f)
-                riderEuc.visualForwardLean = eucComponent.visualForwardLean + clampedPitch / 90f
-                riderEuc.visualSideLean = eucComponent.visualSideLean + fallAnimationController.riderRoll / 45f
-            }
-
-            // Update EUC position with fall animation (falling on its side)
-            playerTransform.position.y = fallAnimationController.eucYOffset
-            playerTransform.position.z += fallAnimationController.eucForwardOffset * delta
-            playerTransform.position.x += fallAnimationController.eucSideOffset * delta
-
-            // Apply EUC roll to visual lean (90 degrees = lying on side)
-            eucComponent.visualSideLean = eucComponent.sideLean + fallAnimationController.eucRoll / 90f
 
             // Update arm positions during fall - arms reach forward to brace for impact
             riderEntity?.getComponent(ArmComponent::class.java)?.let { arm ->
-                // Arms extend forward as rider falls
                 val fallProgress = (fallAnimationController.riderPitch / 90f).coerceIn(0f, 1f)
-                // armYaw ~45 = arms slightly outward, armPitch negative = arms forward
-                arm.leftArmYaw = 45f + fallProgress * 10f    // Slightly out to sides
-                arm.leftArmPitch = -60f - fallProgress * 30f // Forward and reaching out (negative = forward)
+                arm.leftArmYaw = 45f + fallProgress * 10f
+                arm.leftArmPitch = -60f - fallProgress * 30f
                 arm.rightArmYaw = 45f + fallProgress * 10f
                 arm.rightArmPitch = -60f - fallProgress * 30f
             }
             updateArmPositions()
 
-            // Keep camera following (with effects applied)
-            renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta, 0f)
+            // Record fall frame for replay (so we can see the crash)
+            recordFallFrame(delta, playerTransform, eucComponent)
+
+            // Keep camera following
+            val cameraFollowPos = if (usePhysicsPositions) ragdollTorsoPos else playerTransform.position
+            renderer.cameraController.update(cameraFollowPos, playerTransform.yaw, delta, 0f)
         }
 
-        // Render the scene
+        // Render the scene (ragdoll is rendered inside main render pass via activeRagdollRenderer)
         renderer.render()
 
         // Check if animation is complete
@@ -908,12 +1024,246 @@ class EucGame(
             // Reset fall animation
             fallAnimationController.reset()
 
+            // Stop ragdoll physics
+            ragdollPhysics?.stop()
+
+            // Restore model visibility
+            playerEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            riderEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            renderer.hideHead = false
+
             // Reset game over animations
             gameOverRenderer.reset()
 
             // Transition to game over
             stateManager.transition(GameState.GameOver(state.session))
         }
+    }
+
+    private fun renderReplay(delta: Float) {
+        val state = stateManager.current() as GameState.Replay
+
+        // Enable replay mode for systems
+        cullingSystem.enabled = false
+        pigeonSystem.replayMode = true
+        worldGenerator.replayMode = true
+
+        // Update music (keep faded out)
+        musicManager.update(delta)
+
+        // Update replay playback
+        replaySystem.updatePlayback(delta)
+
+        // Play crash sound when replay reaches the end (crash moment)
+        if (replaySystem.justReachedEnd()) {
+            platformServices.playCrashSound(0.8f)
+        }
+
+        // Update pigeon animations (flying pigeons continue)
+        engine.update(delta)
+
+        // Get current interpolated frame
+        val frame = replaySystem.getCurrentFrame()
+        if (frame != null) {
+            // Apply frame data to entities for rendering
+            playerEntity?.getComponent(TransformComponent::class.java)?.let { transform ->
+                transform.position.set(frame.playerPosition)
+                transform.yaw = frame.playerYaw
+                transform.updateRotationFromYaw()
+            }
+            playerEntity?.getComponent(EucComponent::class.java)?.let { euc ->
+                euc.visualForwardLean = frame.eucForwardLean
+                euc.visualSideLean = frame.eucSideLean
+                euc.speed = frame.eucSpeed
+                // Apply eucRoll if we stored it (for fall animation)
+            }
+
+            // Update rider position and lean
+            riderEntity?.getComponent(TransformComponent::class.java)?.let { transform ->
+                transform.position.set(frame.playerPosition)
+                transform.position.x -= 0.05f
+                transform.position.y += 0.7f
+                transform.yaw = frame.playerYaw
+                transform.updateRotationFromYaw()
+            }
+            riderEntity?.getComponent(EucComponent::class.java)?.let { euc ->
+                euc.visualForwardLean = frame.riderVisualForwardLean
+                euc.visualSideLean = frame.riderVisualSideLean
+                euc.speed = frame.eucSpeed
+            }
+
+            // Update head animation
+            riderEntity?.getComponent(HeadComponent::class.java)?.let { head ->
+                head.yaw = frame.headYaw
+                head.pitch = frame.headPitch
+                head.roll = frame.headRoll
+            }
+
+            // Update arm positions
+            riderEntity?.getComponent(ArmComponent::class.java)?.let { arm ->
+                arm.leftArmPitch = frame.leftArmPitch
+                arm.leftArmYaw = frame.leftArmYaw
+                arm.rightArmPitch = frame.rightArmPitch
+                arm.rightArmYaw = frame.rightArmYaw
+            }
+
+            // Free camera control - user drags to rotate around player
+            updateReplayCamera(delta, frame)
+
+            // Update motor sound based on replay speed (only when not paused)
+            if (!replaySystem.isPaused()) {
+                val replaySpeed = replaySystem.getPlaybackSpeed()
+                motorSoundManager.update(frame.eucSpeed * replaySpeed, frame.eucSpeed / 20f, delta)
+            }
+
+            // Update world generator to fill in chunks around player position (for 360 view)
+            worldGenerator.update(frame.playerPosition.z, state.session.distanceTraveled)
+        }
+
+        // Reset post-processing effects for clear replay view
+        renderer.postProcessing.blurStrength = 0f
+        renderer.postProcessing.dangerTint = 0f
+        renderer.postProcessing.vignetteDanger = 0f
+
+        // Render the scene
+        renderer.render()
+
+        // Render replay UI
+        val result = replayRenderer.render(replaySystem)
+        when (result.action) {
+            ReplayRenderer.Action.EXIT -> {
+                replaySystem.stopPlayback()
+                replayRenderer.reset()
+                gameOverRenderer.reset()
+                // Reset systems from replay mode
+                cullingSystem.enabled = true
+                pigeonSystem.replayMode = false
+                worldGenerator.replayMode = false
+                motorSoundManager.stop()
+                stateManager.transition(GameState.GameOver(state.session))
+            }
+            ReplayRenderer.Action.TOGGLE_PAUSE -> {
+                replaySystem.togglePause()
+            }
+            ReplayRenderer.Action.TOGGLE_SLOWMO -> {
+                replaySystem.toggleSlowMo()
+            }
+            ReplayRenderer.Action.SEEK -> {
+                replaySystem.seekTo(result.seekPosition)
+            }
+            ReplayRenderer.Action.NONE -> {}
+        }
+    }
+
+    // Replay camera variables
+    private var replayCameraYaw = 0f
+    private var replayCameraPitch = 20f
+    private var replayCameraDistance = 5f
+    private var lastReplayTouchX = 0f
+    private var lastReplayTouchY = 0f
+    private var isReplayDragging = false
+
+    private fun updateReplayCamera(delta: Float, frame: com.eucleantoomuch.game.replay.ReplayFrame) {
+        val sw = Gdx.graphics.width.toFloat()
+        val sh = Gdx.graphics.height.toFloat()
+        val touchX = Gdx.input.x.toFloat()
+        val touchY = Gdx.input.y.toFloat()
+
+        // Check if touch is in the middle area (not on UI controls at top/bottom)
+        val topBarHeight = 70f * (sh / 720f)
+        val bottomBarHeight = 140f * (sh / 720f)
+        val isInCameraZone = touchY > topBarHeight && touchY < (sh - bottomBarHeight)
+
+        if (Gdx.input.isTouched && isInCameraZone) {
+            if (!isReplayDragging) {
+                isReplayDragging = true
+                lastReplayTouchX = touchX
+                lastReplayTouchY = touchY
+            } else {
+                val deltaX = touchX - lastReplayTouchX
+                val deltaY = touchY - lastReplayTouchY
+
+                // Rotate camera around player (full 360 degrees)
+                replayCameraYaw -= deltaX * 0.3f
+                replayCameraPitch += deltaY * 0.2f
+                replayCameraPitch = replayCameraPitch.coerceIn(-10f, 60f)
+
+                lastReplayTouchX = touchX
+                lastReplayTouchY = touchY
+            }
+        } else {
+            isReplayDragging = false
+        }
+
+        // Calculate camera position orbiting around player
+        val yawRad = Math.toRadians(replayCameraYaw.toDouble()).toFloat()
+        val pitchRad = Math.toRadians(replayCameraPitch.toDouble()).toFloat()
+
+        val camX = frame.playerPosition.x + replayCameraDistance * kotlin.math.sin(yawRad) * kotlin.math.cos(pitchRad)
+        val camY = frame.playerPosition.y + 1.5f + replayCameraDistance * kotlin.math.sin(pitchRad)
+        val camZ = frame.playerPosition.z - replayCameraDistance * kotlin.math.cos(yawRad) * kotlin.math.cos(pitchRad)
+
+        // Update camera to look at player
+        renderer.cameraController.setReplayCamera(
+            camX, camY, camZ,
+            frame.playerPosition.x, frame.playerPosition.y + 1f, frame.playerPosition.z
+        )
+    }
+
+    private fun recordReplayFrame(delta: Float, playerTransform: TransformComponent, eucComponent: EucComponent) {
+        val riderEuc = riderEntity?.getComponent(EucComponent::class.java)
+        val headComponent = riderEntity?.getComponent(HeadComponent::class.java)
+        val armComponent = riderEntity?.getComponent(ArmComponent::class.java)
+
+        replaySystem.recordFrame(
+            delta = delta,
+            playerPos = playerTransform.position,
+            playerYaw = playerTransform.yaw,
+            eucForwardLean = eucComponent.visualForwardLean,
+            eucSideLean = eucComponent.visualSideLean,
+            eucSpeed = eucComponent.speed,
+            eucRoll = eucComponent.visualSideLean,  // Use visual lean for EUC roll
+            riderForwardLean = riderEuc?.visualForwardLean ?: 0f,
+            riderSideLean = riderEuc?.visualSideLean ?: 0f,
+            headYaw = headComponent?.yaw ?: 0f,
+            headPitch = headComponent?.pitch ?: 0f,
+            headRoll = headComponent?.roll ?: 0f,
+            leftArmPitch = armComponent?.leftArmPitch ?: 0f,
+            leftArmYaw = armComponent?.leftArmYaw ?: 0f,
+            rightArmPitch = armComponent?.rightArmPitch ?: 0f,
+            rightArmYaw = armComponent?.rightArmYaw ?: 0f,
+            cameraPos = renderer.cameraController.getCameraPosition(),
+            cameraYaw = renderer.cameraController.getCameraYaw()
+        )
+    }
+
+    private fun recordFallFrame(delta: Float, playerTransform: TransformComponent, eucComponent: EucComponent) {
+        val riderEuc = riderEntity?.getComponent(EucComponent::class.java)
+        val headComponent = riderEntity?.getComponent(HeadComponent::class.java)
+        val armComponent = riderEntity?.getComponent(ArmComponent::class.java)
+
+        replaySystem.recordFrame(
+            delta = delta,
+            playerPos = playerTransform.position,
+            playerYaw = playerTransform.yaw,
+            eucForwardLean = eucComponent.visualForwardLean,
+            eucSideLean = eucComponent.visualSideLean,
+            eucSpeed = eucComponent.speed,
+            eucRoll = eucComponent.visualSideLean,  // EUC roll during fall
+            riderForwardLean = riderEuc?.visualForwardLean ?: 0f,
+            riderSideLean = riderEuc?.visualSideLean ?: 0f,
+            headYaw = headComponent?.yaw ?: 0f,
+            headPitch = headComponent?.pitch ?: 0f,
+            headRoll = headComponent?.roll ?: 0f,
+            leftArmPitch = armComponent?.leftArmPitch ?: 0f,
+            leftArmYaw = armComponent?.leftArmYaw ?: 0f,
+            rightArmPitch = armComponent?.rightArmPitch ?: 0f,
+            rightArmYaw = armComponent?.rightArmYaw ?: 0f,
+            cameraPos = renderer.cameraController.getCameraPosition(),
+            cameraYaw = renderer.cameraController.getCameraYaw()
+        )
     }
 
     override fun resize(width: Int, height: Int) {
@@ -926,6 +1276,7 @@ class EucGame(
         settingsRenderer.resize(width, height)
         creditsRenderer.resize(width, height)
         wheelSelectionRenderer.resize(width, height)
+        replayRenderer.resize(width, height)
     }
 
     override fun resume() {
@@ -944,6 +1295,7 @@ class EucGame(
         settingsRenderer.recreate()
         creditsRenderer.recreate()
         wheelSelectionRenderer.recreate()
+        replayRenderer.recreate()
     }
 
     override fun dispose() {
@@ -959,5 +1311,131 @@ class EucGame(
         settingsRenderer.dispose()
         creditsRenderer.dispose()
         wheelSelectionRenderer.dispose()
+        replayRenderer.dispose()
+        ragdollPhysics?.dispose()
+        ragdollRenderer?.dispose()
+    }
+
+    // Add physics colliders for nearby world objects during ragdoll
+    private val colliderMapper = com.badlogic.ashley.core.ComponentMapper.getFor(
+        com.eucleantoomuch.game.ecs.components.ColliderComponent::class.java
+    )
+    private val obstacleMapper = com.badlogic.ashley.core.ComponentMapper.getFor(
+        com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
+    )
+    private val transformMapperForCollider = com.badlogic.ashley.core.ComponentMapper.getFor(
+        TransformComponent::class.java
+    )
+    private val tempColliderPos = com.badlogic.gdx.math.Vector3()
+    private val tempHalfExtents = com.badlogic.gdx.math.Vector3()
+
+    private fun addWorldCollidersForRagdoll(playerPos: com.badlogic.gdx.math.Vector3) {
+        val physics = ragdollPhysics ?: return
+
+        // Search radius for nearby objects
+        val searchRadius = 15f
+        val searchRadiusSq = searchRadius * searchRadius
+
+        // Add colliders for obstacles (cars, street lights, etc.)
+        // Use index-based loop to avoid nested iterator issue with GDX Array
+        val obstacles = engine.getEntitiesFor(Families.obstacles)
+        for (i in 0 until obstacles.size()) {
+            val entity = obstacles[i]
+            val transform = transformMapperForCollider.get(entity) ?: continue
+            val collider = colliderMapper.get(entity) ?: continue
+            val obstacle = obstacleMapper.get(entity) ?: continue
+
+            // Check if within range
+            val dx = transform.position.x - playerPos.x
+            val dz = transform.position.z - playerPos.z
+            val distSq = dx * dx + dz * dz
+            if (distSq > searchRadiusSq) continue
+
+            // Get collider center position (adjust Y to center of collider)
+            tempColliderPos.set(
+                transform.position.x,
+                transform.position.y + collider.halfExtents.y,
+                transform.position.z
+            )
+            tempHalfExtents.set(collider.halfExtents)
+
+            // Add box collider based on obstacle type
+            when (obstacle.type) {
+                ObstacleType.CAR -> {
+                    // Cars are larger boxes
+                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                }
+                ObstacleType.STREET_LIGHT -> {
+                    // Street lights are thin cylinders
+                    physics.addCylinderCollider(
+                        tempColliderPos,
+                        0.15f,  // thin pole
+                        collider.halfExtents.y * 2f
+                    )
+                }
+                ObstacleType.RECYCLE_BIN -> {
+                    // Bins are boxes
+                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                }
+                ObstacleType.CURB -> {
+                    // Curbs are long thin boxes
+                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                }
+                else -> {
+                    // Default box collider for other types
+                    if (collider.halfExtents.len() > 0.1f) {
+                        physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                    }
+                }
+            }
+        }
+
+        // Also add colliders for cars (they have CarComponent, not ObstacleComponent)
+        // Use index-based loop to avoid nested iterator issue
+        val cars = engine.getEntitiesFor(Families.cars)
+        for (i in 0 until cars.size()) {
+            val entity = cars[i]
+            val transform = transformMapperForCollider.get(entity) ?: continue
+            val collider = colliderMapper.get(entity)
+
+            // Check if within range
+            val dx = transform.position.x - playerPos.x
+            val dz = transform.position.z - playerPos.z
+            val distSq = dx * dx + dz * dz
+            if (distSq > searchRadiusSq) continue
+
+            // Car dimensions (approximate)
+            if (collider != null) {
+                tempColliderPos.set(
+                    transform.position.x,
+                    transform.position.y + collider.halfExtents.y,
+                    transform.position.z
+                )
+                physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw)
+            } else {
+                // Default car size if no collider
+                tempColliderPos.set(transform.position.x, transform.position.y + 0.7f, transform.position.z)
+                tempHalfExtents.set(1.0f, 0.7f, 2.2f)
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+            }
+        }
+
+        Gdx.app.log("EucGame", "Added world colliders for ragdoll physics")
+    }
+
+    // Helper functions to extract rotation angles from transformation matrix
+    private fun extractRollFromMatrix(matrix: com.badlogic.gdx.math.Matrix4): Float {
+        // Extract roll (rotation around Z axis) from matrix
+        // matrix.val indices: 0,1,2,3 = first column, etc.
+        val m00 = matrix.`val`[com.badlogic.gdx.math.Matrix4.M00]
+        val m10 = matrix.`val`[com.badlogic.gdx.math.Matrix4.M10]
+        return Math.toDegrees(kotlin.math.atan2(m10.toDouble(), m00.toDouble())).toFloat()
+    }
+
+    private fun extractPitchFromMatrix(matrix: com.badlogic.gdx.math.Matrix4): Float {
+        // Extract pitch (rotation around X axis) from matrix
+        val m21 = matrix.`val`[com.badlogic.gdx.math.Matrix4.M21]
+        val m22 = matrix.`val`[com.badlogic.gdx.math.Matrix4.M22]
+        return Math.toDegrees(kotlin.math.atan2(m21.toDouble(), m22.toDouble())).toFloat()
     }
 }

@@ -83,6 +83,12 @@ dependencies {
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a")
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86")
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86_64")
+
+    // Bullet physics natives
+    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-armeabi-v7a")
+    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-arm64-v8a")
+    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-x86")
+    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-x86_64")
 }
 
 // Task to copy native libraries to jniLibs folder

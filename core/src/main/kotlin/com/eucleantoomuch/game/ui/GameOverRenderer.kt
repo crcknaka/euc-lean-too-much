@@ -16,6 +16,7 @@ class GameOverRenderer : Disposable {
 
     private val retryButton = Rectangle()
     private val menuButton = Rectangle()
+    private val replayButton = Rectangle()
 
     // Animation states
     private var overlayAlpha = 0f
@@ -24,6 +25,10 @@ class GameOverRenderer : Disposable {
     private var newHighScoreAnim = 0f
     private var retryHover = 0f
     private var menuHover = 0f
+    private var replayHover = 0f
+
+    // Replay availability
+    private var hasReplayFrames = false
     private var safetyTipAnim = 0f  // Animation timer for safety tip
 
     // Current safety tip (randomized on reset)
@@ -55,7 +60,11 @@ class GameOverRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, RETRY, MENU
+        NONE, RETRY, MENU, REPLAY
+    }
+
+    fun setHasReplayFrames(hasFrames: Boolean) {
+        hasReplayFrames = hasFrames
     }
 
     fun render(session: GameSession, isNewHighScore: Boolean): ButtonClicked {
@@ -82,6 +91,7 @@ class GameOverRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         retryHover = UITheme.Anim.ease(retryHover, if (retryButton.contains(touchX, touchY)) 1f else 0f, 10f)
         menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 10f)
+        replayHover = UITheme.Anim.ease(replayHover, if (hasReplayFrames && replayButton.contains(touchX, touchY)) 1f else 0f, 10f)
 
         ui.beginShapes()
 
@@ -113,18 +123,30 @@ class GameOverRenderer : Disposable {
             backgroundColor = UITheme.surface,
             borderColor = if (isNewHighScore) UITheme.accent else UITheme.surfaceBorder)
 
-        // Button layout - side by side at bottom with more padding
-        val buttonWidth = 240f * scale
+        // Button layout - three buttons: RETRY, REPLAY, MENU
+        val buttonWidth = if (hasReplayFrames) 180f * scale else 240f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 32f * scale
-        val totalWidth = buttonWidth * 2 + buttonSpacing
+        val buttonSpacing = 20f * scale
+        val numButtons = if (hasReplayFrames) 3 else 2
+        val totalWidth = buttonWidth * numButtons + buttonSpacing * (numButtons - 1)
         val buttonsY = panelY + 50f * scale  // Lower position for buttons
 
-        retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
-        menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
+        if (hasReplayFrames) {
+            // Three buttons: RETRY, REPLAY, MENU
+            retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
+            replayButton.set(centerX - buttonWidth / 2, buttonsY, buttonWidth, buttonHeight)
+            menuButton.set(centerX + totalWidth / 2 - buttonWidth, buttonsY, buttonWidth, buttonHeight)
+        } else {
+            // Two buttons: RETRY, MENU
+            retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
+            menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
+        }
 
         // Buttons with modern style
         ui.button(retryButton, UITheme.accent, glowIntensity = retryHover * 0.7f)
+        if (hasReplayFrames) {
+            ui.button(replayButton, UITheme.warning, glowIntensity = replayHover * 0.5f)
+        }
         ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)
 
         ui.endShapes()
@@ -211,6 +233,10 @@ class GameOverRenderer : Disposable {
             // Button labels with larger text
             ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
+            if (hasReplayFrames) {
+                ui.textCentered("REPLAY", replayButton.x + replayButton.width / 2, replayButton.y + replayButton.height / 2,
+                    UIFonts.button, UITheme.textPrimary)
+            }
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
         }
@@ -223,6 +249,10 @@ class GameOverRenderer : Disposable {
                 UIFeedback.clickHeavy()
                 return ButtonClicked.RETRY
             }
+            if (hasReplayFrames && replayButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.REPLAY
+            }
             if (menuButton.contains(touchX, touchY)) {
                 UIFeedback.click()
                 return ButtonClicked.MENU
@@ -232,6 +262,10 @@ class GameOverRenderer : Disposable {
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             UIFeedback.clickHeavy()
             return ButtonClicked.RETRY
+        }
+        if (hasReplayFrames && Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            UIFeedback.click()
+            return ButtonClicked.REPLAY
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.M)) {
             UIFeedback.click()

@@ -25,6 +25,9 @@ class WorldGenerator(
     // Configurable render distance
     private var renderDistance = Constants.RENDER_DISTANCE
 
+    // Replay mode - don't remove old chunks, keep more chunks behind
+    var replayMode = false
+
     private var groundModel = models.createGroundChunkModel(Constants.CHUNK_LENGTH)
     private var grassModel = models.createGrassAreaModel(Constants.CHUNK_LENGTH)
     private var manholeModel = models.createManholeModel()
@@ -248,8 +251,9 @@ class WorldGenerator(
     }
 
     fun update(playerZ: Float, totalDistance: Float) {
-        // Start from behind the camera (which is at -8 from player), add extra buffer
-        val startChunk = ((playerZ - 50f) / Constants.CHUNK_LENGTH).toInt()
+        // In replay mode, generate chunks in all directions around player for 360 camera
+        val behindDistance = if (replayMode) 80f else 50f
+        val startChunk = ((playerZ - behindDistance) / Constants.CHUNK_LENGTH).toInt()
         val endChunk = ((playerZ + renderDistance) / Constants.CHUNK_LENGTH).toInt()
 
         // Generate new chunks
@@ -259,11 +263,14 @@ class WorldGenerator(
             }
         }
 
-        // Remove old chunks (behind the camera)
-        val despawnChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
-        val chunksToRemove = activeChunks.keys.filter { it < despawnChunk - 1 }
-        for (chunkIndex in chunksToRemove) {
-            removeChunk(chunkIndex)
+        // Don't remove chunks in replay mode - we need to see behind
+        if (!replayMode) {
+            // Remove old chunks (behind the camera)
+            val despawnChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
+            val chunksToRemove = activeChunks.keys.filter { it < despawnChunk - 1 }
+            for (chunkIndex in chunksToRemove) {
+                removeChunk(chunkIndex)
+            }
         }
     }
 

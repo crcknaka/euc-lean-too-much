@@ -25,6 +25,9 @@ dependencies {
     // FreeType for smooth fonts
     api("com.badlogicgames.gdx:gdx-freetype:$gdxVersion")
 
+    // Bullet physics for ragdoll
+    api("com.badlogicgames.gdx:gdx-bullet:$gdxVersion")
+
     // Ashley ECS
     api("com.badlogicgames.ashley:ashley:$ashleyVersion")
 

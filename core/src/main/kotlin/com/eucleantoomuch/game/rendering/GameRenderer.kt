@@ -62,6 +62,13 @@ class GameRenderer(
     // Head model instance (rendered separately for animation)
     private var headInstance: ModelInstance? = null
 
+    // Flag to hide head during ragdoll (head is rendered by ragdoll system instead)
+    var hideHead = false
+
+    // Ragdoll renderer and physics (set when ragdoll is active)
+    var activeRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
+    var activeRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+
     // Sky color
     private val skyR = 0.5f
     private val skyG = 0.7f
@@ -249,6 +256,13 @@ class GameRenderer(
         // Render head separately with animation
         renderHead()
 
+        // Render ragdoll if active (inside main render pass for correct lighting/post-processing)
+        if (activeRagdollPhysics != null && activeRagdollRenderer != null && activeRagdollPhysics!!.isActive()) {
+            // Make sure blending is disabled for opaque ragdoll rendering
+            Gdx.gl.glDisable(GL20.GL_BLEND)
+            activeRagdollRenderer!!.render(modelBatch, activeRagdollPhysics!!, environment)
+        }
+
         modelBatch.end()
 
         // Render PBR models with SceneManager
@@ -266,6 +280,7 @@ class GameRenderer(
      * Head is attached to the rider's neck and can rotate independently.
      */
     private fun renderHead() {
+        if (hideHead) return  // Skip during ragdoll
         val rider = riderEntity ?: return
         val head = headInstance ?: return
         val riderTransform = transformMapper.get(rider) ?: return
@@ -366,6 +381,20 @@ class GameRenderer(
         camera.viewportWidth = width.toFloat()
         camera.viewportHeight = height.toFloat()
         camera.update()
+    }
+
+    /**
+     * Render ragdoll physics bodies.
+     * Call this after render() when ragdoll is active.
+     */
+    fun renderRagdoll(ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer,
+                      ragdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics) {
+        if (!ragdollPhysics.isActive()) return
+
+        // Render ragdoll bodies with same environment as other models
+        modelBatch.begin(camera)
+        ragdollRenderer.render(modelBatch, ragdollPhysics, environment)
+        modelBatch.end()
     }
 
     override fun dispose() {

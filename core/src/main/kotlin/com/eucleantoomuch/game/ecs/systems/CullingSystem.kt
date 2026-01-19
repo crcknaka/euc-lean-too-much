@@ -15,12 +15,16 @@ class CullingSystem : EntitySystem(7) {
 
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
 
+    // Flag to disable culling (e.g. during replay)
+    var enabled = true
+
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)
         obstacleEntities = engine.getEntitiesFor(Families.obstacles)
     }
 
     override fun update(deltaTime: Float) {
+        if (!enabled) return
         if (playerEntities.size() == 0) return
 
         val playerTransform = transformMapper.get(playerEntities.first())

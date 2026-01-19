@@ -22,6 +22,9 @@ dependencies {
     // LibGDX LWJGL3 backend
     implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
+
+    // Bullet physics natives for desktop
+    implementation("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-desktop")
 }
 
 sourceSets {
