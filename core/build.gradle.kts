@@ -5,6 +5,7 @@ plugins {
 val gdxVersion: String by project
 val ktxVersion: String by project
 val ashleyVersion: String by project
+val gdxGltfVersion: String by project
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -26,6 +27,9 @@ dependencies {
 
     // Ashley ECS
     api("com.badlogicgames.ashley:ashley:$ashleyVersion")
+
+    // GLTF/GLB model loading
+    api("com.github.mgsx-dev.gdx-gltf:gltf:$gdxGltfVersion")
 
     // KTX extensions
     api("io.github.libktx:ktx-app:$ktxVersion")

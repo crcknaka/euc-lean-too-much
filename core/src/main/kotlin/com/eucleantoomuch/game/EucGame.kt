@@ -96,6 +96,7 @@ class EucGame(
     private var wasTouched = false
     private var cameraViewModeText = ""
     private var cameraViewModeTimer = 0f
+    private var ignoreTapFrames = 0  // Skip tap detection for N frames after pause/resume
 
     // FPS limiting (using nanoTime for precision)
     private var lastFrameTimeNanos = 0L
@@ -330,18 +331,28 @@ class EucGame(
                 UIFeedback.pauseOpen()
                 val playingState = stateManager.current() as GameState.Playing
                 pauseRenderer.reset()
+                // Reset touch state and ignore taps for a few frames when returning
+                wasTouched = false
+                ignoreTapFrames = 5
                 stateManager.transition(GameState.Paused(playingState.session))
+                return  // Don't process further input this frame
             }
 
             // Single tap to change camera view (only one finger, not two)
-            val isTouched = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)
-            if (!isTouched && wasTouched) {
-                // Finger lifted - this is a tap
-                cameraViewModeText = renderer.cameraController.cycleViewMode()
-                cameraViewModeTimer = 1.5f  // Show text for 1.5 seconds
-                UIFeedback.tap()
+            // Skip tap detection for a few frames after pause/resume to avoid accidental triggers
+            if (ignoreTapFrames > 0) {
+                ignoreTapFrames--
+                wasTouched = Gdx.input.isTouched(0)
+            } else {
+                val isTouched = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)
+                if (!isTouched && wasTouched) {
+                    // Finger lifted - this is a tap
+                    cameraViewModeText = renderer.cameraController.cycleViewMode()
+                    cameraViewModeTimer = 1.5f  // Show text for 1.5 seconds
+                    UIFeedback.tap()
+                }
+                wasTouched = isTouched
             }
-            wasTouched = isTouched
 
             // Update camera view mode text timer
             if (cameraViewModeTimer > 0) {
@@ -660,8 +671,9 @@ class EucGame(
                 motorSoundManager.start()
                 // Resume music
                 musicManager.resume()
-                // Prevent camera mode change on resume (finger lift would trigger tap)
-                wasTouched = Gdx.input.isTouched(0)
+                // Prevent camera mode change on resume - ignore taps for a few frames
+                wasTouched = false
+                ignoreTapFrames = 5
                 stateManager.transition(GameState.Playing(pausedState.session))
             }
             PauseRenderer.ButtonClicked.RESTART -> {

@@ -10,7 +10,6 @@ import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.ecs.Families
@@ -23,7 +22,8 @@ import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.ShadowComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
-import com.eucleantoomuch.game.util.Constants
+import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
+import net.mgsx.gltf.scene3d.scene.SceneManager
 
 class GameRenderer(
     private val engine: Engine,
@@ -74,6 +74,10 @@ class GameRenderer(
     // Post-processing effects
     val postProcessing = PostProcessing()
 
+    // SceneManager for PBR/GLTF models
+    val sceneManager: SceneManager
+    private val pbrLight: DirectionalLightEx
+
     init {
         postProcessing.initialize()
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
@@ -82,6 +86,19 @@ class GameRenderer(
 
         // Create head model instance for animated rendering
         headInstance = ModelInstance(models.createHeadModel())
+
+        // Setup SceneManager for PBR rendering
+        sceneManager = SceneManager()
+        sceneManager.setCamera(camera)
+
+        // Setup flat lighting for GLB models (like Blender viewport without extra lights)
+        pbrLight = DirectionalLightEx()
+        pbrLight.direction.set(-0.5f, -1f, -0.3f).nor()
+        pbrLight.intensity = 5.5f  // Soft directional light
+        sceneManager.environment.add(pbrLight)
+
+        // Moderate ambient for flat but not overexposed look
+        sceneManager.setAmbientLight(0.020f)
     }
 
     fun setCameraFar(distance: Float) {
@@ -217,7 +234,15 @@ class GameRenderer(
                 tempMatrix.scale(transform.scale.x, transform.scale.y, transform.scale.z)
 
                 activeModel.transform.set(tempMatrix)
-                modelBatch.render(activeModel, environment)
+
+                // Use SceneManager for PBR models with Scene, regular ModelBatch for others
+                if (model.isPbr && model.scene != null) {
+                    // Update scene's model instance transform
+                    model.scene!!.modelInstance.transform.set(tempMatrix)
+                    sceneManager.getRenderableProviders().add(model.scene!!)
+                } else {
+                    modelBatch.render(activeModel, environment)
+                }
             }
         }
 
@@ -225,6 +250,12 @@ class GameRenderer(
         renderHead()
 
         modelBatch.end()
+
+        // Render PBR models with SceneManager
+        sceneManager.update(Gdx.graphics.deltaTime)
+        sceneManager.render()
+        // Clear renderableProviders for next frame
+        sceneManager.getRenderableProviders().clear()
 
         // End post-processing (apply effects and render to screen)
         postProcessing.end()
@@ -339,6 +370,7 @@ class GameRenderer(
 
     override fun dispose() {
         modelBatch.dispose()
+        sceneManager.dispose()
         postProcessing.dispose()
     }
 }

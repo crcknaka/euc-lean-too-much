@@ -86,7 +86,7 @@ class CreditsRenderer : Disposable {
             // Developer
             ui.textCentered("Developed by", centerX, textY, UIFonts.caption, UITheme.textSecondary)
             textY -= 35f * scale
-            ui.textCentered("Your Name", centerX, textY, UIFonts.body, UITheme.textPrimary)
+            ui.textCentered("cRc^", centerX, textY, UIFonts.body, UITheme.textPrimary)
             textY -= 60f * scale
 
             // Special Thanks section

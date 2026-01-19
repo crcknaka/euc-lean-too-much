@@ -2,6 +2,7 @@ package com.eucleantoomuch.game.procedural
 
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
+import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.ModelInstance
@@ -10,6 +11,9 @@ import com.badlogic.gdx.math.Vector3
 import com.eucleantoomuch.game.ecs.components.*
 import com.eucleantoomuch.game.rendering.ProceduralModels
 import com.eucleantoomuch.game.util.Constants
+import net.mgsx.gltf.loaders.glb.GLBLoader
+import net.mgsx.gltf.scene3d.scene.Scene
+import net.mgsx.gltf.scene3d.scene.SceneAsset
 
 class WorldGenerator(
     private val engine: Engine,
@@ -36,6 +40,11 @@ class WorldGenerator(
     private val buildingModels = mutableListOf<Triple<Float, ModelInstance, ModelInstance>>()
     private val skyscraperModels = mutableListOf<Triple<Float, ModelInstance, ModelInstance>>()  // Rare tall buildings
     private val carModels = mutableListOf<ModelInstance>()
+    private var carGlbAsset: SceneAsset? = null
+    private var taxiGlbAsset: SceneAsset? = null
+    private var carGlbScale = 1f  // Scale factor for GLB model to match game units
+    private var taxiGlbScale = 1f  // Scale factor for taxi GLB model
+    private var useGlbCars = false  // Flag to track if GLB cars are being used
 
     // Track skyscraper cluster state
     private var skyscraperClusterRemaining = 0  // How many more skyscrapers in current cluster
@@ -116,10 +125,36 @@ class WorldGenerator(
             skyscraperModels.add(Triple(height, ModelInstance(detailedModel), ModelInstance(simpleModel)))
         }
 
-        // Create variety of cars
+        // Load GLB car models
+        try {
+            val glbFile = Gdx.files.internal("car1.glb")
+            carGlbAsset = GLBLoader().load(glbFile)
+            val boundingBox = carGlbAsset!!.scene.model.calculateBoundingBox(com.badlogic.gdx.math.collision.BoundingBox())
+            carGlbScale = Constants.CAR_LENGTH / maxOf(boundingBox.depth, boundingBox.width, 0.01f)
+            Gdx.app.log("WorldGenerator", "Car GLB loaded, scale: $carGlbScale")
+        } catch (e: Exception) {
+            Gdx.app.log("WorldGenerator", "car1.glb not loaded: ${e.message}")
+            carGlbAsset = null
+        }
+
+        // Load taxi GLB model
+        try {
+            val taxiFile = Gdx.files.internal("taxy.glb")
+            taxiGlbAsset = GLBLoader().load(taxiFile)
+            val boundingBox = taxiGlbAsset!!.scene.model.calculateBoundingBox(com.badlogic.gdx.math.collision.BoundingBox())
+            taxiGlbScale = Constants.CAR_LENGTH / maxOf(boundingBox.depth, boundingBox.width, 0.01f)
+            Gdx.app.log("WorldGenerator", "Taxi GLB loaded, scale: $taxiGlbScale")
+        } catch (e: Exception) {
+            Gdx.app.log("WorldGenerator", "taxy.glb not loaded: ${e.message}")
+            taxiGlbAsset = null
+        }
+
+        // Use GLB cars if at least one model loaded
+        useGlbCars = carGlbAsset != null || taxiGlbAsset != null
+
+        // Create fallback procedural car models
         for (i in 0..3) {
-            val model = models.createCarModel(models.getRandomCarColor())
-            carModels.add(ModelInstance(model))
+            carModels.add(ModelInstance(models.createCarModel(models.getRandomCarColor())))
         }
 
         // Create tree variants with height variation
@@ -1496,12 +1531,34 @@ class WorldGenerator(
         // If opposite direction, start further ahead so player can see them coming
         val startZ = if (direction == 1) z + 30f else z + 80f
 
+        // Randomly choose between car1 and taxi GLB models
+        val useTaxi = taxiGlbAsset != null && (carGlbAsset == null || MathUtils.randomBoolean())
+        val chosenAsset = if (useTaxi) taxiGlbAsset else carGlbAsset
+        val chosenScale = if (useTaxi) taxiGlbScale else carGlbScale
+
+        // Apply scale for GLB model (100x bigger for testing)
         entity.add(TransformComponent().apply {
             position.set(x, 0f, startZ)
             yaw = if (direction == -1) 180f else 0f
             updateRotationFromYaw()
+            if (useGlbCars && chosenAsset != null) {
+                val testScale = chosenScale * 100f
+                scale.set(testScale, testScale, testScale)
+            }
         })
-        entity.add(ModelComponent().apply { modelInstance = ModelInstance(carModels.random().model) })
+
+        // Create model component - use Scene for GLB models to preserve PBR materials
+        entity.add(ModelComponent().apply {
+            if (useGlbCars && chosenAsset != null) {
+                // Create a new Scene instance for this car (preserves PBR materials)
+                scene = Scene(chosenAsset.scene)
+                modelInstance = scene!!.modelInstance
+                isPbr = true
+            } else {
+                modelInstance = ModelInstance(carModels.random().model)
+                isPbr = false
+            }
+        })
         entity.add(VelocityComponent())
         entity.add(ColliderComponent().apply {
             setSize(Constants.CAR_WIDTH, Constants.CAR_HEIGHT, Constants.CAR_LENGTH)
@@ -1546,5 +1603,10 @@ class WorldGenerator(
         nextFlockId = 0
         // Reset tower crane tracking
         lastCraneChunk = -20
+    }
+
+    fun dispose() {
+        carGlbAsset?.dispose()
+        taxiGlbAsset?.dispose()
     }
 }
