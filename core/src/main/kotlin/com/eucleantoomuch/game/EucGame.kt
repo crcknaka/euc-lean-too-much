@@ -1207,6 +1207,15 @@ class EucGame(
         // Update fall animation (for camera effects and timing)
         fallAnimationController.update(delta)
 
+        // Keep updating the world (cars, pedestrians, etc.) during fall
+        engine.update(delta)
+
+        // Update world generator to keep spawning chunks
+        val playerTransformForWorld = playerEntity?.getComponent(TransformComponent::class.java)
+        if (playerTransformForWorld != null) {
+            worldGenerator.update(playerTransformForWorld.position.z, state.session.distanceTraveled)
+        }
+
         // Always update ragdoll physics (for pedestrians even if player ragdoll is inactive)
         ragdollPhysics?.update(delta)
 

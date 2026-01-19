@@ -135,7 +135,6 @@ class RagdollPhysics : Disposable {
     private var isFrozen = false  // When frozen, ragdoll stays visible but doesn't simulate
 
     // Temp vectors for calculations
-    private val tempVec = Vector3()
     private val tempMatrix = Matrix4()
     private val tempMatrix2 = Matrix4()
 
@@ -155,13 +154,13 @@ class RagdollPhysics : Disposable {
         dynamicsWorld = btDiscreteDynamicsWorld(dispatcher, broadphase, constraintSolver, collisionConfig)
         dynamicsWorld.gravity = Vector3(0f, -12f, 0f)  // Gravity
 
-        // Create ground plane (y = 0.05 to be slightly above road surface to prevent clipping)
-        groundShape = btStaticPlaneShape(Vector3(0f, 1f, 0f), 0.05f)
+        // Create ground plane at Y = 0 (road surface level)
+        groundShape = btStaticPlaneShape(Vector3(0f, 1f, 0f), 0f)
         groundMotionState = btDefaultMotionState()
         val groundInfo = btRigidBody.btRigidBodyConstructionInfo(0f, groundMotionState, groundShape, Vector3.Zero)
         groundBody = btRigidBody(groundInfo)
-        groundBody.friction = 0.8f
-        groundBody.restitution = 0.2f
+        groundBody.friction = 1.0f  // High friction to stop sliding
+        groundBody.restitution = 0.05f  // Almost no bounce
         dynamicsWorld.addRigidBody(groundBody)
         groundInfo.dispose()
     }
@@ -203,46 +202,65 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC as a simple box collider - stable and predictable
-        // Dimensions: width 0.15m (X), height 0.45m (Y), depth 0.45m (Z)
-        eucShape = btBoxShape(Vector3(0.075f, 0.225f, 0.225f))
+        // EUC as a simple box collider
+        val halfHeight = 0.225f
+        eucShape = btBoxShape(Vector3(0.075f, halfHeight, halfHeight))
 
-        val eucMass = 20f  // 20 kg EUC
+        val eucMass = 18f  // Lighter for more dramatic movement
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
-        // Initial transform - start slightly above ground to avoid clipping
-        // Wheel radius is 0.22m, so center should be at Y = 0.22 + small margin
-        val startY = 0.25f.coerceAtLeast(eucPosition.y + 0.22f)
+        // Start at reasonable height
+        val startY = (halfHeight + 0.05f).coerceAtLeast(eucPosition.y)
+
+        // Determine which way to fall - use sideLean, or default to right if neutral
+        val fallDirection = if (kotlin.math.abs(sideLean) > 0.1f) {
+            if (sideLean > 0) 1f else -1f
+        } else {
+            if (com.badlogic.gdx.math.MathUtils.random() > 0.5f) 1f else -1f  // Random if neutral
+        }
 
         tempMatrix.idt()
         tempMatrix.translate(eucPosition.x, startY, eucPosition.z)
         tempMatrix.rotate(Vector3.Y, eucYaw)
-        // Apply initial lean rotation (reduced to prevent wild spinning)
-        tempMatrix.rotate(Vector3.Z, sideLean * 15f)
-        tempMatrix.rotate(Vector3.X, -forwardLean * 10f)
+        // Start tilted
+        tempMatrix.rotate(Vector3.Z, fallDirection * 20f)
+        tempMatrix.rotate(Vector3.X, -forwardLean * 15f)
 
         eucMotionState = btDefaultMotionState(tempMatrix)
         val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
         eucBody = btRigidBody(eucInfo)
-        eucBody!!.friction = 0.8f      // High friction - wheel grips ground
-        eucBody!!.restitution = 0.1f   // Low bounce
-        eucBody!!.setDamping(0.3f, 0.5f)  // Higher damping - settles quickly, no jittering
+        eucBody!!.friction = 0.6f
+        eucBody!!.restitution = 0.3f  // Some bounce
+        eucBody!!.setDamping(0.1f, 0.15f)  // Low damping for more tumbling
 
-        // Simple forward momentum (reduced)
-        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.4f
-        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.4f
+        // Enable CCD
+        eucBody!!.setCcdMotionThreshold(0.05f)
+        eucBody!!.setCcdSweptSphereRadius(halfHeight * 0.9f)
 
-        // Minimal upward velocity - just enough to not clip ground
-        val upKick = 0.2f
+        // Speed factor - more dramatic at higher speeds
+        val speedFactor = (playerVelocity / 10f).coerceIn(0.5f, 2f)
 
-        eucBody!!.linearVelocity = Vector3(forwardX, upKick, forwardZ)
+        // Forward momentum - keeps going forward
+        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.7f
+        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.7f
 
-        // Minimal angular velocity - wheel tips over gently
+        // Side kick based on lean and speed
+        val sideKick = (2f + playerVelocity * 0.3f) * fallDirection
+        val sideX = kotlin.math.cos(yawRad) * sideKick
+        val sideZ = -kotlin.math.sin(yawRad) * sideKick
+
+        // Upward kick - higher at higher speeds for tumbling
+        val upKick = 1f + playerVelocity * 0.15f
+
+        eucBody!!.linearVelocity = Vector3(forwardX + sideX, upKick, forwardZ + sideZ)
+
+        // Angular velocity - tumble and spin based on speed
+        val tumbleSpeed = (3f + playerVelocity * 0.5f) * speedFactor
         eucBody!!.angularVelocity = Vector3(
-            playerVelocity * 0.3f,  // Roll forward
-            0f,
-            sideLean * 1.5f         // Tip to the side based on lean
+            -forwardLean * tumbleSpeed,           // Pitch tumble
+            sideLean * tumbleSpeed * 0.5f,        // Yaw spin
+            fallDirection * tumbleSpeed * 1.5f    // Roll to the side
         )
 
         dynamicsWorld.addRigidBody(eucBody)
@@ -760,7 +778,6 @@ class RagdollPhysics : Disposable {
     }
 
     // Position getters
-    fun getHeadPosition(out: Vector3): Vector3 = getPartPosition(head, out)
     fun getTorsoPosition(out: Vector3): Vector3 = getPartPosition(torso, out)
 
     private fun getPartPosition(part: BodyPart, out: Vector3): Vector3 {
@@ -874,8 +891,6 @@ class RagdollPhysics : Disposable {
     ): Int {
         val ragdoll = PedestrianRagdoll(entityIndex = entityIndex, shirtColor = shirtColor)
 
-        val yawRad = Math.toRadians(yaw.toDouble()).toFloat()
-
         // Pedestrian scale (1.7x for better visibility)
         val scale = 1.7f
         val legScale = 0.85f  // Shorter legs
@@ -948,7 +963,7 @@ class RagdollPhysics : Disposable {
         createSimplifiedPedestrianConstraints(ragdoll, torsoHeight / 2, torsoWidth, armLength, legLength, hipOffset, scale)
 
         // Apply initial velocities from impact
-        applySimplifiedPedestrianImpactVelocities(ragdoll, playerVelocity, playerDirection, yawRad)
+        applySimplifiedPedestrianImpactVelocities(ragdoll, playerVelocity, playerDirection)
 
         pedestrianRagdolls.add(ragdoll)
 
@@ -1055,28 +1070,10 @@ class RagdollPhysics : Disposable {
         ragdoll.constraints.add(constraint)
     }
 
-    private fun createPedestrianHingeConstraint(
-        ragdoll: PedestrianRagdoll,
-        bodyA: btRigidBody, bodyB: btRigidBody,
-        pivotA: Vector3, pivotB: Vector3,
-        axis: Vector3,
-        lowLimit: Float, highLimit: Float
-    ) {
-        val constraint = btHingeConstraint(bodyA, bodyB, pivotA, pivotB, axis, axis)
-        constraint.setLimit(
-            Math.toRadians(lowLimit.toDouble()).toFloat(),
-            Math.toRadians(highLimit.toDouble()).toFloat()
-        )
-
-        dynamicsWorld.addConstraint(constraint, true)
-        ragdoll.constraints.add(constraint)
-    }
-
     private fun applySimplifiedPedestrianImpactVelocities(
         ragdoll: PedestrianRagdoll,
         playerVelocity: Float,
-        playerDirection: Vector3,
-        yawRad: Float
+        playerDirection: Vector3
     ) {
         // Calculate impact force (realistic stumble, not flying)
         val impactForce = playerVelocity * 1.5f  // Realistic stumble force
