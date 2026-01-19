@@ -88,6 +88,11 @@ class EucGame(
     // Background music manager
     private lateinit var musicManager: MusicManager
 
+    // Camera view mode switching - track single tap
+    private var wasTouched = false
+    private var cameraViewModeText = ""
+    private var cameraViewModeTimer = 0f
+
     // FPS limiting (using nanoTime for precision)
     private var lastFrameTimeNanos = 0L
     private var currentMaxFps = 0  // 0 = unlimited
@@ -298,6 +303,21 @@ class EucGame(
                 val playingState = stateManager.current() as GameState.Playing
                 pauseRenderer.reset()
                 stateManager.transition(GameState.Paused(playingState.session))
+            }
+
+            // Single tap to change camera view (only one finger, not two)
+            val isTouched = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)
+            if (!isTouched && wasTouched) {
+                // Finger lifted - this is a tap
+                cameraViewModeText = renderer.cameraController.cycleViewMode()
+                cameraViewModeTimer = 1.5f  // Show text for 1.5 seconds
+                UIFeedback.tap()
+            }
+            wasTouched = isTouched
+
+            // Update camera view mode text timer
+            if (cameraViewModeTimer > 0) {
+                cameraViewModeTimer -= delta
             }
         }
     }
@@ -550,6 +570,11 @@ class EucGame(
             val (shakeX, shakeY) = hud.getScreenShake()
             renderer.cameraController.setWobbleShake(shakeX, shakeY)
         }
+
+        // Show camera view mode text
+        if (cameraViewModeTimer > 0) {
+            hud.renderCameraMode(cameraViewModeText, cameraViewModeTimer / 1.5f)
+        }
     }
 
     private fun renderPaused() {
@@ -637,7 +662,12 @@ class EucGame(
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         if (playerTransform != null) {
             renderer.cameraController.initialize(playerTransform.position)
+            renderer.cameraController.resetViewMode()
         }
+
+        // Reset camera mode UI state
+        cameraViewModeTimer = 0f
+        wasTouched = false
 
         // Generate initial world
         worldGenerator.update(0f, 0f)

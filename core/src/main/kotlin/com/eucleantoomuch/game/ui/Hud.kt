@@ -638,6 +638,44 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
      */
     fun getScreenShake(): Pair<Float, Float> = Pair(wobbleShakeX, wobbleShakeY)
 
+    /**
+     * Render camera mode indicator when switching views.
+     * @param modeName Name of the camera mode ("Normal", "Close", "First Person")
+     * @param alpha Fade alpha (1 = full, 0 = invisible)
+     */
+    fun renderCameraMode(modeName: String, alpha: Float) {
+        UIFonts.initialize()
+
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+        val scale = UITheme.Dimensions.scale()
+
+        // Position at bottom center of screen
+        val y = sh * 0.15f
+
+        ui.beginShapes()
+
+        // Semi-transparent background pill
+        ui.layout.setText(UIFonts.heading, modeName)
+        val textWidth = ui.layout.width
+        val pillWidth = textWidth + 60f * scale
+        val pillHeight = 50f * scale
+        val pillX = sw / 2 - pillWidth / 2
+        val pillY = y - pillHeight / 2
+
+        ui.roundedRect(pillX, pillY, pillWidth, pillHeight, 25f * scale,
+            UITheme.withAlpha(UITheme.surface, 0.85f * alpha))
+
+        ui.endShapes()
+
+        ui.beginBatch()
+
+        // Camera mode text
+        ui.textCentered(modeName, sw / 2, y, UIFonts.heading, UITheme.withAlpha(UITheme.textPrimary, alpha))
+
+        ui.endBatch()
+    }
+
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
     }
