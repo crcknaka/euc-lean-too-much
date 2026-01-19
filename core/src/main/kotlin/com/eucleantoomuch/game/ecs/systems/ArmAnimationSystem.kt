@@ -11,19 +11,11 @@ import com.eucleantoomuch.game.ecs.components.EucComponent
 /**
  * System that animates arm positions based on rider speed.
  * - At low speed (< 15 km/h): arms move in balancing motion (like tightrope walker)
- * - At medium speed (15-35 km/h): arms relaxed down, swaying with turns
- * - At high speed (>= 35 km/h): arms held behind the back
+ * - At high speed (>= 15 km/h): arms forward pose (80%) or behind back pose (20%)
  */
 class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
     private val armMapper = ComponentMapper.getFor(ArmComponent::class.java)
     private val eucMapper = ComponentMapper.getFor(EucComponent::class.java)
-
-    // Pose indices for blending
-    private companion object {
-        const val POSE_BALANCE = 0
-        const val POSE_RELAXED = 1
-        const val POSE_BEHIND_BACK = 2
-    }
 
     override fun processEntity(entity: Entity, deltaTime: Float) {
         val arm = armMapper.get(entity) ?: return
@@ -32,15 +24,18 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         // Update balance animation time
         arm.balanceTime += deltaTime
 
-        // Determine target pose based on speed (3 poses now)
-        val targetPose = when {
-            euc.speed < ArmComponent.BALANCE_SPEED_THRESHOLD -> POSE_BALANCE
-            euc.speed < ArmComponent.RELAXED_SPEED_THRESHOLD -> POSE_RELAXED
-            else -> POSE_BEHIND_BACK
+        // Detect start of acceleration (forward lean becoming positive)
+        // Re-roll pose choice with 20% chance for behind-back
+        val isAccelerating = euc.visualForwardLean > 0.15f
+        if (isAccelerating && !arm.wasAccelerating) {
+            // Just started accelerating - roll for pose
+            arm.useBehindBack = MathUtils.random() < 0.2f
         }
+        arm.wasAccelerating = isAccelerating
 
-        // poseBlend now goes 0..2 for 3 poses
-        val targetPoseBlend = targetPose.toFloat()
+        // Determine target pose based on speed (2 poses: balance vs arms forward/behind back)
+        // poseBlend: 0 = balance, 1 = arms forward or behind back (based on useBehindBack)
+        val targetPoseBlend = if (euc.speed < ArmComponent.BALANCE_SPEED_THRESHOLD) 0f else 1f
 
         // Smoothly transition between poses
         arm.poseBlend = MathUtils.lerp(
@@ -82,8 +77,8 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         arm.rightForearmBend = 0f  // Straight arm for balance
     }
 
-    private fun calculateRelaxedPose(arm: ArmComponent, euc: EucComponent) {
-        // Relaxed pose: arms extend forward based on acceleration (forward lean)
+    private fun calculateArmsForwardPose(arm: ArmComponent, euc: EucComponent) {
+        // Arms forward pose: arms extend forward based on acceleration (forward lean)
         // When accelerating hard, arms stretch forward for balance
         // When cruising (no acceleration), arms hang down naturally
 
@@ -151,49 +146,42 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
     }
 
     /**
-     * Calculate blended pose between all 3 arm positions.
-     * poseBlend: 0 = balance, 1 = relaxed, 2 = behind back
+     * Calculate blended pose between balance and high-speed pose.
+     * poseBlend: 0 = balance, 1 = relaxed or behind back (based on prefersBehindBack)
      */
     private fun calculateBlendedPose(arm: ArmComponent, euc: EucComponent) {
-        // Determine which two poses to blend between
-        val lowerPose = arm.poseBlend.toInt().coerceIn(0, 1)
-        val upperPose = (lowerPose + 1).coerceIn(0, 2)
-        val blendFactor = arm.poseBlend - lowerPose
+        val blendFactor = arm.poseBlend.coerceIn(0f, 1f)
 
-        // Calculate lower pose
-        when (lowerPose) {
-            POSE_BALANCE -> calculateBalancePose(arm, euc)
-            POSE_RELAXED -> calculateRelaxedPose(arm, euc)
-            else -> calculateBehindBackPose(arm, euc)
-        }
+        // Calculate balance pose first
+        calculateBalancePose(arm, euc)
 
-        // If we need to blend, store values and calculate upper pose
-        if (blendFactor > 0.01f && upperPose != lowerPose) {
-            val lowerLeftYaw = arm.leftArmYaw
-            val lowerLeftPitch = arm.leftArmPitch
-            val lowerLeftRoll = arm.leftArmRoll
-            val lowerLeftBend = arm.leftForearmBend
-            val lowerRightYaw = arm.rightArmYaw
-            val lowerRightPitch = arm.rightArmPitch
-            val lowerRightRoll = arm.rightArmRoll
-            val lowerRightBend = arm.rightForearmBend
+        // If we need to blend toward high-speed pose
+        if (blendFactor > 0.01f) {
+            val balanceLeftYaw = arm.leftArmYaw
+            val balanceLeftPitch = arm.leftArmPitch
+            val balanceLeftRoll = arm.leftArmRoll
+            val balanceLeftBend = arm.leftForearmBend
+            val balanceRightYaw = arm.rightArmYaw
+            val balanceRightPitch = arm.rightArmPitch
+            val balanceRightRoll = arm.rightArmRoll
+            val balanceRightBend = arm.rightForearmBend
 
-            // Calculate upper pose
-            when (upperPose) {
-                POSE_RELAXED -> calculateRelaxedPose(arm, euc)
-                POSE_BEHIND_BACK -> calculateBehindBackPose(arm, euc)
-                else -> calculateBalancePose(arm, euc)
+            // Calculate high-speed pose (arms forward or behind back based on current roll)
+            if (arm.useBehindBack) {
+                calculateBehindBackPose(arm, euc)
+            } else {
+                calculateArmsForwardPose(arm, euc)
             }
 
-            // Lerp between lower and upper pose
-            arm.leftArmYaw = MathUtils.lerp(lowerLeftYaw, arm.leftArmYaw, blendFactor)
-            arm.leftArmPitch = MathUtils.lerp(lowerLeftPitch, arm.leftArmPitch, blendFactor)
-            arm.leftArmRoll = MathUtils.lerp(lowerLeftRoll, arm.leftArmRoll, blendFactor)
-            arm.leftForearmBend = MathUtils.lerp(lowerLeftBend, arm.leftForearmBend, blendFactor)
-            arm.rightArmYaw = MathUtils.lerp(lowerRightYaw, arm.rightArmYaw, blendFactor)
-            arm.rightArmPitch = MathUtils.lerp(lowerRightPitch, arm.rightArmPitch, blendFactor)
-            arm.rightArmRoll = MathUtils.lerp(lowerRightRoll, arm.rightArmRoll, blendFactor)
-            arm.rightForearmBend = MathUtils.lerp(lowerRightBend, arm.rightForearmBend, blendFactor)
+            // Lerp between balance and high-speed pose
+            arm.leftArmYaw = MathUtils.lerp(balanceLeftYaw, arm.leftArmYaw, blendFactor)
+            arm.leftArmPitch = MathUtils.lerp(balanceLeftPitch, arm.leftArmPitch, blendFactor)
+            arm.leftArmRoll = MathUtils.lerp(balanceLeftRoll, arm.leftArmRoll, blendFactor)
+            arm.leftForearmBend = MathUtils.lerp(balanceLeftBend, arm.leftForearmBend, blendFactor)
+            arm.rightArmYaw = MathUtils.lerp(balanceRightYaw, arm.rightArmYaw, blendFactor)
+            arm.rightArmPitch = MathUtils.lerp(balanceRightPitch, arm.rightArmPitch, blendFactor)
+            arm.rightArmRoll = MathUtils.lerp(balanceRightRoll, arm.rightArmRoll, blendFactor)
+            arm.rightForearmBend = MathUtils.lerp(balanceRightBend, arm.rightForearmBend, blendFactor)
         }
     }
 }

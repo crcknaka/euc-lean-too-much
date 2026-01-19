@@ -99,6 +99,7 @@ class EntityFactory(
         entity.add(EucComponent())
 
         // Add ArmComponent for arm animation state
+        // Pose is dynamically chosen during gameplay (20% chance for behind-back on each acceleration)
         entity.add(ArmComponent())
 
         // Add HeadComponent for head animation state

@@ -7,11 +7,18 @@ import com.badlogic.gdx.utils.Pool
  * Component to track arm animation state for the rider.
  * Arms animate based on speed:
  * - At low speed (< 15 km/h): arms move to balance (like a tightrope walker)
- * - At high speed (>= 15 km/h): arms held behind the back
+ * - At high speed (>= 15 km/h): arms forward pose (80%) or behind back pose (20%)
  */
 class ArmComponent : Component, Pool.Poolable {
-    // Arm pose blend: 0 = balance pose (arms out), 1 = behind back pose
+    // Arm pose blend: 0 = balance pose (arms out), 1 = arms forward/behind back pose
     var poseBlend: Float = 0f
+
+    // Current high-speed pose: false = arms forward, true = behind back
+    // Re-rolled with 20% chance each time rider starts accelerating
+    var useBehindBack: Boolean = false
+
+    // Track if we were accelerating last frame (to detect new acceleration)
+    var wasAccelerating: Boolean = false
 
     // Left arm angles (degrees, relative to shoulder)
     var leftArmPitch: Float = 0f   // Forward/backward rotation
@@ -40,12 +47,13 @@ class ArmComponent : Component, Pool.Poolable {
     companion object {
         // Speed thresholds in m/s (game uses m/s internally)
         const val BALANCE_SPEED_THRESHOLD = 4.17f   // ~15 km/h - below this, arms balance
-        const val RELAXED_SPEED_THRESHOLD = 19.44f  // ~70 km/h - above this, arms go behind back
         const val TRANSITION_SPEED = 3f             // How fast to blend between poses (per second)
     }
 
     override fun reset() {
         poseBlend = 0f
+        useBehindBack = false
+        wasAccelerating = false
         leftArmPitch = 0f
         leftArmYaw = 0f
         leftArmRoll = 0f
