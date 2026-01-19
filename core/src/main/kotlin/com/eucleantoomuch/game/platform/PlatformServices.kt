@@ -121,6 +121,16 @@ interface PlatformServices {
      * Play person impact sound when crashing into a pedestrian.
      */
     fun playPersonImpactSound()
+
+    /**
+     * Play generic hit sound for obstacles without specific sounds.
+     */
+    fun playGenericHitSound()
+
+    /**
+     * Play car crash sound when colliding with a car.
+     */
+    fun playCarCrashSound()
 }
 
 /**
@@ -192,6 +202,14 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun playPersonImpactSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playGenericHitSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playCarCrashSound() {
         // No-op on desktop/unsupported platforms
     }
 }

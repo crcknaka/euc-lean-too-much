@@ -73,7 +73,6 @@ class EucGame(
     private var countdownTimer = 2f
     private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
-    private var currentCollisionType: ObstacleType? = null  // Track collision type for sound
 
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
@@ -146,7 +145,11 @@ class EucGame(
 
         // Add systems to engine
         eucPhysicsSystem = EucPhysicsSystem(gameInput)
-        eucPhysicsSystem.onPlayerFall = { handlePlayerFall() }
+        eucPhysicsSystem.onPlayerFall = {
+            // Play generic hit sound for physics-based falls (wobble, loss of balance)
+            platformServices.playGenericHitSound()
+            handlePlayerFall()
+        }
 
         collisionSystem = CollisionSystem()
         collisionSystem.onCollision = { obstacleType, causesGameOver ->
@@ -157,10 +160,10 @@ class EucGame(
                 ObstacleType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
                 ObstacleType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
                 ObstacleType.PEDESTRIAN -> platformServices.playPersonImpactSound()
-                else -> {} // Other obstacles use crash sound via handlePlayerFall
+                ObstacleType.CAR -> platformServices.playCarCrashSound()
+                ObstacleType.CURB, ObstacleType.POTHOLE -> platformServices.playGenericHitSound()
             }
             if (causesGameOver) {
-                currentCollisionType = obstacleType
                 handlePlayerFall()
             }
         }
@@ -634,6 +637,8 @@ class EucGame(
                 motorSoundManager.start()
                 // Resume music
                 musicManager.resume()
+                // Prevent camera mode change on resume (finger lift would trigger tap)
+                wasTouched = Gdx.input.isTouched(0)
                 stateManager.transition(GameState.Playing(pausedState.session))
             }
             PauseRenderer.ButtonClicked.RESTART -> {
@@ -767,20 +772,14 @@ class EucGame(
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         if (eucComponent != null && playerTransform != null) {
-            // Skip crash sound for obstacles that have their own impact sound
-            val skipCrashSound = currentCollisionType in listOf(
-                ObstacleType.STREET_LIGHT,
-                ObstacleType.RECYCLE_BIN,
-                ObstacleType.PEDESTRIAN
-            )
+            // Always skip synthesized crash sound - all obstacles have their own sounds now
             fallAnimationController.start(
                 speed = eucComponent.speed,
                 forwardLean = eucComponent.forwardLean,
                 sideLean = eucComponent.sideLean,
                 yaw = playerTransform.yaw,
-                skipSound = skipCrashSound
+                skipSound = true  // All obstacles have their own sounds
             )
-            currentCollisionType = null  // Reset for next collision
         }
 
         // Transition to falling state (will show animation before game over)

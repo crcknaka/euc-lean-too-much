@@ -65,6 +65,8 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     private val streetLightImpactSound: Int = soundPool.load(context, R.raw.impact_street_light, 1)
     private val recycleBinImpactSound: Int = soundPool.load(context, R.raw.impact_recycle, 1)
     private val personImpactSound: Int = soundPool.load(context, R.raw.personimpact, 1)
+    private val genericHitSound: Int = soundPool.load(context, R.raw.hit1, 1)
+    private val carCrashSound: Int = soundPool.load(context, R.raw.carcrash, 1)
 
     override fun vibrate(durationMs: Long, amplitude: Int) {
         if (!hasVibrator()) return
@@ -677,7 +679,7 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     }
 
     override fun playStreetLightImpactSound() {
-        soundPool.play(streetLightImpactSound, 1f, 1f, 1, 0, 1f)
+        soundPool.play(streetLightImpactSound, 0.6f, 0.6f, 1, 0, 1f)  // Quieter
     }
 
     override fun playRecycleBinImpactSound() {
@@ -686,5 +688,13 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
     override fun playPersonImpactSound() {
         soundPool.play(personImpactSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playGenericHitSound() {
+        soundPool.play(genericHitSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playCarCrashSound() {
+        soundPool.play(carCrashSound, 1f, 1f, 1, 0, 1f)
     }
 }
