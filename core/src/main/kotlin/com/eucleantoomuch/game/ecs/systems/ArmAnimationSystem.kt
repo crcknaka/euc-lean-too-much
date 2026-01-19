@@ -103,20 +103,26 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         val swingTime = arm.balanceTime * 1.2f
         val idleSway = MathUtils.sin(swingTime) * 3f * (1f - accelFactor)  // Less sway when accelerating
 
-        // Turn response - BOTH arms swing in SAME direction (inertia effect)
-        val turnSwing = -euc.visualSideLean * 40f * (1f - accelFactor * 0.7f)  // Less turn response when arms forward
+        // Turn response when not accelerating - BOTH arms swing in SAME direction (inertia effect)
+        val turnSwing = -euc.visualSideLean * 40f * (1f - accelFactor * 0.7f)
+
+        // Dynamic turn response when accelerating - opposite arms react via pitch
+        // Left turn (negative sideLean) -> left arm drops (less forward), right stays up
+        // Right turn (positive sideLean) -> right arm drops (less forward), left stays up
+        val turnPitchDrop = euc.visualSideLean * 40f * accelFactor  // Only when accelerating
 
         // Forearm bend: straight when reaching forward, slightly bent when relaxed
         val forearmBend = MathUtils.lerp(10f, 0f, accelFactor)
 
-        // Both arms move together
+        // Left arm - in left turn pitch goes toward 0 (drops down)
         arm.leftArmYaw = targetYaw + idleSway + turnSwing
-        arm.leftArmPitch = targetPitch
+        arm.leftArmPitch = targetPitch + turnPitchDrop  // positive turnPitchDrop = less forward = lower
         arm.leftArmRoll = 0f
         arm.leftForearmBend = forearmBend
 
+        // Right arm - in right turn pitch goes toward 0 (drops down)
         arm.rightArmYaw = targetYaw + idleSway + turnSwing
-        arm.rightArmPitch = targetPitch
+        arm.rightArmPitch = targetPitch - turnPitchDrop  // negative = less forward = lower
         arm.rightArmRoll = 0f
         arm.rightForearmBend = forearmBend
     }
@@ -131,16 +137,16 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         // Turn response - both arms shift together
         val turnResponse = euc.visualSideLean * 15f
 
-        // Left arm
-        arm.leftArmYaw = 25f + idleSway + turnResponse
+        // Left arm - closer to body
+        arm.leftArmYaw = 10f + idleSway + turnResponse
         arm.leftArmPitch = 50f
-        arm.leftArmRoll = -15f
+        arm.leftArmRoll = -10f
         arm.leftForearmBend = 90f
 
         // Right arm - same turn direction
-        arm.rightArmYaw = 25f + idleSway + turnResponse
+        arm.rightArmYaw = 10f + idleSway + turnResponse
         arm.rightArmPitch = 50f
-        arm.rightArmRoll = 15f
+        arm.rightArmRoll = 10f
         arm.rightForearmBend = 90f
     }
 
