@@ -19,9 +19,11 @@ class CollisionSystem : EntitySystem(5) {
     private val obstacleMapper = ComponentMapper.getFor(ObstacleComponent::class.java)
     private val eucMapper = ComponentMapper.getFor(EucComponent::class.java)
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
+    private val pedestrianMapper = ComponentMapper.getFor(PedestrianComponent::class.java)
 
     var onCollision: ((ObstacleType, Boolean) -> Unit)? = null  // Type, causesGameOver
     var onNearMiss: (() -> Unit)? = null  // Called when player passes close to pedestrian
+    var onPedestrianHit: ((Entity) -> Unit)? = null  // Called when player hits a pedestrian
 
     // Near miss tracking - distance threshold for "close call"
     private val nearMissThresholdPedestrian = 1.2f  // Distance in meters for pedestrian near miss
@@ -56,6 +58,12 @@ class CollisionSystem : EntitySystem(5) {
 
             if (obstacleComponent.hasBeenPassed) continue
 
+            // Skip pedestrians that are already falling (ragdolling)
+            if (obstacleComponent.type == ObstacleType.PEDESTRIAN) {
+                val pedestrianComponent = pedestrianMapper.get(obstacleEntity)
+                if (pedestrianComponent != null && pedestrianComponent.isRagdolling) continue
+            }
+
             // Skip obstacles too far away (quick Z distance check)
             val zDist = obstacleTransform.position.z - playerZ
             if (zDist > collisionCheckRange || zDist < -5f) {
@@ -73,7 +81,7 @@ class CollisionSystem : EntitySystem(5) {
 
             // Simple AABB collision check
             if (checkAABBCollision(playerCollider, obstacleCollider)) {
-                handleCollision(playerComponent, eucComponent, obstacleComponent)
+                handleCollision(playerComponent, eucComponent, obstacleComponent, obstacleEntity)
             } else if (!obstacleComponent.nearMissTriggered) {
                 // Near miss detection for pedestrians and cars
                 val nearMissThreshold = when (obstacleComponent.type) {
@@ -105,7 +113,8 @@ class CollisionSystem : EntitySystem(5) {
     private fun handleCollision(
         player: PlayerComponent,
         euc: EucComponent,
-        obstacle: ObstacleComponent
+        obstacle: ObstacleComponent,
+        obstacleEntity: Entity
     ) {
         when (obstacle.type) {
             ObstacleType.PUDDLE -> {
@@ -128,6 +137,15 @@ class CollisionSystem : EntitySystem(5) {
                     euc.applyWobbleEffect(0.7f)
                     onCollision?.invoke(ObstacleType.POTHOLE, false)
                 }
+            }
+            ObstacleType.PEDESTRIAN -> {
+                // Pedestrian collision - pedestrian falls AND player falls too
+                onPedestrianHit?.invoke(obstacleEntity)
+                // Mark as passed so we don't collide again
+                obstacle.hasBeenPassed = true
+                // Player also falls when hitting pedestrian
+                player.isAlive = false
+                onCollision?.invoke(obstacle.type, true)
             }
             else -> {
                 // All other obstacles cause game over

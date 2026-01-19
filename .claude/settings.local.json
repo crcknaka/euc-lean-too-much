@@ -15,7 +15,9 @@
       "Bash(.gradlew.bat android:assembleDebug)",
       "Bash(powershell -Command \"cd C:\\\\Projects\\\\euc-lean-too-much; .\\\\gradlew.bat android:assembleDebug\")",
       "Bash(cmd //c gradlew.bat :core:compileKotlin)",
-      "Bash(cmd /c \"gradlew.bat android:assembleDebug\")"
+      "Bash(cmd /c \"gradlew.bat android:assembleDebug\")",
+      "Bash(cmd.exe /c:*)",
+      "Bash(powershell -Command:*)"
     ]
   }
 }

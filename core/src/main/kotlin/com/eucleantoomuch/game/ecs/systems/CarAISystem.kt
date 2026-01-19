@@ -13,7 +13,12 @@ class CarAISystem : IteratingSystem(Families.cars, 4) {
     private val velocityMapper = ComponentMapper.getFor(VelocityComponent::class.java)
     private val carMapper = ComponentMapper.getFor(CarComponent::class.java)
 
+    /** Debug flag to freeze all AI movement */
+    var frozen = false
+
     override fun processEntity(entity: Entity, deltaTime: Float) {
+        if (frozen) return  // Skip AI processing when frozen
+
         val velocity = velocityMapper.get(entity)
         val car = carMapper.get(entity)
 

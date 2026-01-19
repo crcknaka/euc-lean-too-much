@@ -12,7 +12,7 @@ class FallAnimationController(
     private val platformServices: PlatformServices
 ) {
     companion object {
-        const val FALL_DURATION = 2.0f  // Total animation duration in seconds
+        const val FALL_DURATION = 3.0f  // Total animation duration in seconds
         const val IMPACT_TIME = 0.15f   // When the "impact" happens
     }
 

@@ -75,6 +75,15 @@ class RagdollPhysics : Disposable {
         val motionState: btDefaultMotionState
     )
 
+    // Pedestrian ragdoll bodies (simple box physics, uses original model)
+    data class PedestrianBody(
+        var shape: btCollisionShape? = null,
+        var body: btRigidBody? = null,
+        var motionState: btDefaultMotionState? = null,
+        var entityIndex: Int = -1  // To track which entity this belongs to
+    )
+    private val pedestrianBodies = mutableListOf<PedestrianBody>()
+
     // State
     private var isActive = false
     private var isFrozen = false  // When frozen, ragdoll stays visible but doesn't simulate
@@ -151,7 +160,7 @@ class RagdollPhysics : Disposable {
         // EUC dimensions as box: width ~0.12m, height ~0.44m, depth ~0.44m
         eucShape = btBoxShape(Vector3(0.06f, 0.22f, 0.22f))
 
-        val eucMass = 20f  // 20 kg EUC
+        val eucMass = 35f  // 35 kg EUC (heavy wheel like Begode, Veteran)
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
@@ -495,9 +504,11 @@ class RagdollPhysics : Disposable {
 
     /**
      * Step the physics simulation.
+     * Runs if main ragdoll is active OR if there are falling pedestrians.
      */
     fun update(delta: Float) {
-        if (!isActive) return
+        // Run simulation if main ragdoll is active or there are pedestrian ragdolls
+        if (!isActive && pedestrianBodies.isEmpty()) return
 
         // Step physics world (max 4 substeps for stability)
         dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
@@ -629,6 +640,108 @@ class RagdollPhysics : Disposable {
     }
 
     /**
+     * Add a pedestrian ragdoll body (simple box that falls when hit).
+     * @param position Center position of the pedestrian
+     * @param yaw Rotation around Y axis in degrees
+     * @param playerVelocity Player's speed at collision (used for impact force)
+     * @param playerDirection Direction player was moving (normalized)
+     * @param entityIndex Index to track which entity this belongs to
+     * @return Index of the created pedestrian body
+     */
+    fun addPedestrianRagdoll(
+        position: Vector3,
+        yaw: Float,
+        playerVelocity: Float,
+        playerDirection: Vector3,
+        entityIndex: Int
+    ): Int {
+        // Pedestrian dimensions: width 0.5m, height 1.7m
+        val halfWidth = 0.25f
+        val halfHeight = 0.85f
+        val halfDepth = 0.2f
+
+        val shape = btBoxShape(Vector3(halfWidth, halfHeight, halfDepth))
+        val mass = 70f  // ~70kg human
+
+        val inertia = Vector3()
+        shape.calculateLocalInertia(mass, inertia)
+
+        // Initial transform - center of mass at hip height
+        tempMatrix.idt()
+        tempMatrix.translate(position.x, position.y + halfHeight, position.z)
+        tempMatrix.rotate(Vector3.Y, yaw)
+
+        val motionState = btDefaultMotionState(tempMatrix)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, motionState, shape, inertia)
+        val body = btRigidBody(info)
+        body.friction = 0.6f
+        body.restitution = 0.1f
+        body.setDamping(0.1f, 0.3f)
+        body.activationState = 4  // DISABLE_DEACTIVATION
+
+        // Apply impact force from player collision (realistic - pedestrian stumbles/falls, doesn't fly)
+        val impactForce = playerVelocity * 25f  // Much lower - realistic stumble
+        val upwardForce = 0.5f + playerVelocity * 0.05f  // Minimal upward - just enough to start falling
+
+        body.linearVelocity = Vector3(
+            playerDirection.x * impactForce * 0.5f,
+            upwardForce,
+            playerDirection.z * impactForce * 0.5f
+        )
+
+        // Add some spin/tumble (reduced for realism)
+        body.angularVelocity = Vector3(
+            playerVelocity * 0.2f,  // Tumble forward
+            playerDirection.x * 0.5f,  // Slight spin based on impact direction
+            -playerDirection.z * 0.1f
+        )
+
+        dynamicsWorld.addRigidBody(body)
+        info.dispose()
+
+        val pedestrianBody = PedestrianBody(shape, body, motionState, entityIndex)
+        pedestrianBodies.add(pedestrianBody)
+
+        Gdx.app.log("RagdollPhysics", "Added pedestrian ragdoll at ${position}, velocity=$playerVelocity")
+
+        return pedestrianBodies.size - 1
+    }
+
+    /**
+     * Get transform for a pedestrian ragdoll body.
+     * Pedestrian ragdolls work independently of main ragdoll state.
+     * @param index Index returned by addPedestrianRagdoll
+     * @return Transform matrix or null if invalid
+     */
+    fun getPedestrianTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianBodies.size) return null
+
+        val pedestrian = pedestrianBodies[index]
+        pedestrian.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get number of active pedestrian ragdoll bodies.
+     */
+    fun getPedestrianCount(): Int = pedestrianBodies.size
+
+    /**
+     * Clear all pedestrian ragdoll bodies.
+     */
+    private fun clearPedestrianBodies() {
+        for (pedestrian in pedestrianBodies) {
+            pedestrian.body?.let {
+                dynamicsWorld.removeRigidBody(it)
+                it.dispose()
+            }
+            pedestrian.motionState?.dispose()
+            pedestrian.shape?.dispose()
+        }
+        pedestrianBodies.clear()
+    }
+
+    /**
      * Stop the simulation and cleanup bodies.
      */
     fun stop() {
@@ -647,6 +760,9 @@ class RagdollPhysics : Disposable {
 
         // Cleanup world colliders
         clearWorldColliders()
+
+        // Cleanup pedestrian ragdolls
+        clearPedestrianBodies()
 
         // Cleanup EUC
         cleanupBody(eucBody, eucMotionState, eucShape)

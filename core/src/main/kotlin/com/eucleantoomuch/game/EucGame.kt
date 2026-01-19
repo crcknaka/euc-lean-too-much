@@ -45,6 +45,8 @@ import com.eucleantoomuch.game.ui.SettingsRenderer
 import com.eucleantoomuch.game.ui.UIFeedback
 import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
+import com.eucleantoomuch.game.ui.DebugMenu
+import com.eucleantoomuch.game.ui.DebugConfig
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -71,6 +73,10 @@ class EucGame(
     private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
     private lateinit var replayRenderer: ReplayRenderer
 
+    // Debug menu (admin tools)
+    private lateinit var debugMenu: DebugMenu
+    private lateinit var debugShapeRenderer: com.badlogic.gdx.graphics.glutils.ShapeRenderer
+
     // Replay system
     private lateinit var replaySystem: ReplaySystem
 
@@ -89,6 +95,8 @@ class EucGame(
     private lateinit var collisionSystem: CollisionSystem
     private lateinit var cullingSystem: CullingSystem
     private lateinit var pigeonSystem: PigeonSystem
+    private lateinit var pedestrianAISystem: PedestrianAISystem
+    private lateinit var carAISystem: CarAISystem
 
     // Speed warning system (beeps and vibration at high speed)
     private lateinit var speedWarningManager: SpeedWarningManager
@@ -191,14 +199,20 @@ class EucGame(
             UIFeedback.nearMiss()
             session.nearMisses++
         }
+        collisionSystem.onPedestrianHit = { pedestrianEntity ->
+            // Start ragdoll physics for the hit pedestrian
+            startPedestrianRagdoll(pedestrianEntity)
+        }
 
         pigeonSystem = PigeonSystem(models, platformServices)
         cullingSystem = CullingSystem()
+        pedestrianAISystem = PedestrianAISystem()
+        carAISystem = CarAISystem()
 
         engine.addSystem(eucPhysicsSystem)
         engine.addSystem(MovementSystem())
-        engine.addSystem(PedestrianAISystem())
-        engine.addSystem(CarAISystem())
+        engine.addSystem(pedestrianAISystem)
+        engine.addSystem(carAISystem)
         engine.addSystem(pigeonSystem)
         engine.addSystem(ArmAnimationSystem())
         engine.addSystem(HeadAnimationSystem())
@@ -215,6 +229,10 @@ class EucGame(
         creditsRenderer = CreditsRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
         replayRenderer = ReplayRenderer()
+
+        // Initialize debug menu (admin tools)
+        debugMenu = DebugMenu(engine)
+        debugShapeRenderer = com.badlogic.gdx.graphics.glutils.ShapeRenderer()
 
         // Initialize replay system
         replaySystem = ReplaySystem()
@@ -334,7 +352,21 @@ class EucGame(
         // Apply FPS limit if set
         applyFpsLimit()
 
-        val delta = Gdx.graphics.deltaTime
+        var delta = Gdx.graphics.deltaTime
+
+        // Apply slow motion from debug menu
+        if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.slowMotion) {
+            delta *= debugMenu.timeScale
+        }
+
+        // Update debug menu
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            debugMenu.update(Gdx.graphics.deltaTime)  // Use real delta for menu responsiveness
+
+            // Sync freeze AI state to AI systems
+            pedestrianAISystem.frozen = debugMenu.freezeAI
+            carAISystem.frozen = debugMenu.freezeAI
+        }
 
         // Update input
         gameInput.update(delta)
@@ -391,6 +423,20 @@ class EucGame(
             if (cameraViewModeTimer > 0) {
                 cameraViewModeTimer -= delta
             }
+        }
+
+        // Render debug overlays and menu (always on top, after all other rendering)
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            // Render debug info overlays (stats, entity info, etc.)
+            debugMenu.renderOverlays(
+                playerEntity = playerEntity,
+                inputData = gameInput.getInput(),
+                cameraPosition = renderer.cameraController.getCameraPosition(),
+                cameraYaw = renderer.cameraController.getCameraYaw()
+            )
+
+            // Render debug menu panel (if open)
+            debugMenu.render()
         }
     }
 
@@ -595,6 +641,10 @@ class EucGame(
         // Update game
         updateGameWorld(delta, processInput = true)
 
+        // Update pedestrian ragdoll physics (if any pedestrians are falling)
+        ragdollPhysics?.update(delta)
+        updateFallingPedestrians()
+
         // Update session
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
@@ -670,6 +720,15 @@ class EucGame(
 
         // Render
         renderer.render()
+
+        // Render 3D debug visualizations (colliders, etc.)
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            debugMenu.render3DDebug(
+                shapeRenderer = debugShapeRenderer,
+                camera = renderer.camera,
+                playerPosition = playerTransform?.position
+            )
+        }
 
         // Render HUD
         if (eucComponent != null) {
@@ -855,7 +914,55 @@ class EucGame(
         renderer.riderEntity = null
     }
 
+    // Temp vector for pedestrian ragdoll
+    private val pedestrianImpactDir = com.badlogic.gdx.math.Vector3()
+
+    private fun startPedestrianRagdoll(pedestrianEntity: com.badlogic.ashley.core.Entity) {
+        if (!useRagdollPhysics || ragdollPhysics == null) return
+
+        val pedestrianComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
+        ) ?: return
+
+        // Don't ragdoll if already ragdolling
+        if (pedestrianComponent.isRagdolling) return
+
+        val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
+        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
+        val eucComponent = playerEntity?.getComponent(EucComponent::class.java) ?: return
+
+        // Calculate impact direction (from player to pedestrian)
+        val yawRad = Math.toRadians(playerTransform.yaw.toDouble()).toFloat()
+        pedestrianImpactDir.set(
+            kotlin.math.sin(yawRad),
+            0f,
+            kotlin.math.cos(yawRad)
+        )
+
+        // Add pedestrian ragdoll body
+        val bodyIndex = ragdollPhysics!!.addPedestrianRagdoll(
+            position = pedestrianTransform.position,
+            yaw = pedestrianTransform.yaw,
+            playerVelocity = eucComponent.speed,
+            playerDirection = pedestrianImpactDir,
+            entityIndex = pedestrianEntity.hashCode()
+        )
+
+        // Mark pedestrian as ragdolling
+        pedestrianComponent.isRagdolling = true
+        pedestrianComponent.ragdollBodyIndex = bodyIndex
+        pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+
+        Gdx.app.log("EucGame", "Started pedestrian ragdoll, index=$bodyIndex")
+    }
+
     private fun handlePlayerFall() {
+        // God mode - prevent death
+        if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.godMode) {
+            Gdx.app.log("Debug", "God mode: Player death prevented")
+            return
+        }
+
         // Stop speed warnings
         speedWarningManager.stop()
         // Stop motor sound
@@ -887,7 +994,8 @@ class EucGame(
                     forwardLean = eucComponent.forwardLean
                 )
 
-                // Add colliders for nearby world objects
+                // Reset collider tracking and add initial colliders
+                resetColliderTracking()
                 addWorldCollidersForRagdoll(playerTransform.position)
             }
         }
@@ -910,10 +1018,12 @@ class EucGame(
         // Update fall animation (for camera effects and timing)
         fallAnimationController.update(delta)
 
+        // Always update ragdoll physics (for pedestrians even if player ragdoll is inactive)
+        ragdollPhysics?.update(delta)
+
         // Update ragdoll physics if active
         val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
         if (ragdollActive) {
-            ragdollPhysics!!.update(delta)
 
             // Hide rider models during ragdoll - use RagdollRenderer instead
             // BUT keep playerEntity (EUC wheel) visible - it uses original model
@@ -949,6 +1059,9 @@ class EucGame(
                 // Get EUC position from physics
                 ragdollPhysics!!.getEucPosition(ragdollEucPos)
                 playerTransform.position.set(ragdollEucPos)
+
+                // Dynamically update world colliders as ragdoll moves
+                updateWorldCollidersForRagdoll(ragdollEucPos)
 
                 // Get rotation from physics transform matrix
                 val eucTransform = ragdollPhysics!!.getEucTransform()
@@ -1019,6 +1132,9 @@ class EucGame(
             val cameraFollowPos = if (usePhysicsPositions) ragdollTorsoPos else playerTransform.position
             renderer.cameraController.update(cameraFollowPos, playerTransform.yaw, delta, 0f)
         }
+
+        // Update falling pedestrians (always, not just when player ragdoll is active)
+        updateFallingPedestrians()
 
         // Render the scene (ragdoll is rendered inside main render pass via activeRagdollRenderer)
         renderer.render()
@@ -1282,6 +1398,9 @@ class EucGame(
         creditsRenderer.resize(width, height)
         wheelSelectionRenderer.resize(width, height)
         replayRenderer.resize(width, height)
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            debugMenu.resize(width, height)
+        }
     }
 
     override fun resume() {
@@ -1301,6 +1420,9 @@ class EucGame(
         creditsRenderer.recreate()
         wheelSelectionRenderer.recreate()
         replayRenderer.recreate()
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            debugMenu.recreate()
+        }
     }
 
     override fun dispose() {
@@ -1319,6 +1441,10 @@ class EucGame(
         replayRenderer.dispose()
         ragdollPhysics?.dispose()
         ragdollRenderer?.dispose()
+        if (DebugConfig.DEBUG_MENU_ENABLED) {
+            debugMenu.dispose()
+            debugShapeRenderer.dispose()
+        }
     }
 
     // Add physics colliders for nearby world objects during ragdoll
@@ -1419,6 +1545,149 @@ class EucGame(
         }
 
         Gdx.app.log("EucGame", "Added $colliderCount world colliders for ragdoll physics")
+    }
+
+    // Track entities that already have colliders added (to avoid duplicates)
+    private val addedColliderEntities = mutableSetOf<com.badlogic.ashley.core.Entity>()
+    private var lastColliderUpdateZ = Float.MIN_VALUE
+
+    /**
+     * Dynamically update world colliders as ragdoll moves forward.
+     * Only adds NEW colliders for objects that weren't in range before.
+     */
+    private fun updateWorldCollidersForRagdoll(ragdollPos: com.badlogic.gdx.math.Vector3) {
+        val physics = ragdollPhysics ?: return
+
+        // Only update every 5 meters of forward movement to avoid constant updates
+        if (ragdollPos.z - lastColliderUpdateZ < 5f) return
+        lastColliderUpdateZ = ragdollPos.z
+
+        // Search radius for nearby objects
+        val searchRadius = 25f
+        val searchRadiusSq = searchRadius * searchRadius
+
+        var newColliderCount = 0
+
+        // Check all collidable objects
+        val collidables = engine.getEntitiesFor(Families.collidable)
+        for (i in 0 until collidables.size()) {
+            val entity = collidables[i]
+
+            // Skip if already added
+            if (entity in addedColliderEntities) continue
+
+            // Skip player and rider entities
+            if (entity == playerEntity || entity == riderEntity) continue
+
+            val transform = transformMapperForCollider.get(entity) ?: continue
+            val collider = colliderMapper.get(entity) ?: continue
+
+            // Skip very small colliders
+            if (collider.halfExtents.len() < 0.1f) continue
+
+            // Check if within range
+            val dx = transform.position.x - ragdollPos.x
+            val dz = transform.position.z - ragdollPos.z
+            val distSq = dx * dx + dz * dz
+            if (distSq > searchRadiusSq) continue
+
+            // Get collider center position
+            tempColliderPos.set(
+                transform.position.x,
+                transform.position.y + collider.halfExtents.y,
+                transform.position.z
+            )
+            tempHalfExtents.set(collider.halfExtents)
+
+            // Check obstacle type for special handling
+            val obstacle = obstacleMapper.get(entity)
+            if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
+                physics.addCylinderCollider(tempColliderPos, 0.15f, collider.halfExtents.y * 2f)
+            } else {
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+            }
+
+            addedColliderEntities.add(entity)
+            newColliderCount++
+        }
+
+        // Also check cars
+        val cars = engine.getEntitiesFor(Families.cars)
+        for (i in 0 until cars.size()) {
+            val entity = cars[i]
+            if (entity in addedColliderEntities) continue
+
+            val transform = transformMapperForCollider.get(entity) ?: continue
+            val collider = colliderMapper.get(entity) ?: continue
+
+            val dx = transform.position.x - ragdollPos.x
+            val dz = transform.position.z - ragdollPos.z
+            val distSq = dx * dx + dz * dz
+            if (distSq > searchRadiusSq) continue
+
+            tempColliderPos.set(
+                transform.position.x,
+                transform.position.y + collider.halfExtents.y,
+                transform.position.z
+            )
+            physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw)
+
+            addedColliderEntities.add(entity)
+            newColliderCount++
+        }
+
+        if (newColliderCount > 0) {
+            Gdx.app.log("EucGame", "Added $newColliderCount new colliders during ragdoll flight")
+        }
+    }
+
+    /**
+     * Reset collider tracking when starting new ragdoll.
+     */
+    private fun resetColliderTracking() {
+        addedColliderEntities.clear()
+        lastColliderUpdateZ = Float.MIN_VALUE
+    }
+
+    // Temp matrix for pedestrian transform updates
+    private val pedestrianTempMatrix = com.badlogic.gdx.math.Matrix4()
+    private val pedestrianTempPos = com.badlogic.gdx.math.Vector3()
+
+    /**
+     * Update positions of falling pedestrians from ragdoll physics.
+     */
+    private fun updateFallingPedestrians() {
+        if (ragdollPhysics == null) return
+
+        val pedestrians = engine.getEntitiesFor(Families.pedestrians)
+        for (i in 0 until pedestrians.size()) {
+            val entity = pedestrians[i]
+            val pedestrianComponent = entity.getComponent(
+                com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
+            ) ?: continue
+
+            if (!pedestrianComponent.isRagdolling) continue
+
+            val transform = entity.getComponent(TransformComponent::class.java) ?: continue
+            val modelComponent = entity.getComponent(ModelComponent::class.java) ?: continue
+
+            // Get physics transform
+            val physicsTransform = ragdollPhysics!!.getPedestrianTransform(pedestrianComponent.ragdollBodyIndex)
+            if (physicsTransform != null) {
+                // Extract position from physics
+                physicsTransform.getTranslation(pedestrianTempPos)
+
+                // Update entity transform position
+                transform.position.set(pedestrianTempPos)
+                // Offset Y down by half height since physics center is at hip level
+                transform.position.y = pedestrianTempPos.y - 0.85f
+
+                // Update model instance transform directly for rotation
+                modelComponent.modelInstance?.transform?.set(physicsTransform)
+                // Correct the Y position for model (physics is centered at hip)
+                modelComponent.modelInstance?.transform?.translate(0f, -0.85f, 0f)
+            }
+        }
     }
 
     // Helper functions to extract rotation angles from transformation matrix

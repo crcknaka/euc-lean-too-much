@@ -16,7 +16,11 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
     private val velocityMapper = ComponentMapper.getFor(VelocityComponent::class.java)
     private val pedestrianMapper = ComponentMapper.getFor(PedestrianComponent::class.java)
 
+    /** Debug flag to freeze all AI movement */
+    var frozen = false
+
     override fun processEntity(entity: Entity, deltaTime: Float) {
+        if (frozen) return  // Skip AI processing when frozen
         val transform = transformMapper.get(entity)
         val velocity = velocityMapper.get(entity)
         val pedestrian = pedestrianMapper.get(entity)
@@ -96,6 +100,11 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
             }
 
             PedestrianState.STANDING, PedestrianState.CHATTING -> {
+                velocity.linear.setZero()
+            }
+
+            PedestrianState.FALLING -> {
+                // Ragdoll physics controls this pedestrian, don't update AI
                 velocity.linear.setZero()
             }
         }
@@ -186,6 +195,11 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
             PedestrianState.CROSSING, PedestrianState.WALKING_TO_CROSSING -> {
                 // Sidewalk pedestrians don't cross, treat as walking
                 pedestrian.state = PedestrianState.WALKING
+            }
+
+            PedestrianState.FALLING -> {
+                // Ragdoll physics controls this pedestrian, don't update AI
+                velocity.linear.setZero()
             }
         }
     }
