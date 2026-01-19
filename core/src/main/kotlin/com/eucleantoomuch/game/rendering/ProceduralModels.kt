@@ -30,7 +30,7 @@ class ProceduralModels : Disposable {
     private val helmetColor = Color(0.15f, 0.15f, 0.15f, 1f)     // Dark helmet
     private val helmetVisorColor = Color(0.1f, 0.1f, 0.12f, 1f)  // Slightly reflective visor
     private val roadColor = Color(0.3f, 0.3f, 0.3f, 1f)          // Dark gray
-    private val sidewalkColor = Color(0.6f, 0.6f, 0.6f, 1f)      // Light gray
+    private val sidewalkColor = Color(0.5f, 0.5f, 0.5f, 1f)      // Medium gray
     private val roadLineColor = Color(1f, 1f, 1f, 1f)            // White
     private val manholeColor = Color(0.15f, 0.15f, 0.15f, 1f)    // Very dark
     private val puddleColor = Color(0.3f, 0.4f, 0.6f, 0.7f)      // Blue-ish
