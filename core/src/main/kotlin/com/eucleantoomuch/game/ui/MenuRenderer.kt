@@ -17,12 +17,14 @@ class MenuRenderer : Disposable {
     private val playButton = Rectangle()
     private val calibrateButton = Rectangle()
     private val settingsButton = Rectangle()
+    private val creditsButton = Rectangle()
     private val exitButton = Rectangle()
 
     // Animation states
     private var playButtonHover = 0f
     private var calibrateButtonHover = 0f
     private var settingsButtonHover = 0f
+    private var creditsButtonHover = 0f
     private var exitButtonHover = 0f
     private var titlePulse = 0f
     private var enterAnimProgress = 0f
@@ -48,7 +50,7 @@ class MenuRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, PLAY, CALIBRATE, SETTINGS, EXIT
+        NONE, PLAY, CALIBRATE, SETTINGS, CREDITS, EXIT
     }
 
     fun render(highScore: Int, maxDistance: Float, maxNearMisses: Int): ButtonClicked {
@@ -73,11 +75,13 @@ class MenuRenderer : Disposable {
         val playHovered = playButton.contains(touchX, touchY)
         val calibrateHovered = calibrateButton.contains(touchX, touchY)
         val settingsHovered = settingsButton.contains(touchX, touchY)
+        val creditsHovered = creditsButton.contains(touchX, touchY)
         val exitHovered = exitButton.contains(touchX, touchY)
 
         playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 10f)
         calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 10f)
         settingsButtonHover = UITheme.Anim.ease(settingsButtonHover, if (settingsHovered) 1f else 0f, 10f)
+        creditsButtonHover = UITheme.Anim.ease(creditsButtonHover, if (creditsHovered) 1f else 0f, 10f)
         exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 10f)
 
         val scale = UITheme.Dimensions.scale()
@@ -112,18 +116,20 @@ class MenuRenderer : Disposable {
         val buttonsStartY = centerY + 80f * scale
         playButton.set(centerX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
         calibrateButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
+        settingsButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight * 2 - buttonSpacing * 2, buttonWidth, buttonHeight)
 
-        // Settings and Exit buttons side by side
-        val smallButtonsY = buttonsStartY - buttonHeight * 2 - buttonSpacing * 3
+        // Credits and Exit buttons side by side (small)
+        val smallButtonsY = buttonsStartY - buttonHeight * 3 - buttonSpacing * 4
         val smallButtonSpacing = 24f * scale
-        settingsButton.set(centerX - smallButtonWidth - smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        creditsButton.set(centerX - smallButtonWidth - smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
         exitButton.set(centerX + smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
 
         // Apply enter animation
         val playY = playButton.y - (1 - enterAnimProgress) * 120
         val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 180
         val settingsY = settingsButton.y - (1 - enterAnimProgress) * 240
-        val exitY = exitButton.y - (1 - enterAnimProgress) * 240
+        val creditsY = creditsButton.y - (1 - enterAnimProgress) * 300
+        val exitY = exitButton.y - (1 - enterAnimProgress) * 300
 
         // Draw buttons with modern style
         val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
@@ -134,6 +140,9 @@ class MenuRenderer : Disposable {
 
         val settingsRect = Rectangle(settingsButton.x, settingsY, settingsButton.width, settingsButton.height)
         ui.button(settingsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = settingsButtonHover * 0.4f)
+
+        val creditsRect = Rectangle(creditsButton.x, creditsY, creditsButton.width, creditsButton.height)
+        ui.button(creditsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = creditsButtonHover * 0.4f)
 
         val exitRect = Rectangle(exitButton.x, exitY, exitButton.width, exitButton.height)
         ui.button(exitRect, UITheme.danger, pressedOffset = 0f, glowIntensity = exitButtonHover * 0.6f)
@@ -166,7 +175,8 @@ class MenuRenderer : Disposable {
         // Button labels with larger text
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
         ui.textCentered("CALIBRATE", calibrateRect.x + calibrateRect.width / 2, calibrateRect.y + calibrateRect.height / 2, UIFonts.button, UITheme.textPrimary)
-        ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.body, UITheme.textPrimary)
+        ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.button, UITheme.textPrimary)
+        ui.textCentered("CREDITS", creditsRect.x + creditsRect.width / 2, creditsRect.y + creditsRect.height / 2, UIFonts.body, UITheme.textPrimary)
         ui.textCentered("EXIT", exitRect.x + exitRect.width / 2, exitRect.y + exitRect.height / 2, UIFonts.body, UITheme.textPrimary)
 
         // Stats with improved layout - 3 columns
@@ -219,6 +229,10 @@ class MenuRenderer : Disposable {
             if (settingsButton.contains(touchX, touchY)) {
                 UIFeedback.click()
                 return ButtonClicked.SETTINGS
+            }
+            if (creditsButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.CREDITS
             }
             if (exitButton.contains(touchX, touchY)) {
                 UIFeedback.click()

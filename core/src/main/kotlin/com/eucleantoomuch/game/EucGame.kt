@@ -32,6 +32,7 @@ import com.eucleantoomuch.game.state.GameStateManager
 import com.eucleantoomuch.game.state.HighScoreManager
 import com.eucleantoomuch.game.state.SettingsManager
 import com.eucleantoomuch.game.ui.CalibrationRenderer
+import com.eucleantoomuch.game.ui.CreditsRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
 import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
@@ -62,6 +63,7 @@ class EucGame(
     private lateinit var pauseRenderer: PauseRenderer
     private lateinit var calibrationRenderer: CalibrationRenderer
     private lateinit var settingsRenderer: SettingsRenderer
+    private lateinit var creditsRenderer: CreditsRenderer
     private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
 
     // Game state
@@ -191,6 +193,7 @@ class EucGame(
         pauseRenderer = PauseRenderer()
         calibrationRenderer = CalibrationRenderer()
         settingsRenderer = SettingsRenderer(settingsManager)
+        creditsRenderer = CreditsRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
 
         // Apply saved render distance setting
@@ -308,6 +311,7 @@ class EucGame(
             is GameState.Menu -> renderMenu()
             is GameState.WheelSelection -> renderWheelSelection()
             is GameState.Settings -> renderSettings()
+            is GameState.Credits -> renderCredits()
             is GameState.Calibrating -> renderCalibration()
             is GameState.Countdown -> renderCountdown(delta)
             is GameState.Playing -> renderPlaying(delta)
@@ -370,6 +374,10 @@ class EucGame(
             MenuRenderer.ButtonClicked.SETTINGS -> {
                 stateManager.transition(GameState.Settings(returnTo = GameState.Menu))
             }
+            MenuRenderer.ButtonClicked.CREDITS -> {
+                creditsRenderer.reset()
+                stateManager.transition(GameState.Credits)
+            }
             MenuRenderer.ButtonClicked.EXIT -> {
                 Gdx.app.exit()
                 // Force kill the process on Android (Gdx.app.exit() only minimizes)
@@ -421,6 +429,21 @@ class EucGame(
                 stateManager.transition(settingsState.returnTo)
             }
             SettingsRenderer.Action.NONE -> {}
+        }
+    }
+
+    private fun renderCredits() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        // Continue music during credits
+        musicManager.update(Gdx.graphics.deltaTime)
+
+        when (creditsRenderer.render()) {
+            CreditsRenderer.ButtonClicked.BACK -> {
+                stateManager.transition(GameState.Menu)
+            }
+            CreditsRenderer.ButtonClicked.NONE -> {}
         }
     }
 
@@ -889,6 +912,7 @@ class EucGame(
         pauseRenderer.resize(width, height)
         calibrationRenderer.resize(width, height)
         settingsRenderer.resize(width, height)
+        creditsRenderer.resize(width, height)
         wheelSelectionRenderer.resize(width, height)
     }
 
@@ -906,6 +930,7 @@ class EucGame(
         pauseRenderer.recreate()
         calibrationRenderer.recreate()
         settingsRenderer.recreate()
+        creditsRenderer.recreate()
         wheelSelectionRenderer.recreate()
     }
 
@@ -920,6 +945,7 @@ class EucGame(
         pauseRenderer.dispose()
         calibrationRenderer.dispose()
         settingsRenderer.dispose()
+        creditsRenderer.dispose()
         wheelSelectionRenderer.dispose()
     }
 }
