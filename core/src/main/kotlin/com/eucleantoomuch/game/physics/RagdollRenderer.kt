@@ -12,12 +12,11 @@ import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.Matrix4
-import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
 
 /**
  * Renders ragdoll physics bodies as visible 3D shapes.
- * Uses capsules for limbs, sphere for head, cylinder for EUC wheel.
+ * Uses boxes for limbs, sphere for head. EUC wheel uses original model.
  */
 class RagdollRenderer : Disposable {
 
@@ -30,7 +29,6 @@ class RagdollRenderer : Disposable {
     private lateinit var lowerArmModel: Model
     private lateinit var upperLegModel: Model
     private lateinit var lowerLegModel: Model
-    private lateinit var eucWheelModel: Model
 
     // Model instances (reused each frame)
     private val headInstance: ModelInstance
@@ -43,13 +41,11 @@ class RagdollRenderer : Disposable {
     private val leftLowerLegInstance: ModelInstance
     private val rightUpperLegInstance: ModelInstance
     private val rightLowerLegInstance: ModelInstance
-    private val eucWheelInstance: ModelInstance
 
     // Colors for body parts - match ProceduralModels colors exactly
     private val skinColor = Color(0.9f, 0.7f, 0.6f, 1f)    // Same as riderSkinColor
     private val torsoColor = Color(0.3f, 0.5f, 0.7f, 1f)   // Same as riderBodyColor (blue jacket)
     private val pantsColor = Color(0.2f, 0.2f, 0.3f, 1f)   // Same as riderPantsColor
-    private val eucColor = Color(0.1f, 0.1f, 0.1f, 1f)     // Same as eucWheelColor
     private val helmetColor = Color(0.15f, 0.15f, 0.15f, 1f) // Same as helmetColor
 
     init {
@@ -65,7 +61,6 @@ class RagdollRenderer : Disposable {
         leftLowerLegInstance = ModelInstance(lowerLegModel)
         rightUpperLegInstance = ModelInstance(upperLegModel)
         rightLowerLegInstance = ModelInstance(lowerLegModel)
-        eucWheelInstance = ModelInstance(eucWheelModel)
     }
 
     private fun createModels() {
@@ -129,28 +124,14 @@ class RagdollRenderer : Disposable {
             opaqueMaterial(pantsColor),
             attrs
         )
-
-        // EUC wheel - cylinder
-        eucWheelModel = modelBuilder.createCylinder(
-            0.44f, 0.12f, 0.44f, 16,
-            opaqueMaterial(eucColor),
-            attrs
-        )
     }
 
     /**
      * Render ragdoll bodies using transforms from physics simulation.
+     * Note: EUC wheel is NOT rendered here - original model stays visible
      */
     fun render(modelBatch: ModelBatch, ragdollPhysics: RagdollPhysics, environment: Environment) {
         if (!ragdollPhysics.isActive()) return
-
-        // EUC wheel
-        ragdollPhysics.getEucTransform()?.let { transform ->
-            eucWheelInstance.transform.set(transform)
-            // Rotate to align cylinder with X axis (wheel orientation)
-            eucWheelInstance.transform.rotate(Vector3.Z, 90f)
-            modelBatch.render(eucWheelInstance, environment)
-        }
 
         // Head
         ragdollPhysics.getHeadTransform()?.let { transform ->
@@ -212,6 +193,5 @@ class RagdollRenderer : Disposable {
         lowerArmModel.dispose()
         upperLegModel.dispose()
         lowerLegModel.dispose()
-        eucWheelModel.dispose()
     }
 }

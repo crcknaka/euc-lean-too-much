@@ -915,14 +915,14 @@ class EucGame(
         if (ragdollActive) {
             ragdollPhysics!!.update(delta)
 
-            // Hide original player models during ragdoll - use RagdollRenderer instead
-            playerEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            // Hide rider models during ragdoll - use RagdollRenderer instead
+            // BUT keep playerEntity (EUC wheel) visible - it uses original model
             riderEntity?.getComponent(ModelComponent::class.java)?.visible = false
             leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
             rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
             renderer.hideHead = true
 
-            // Use RagdollRenderer to draw physics-driven ragdoll
+            // Use RagdollRenderer to draw physics-driven ragdoll (rider only, not EUC)
             renderer.activeRagdollRenderer = ragdollRenderer
             renderer.activeRagdollPhysics = ragdollPhysics
         } else {
@@ -953,9 +953,9 @@ class EucGame(
                 // Get rotation from physics transform matrix
                 val eucTransform = ragdollPhysics!!.getEucTransform()
                 if (eucTransform != null) {
-                    // Extract rotation and apply to visual lean
-                    // The physics gives us a full transform, we need to convert to lean values
-                    eucComponent.visualSideLean = eucComponent.sideLean + extractRollFromMatrix(eucTransform) / 90f
+                    // Extract rotation and apply to visual lean for EUC wheel
+                    eucComponent.visualSideLean = extractRollFromMatrix(eucTransform) / 45f
+                    eucComponent.visualForwardLean = extractPitchFromMatrix(eucTransform) / 45f
                 }
 
                 // Get torso/rider position from physics

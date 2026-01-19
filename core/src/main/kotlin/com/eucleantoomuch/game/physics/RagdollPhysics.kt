@@ -41,7 +41,7 @@ class RagdollPhysics : Disposable {
     private var groundMotionState: btDefaultMotionState? = null
 
     // EUC wheel body
-    private var eucShape: btCylinderShape? = null
+    private var eucShape: btCollisionShape? = null
     private var eucBody: btRigidBody? = null
     private var eucMotionState: btDefaultMotionState? = null
 
@@ -148,8 +148,8 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC dimensions: radius ~0.22m, width ~0.12m
-        eucShape = btCylinderShapeX(Vector3(0.06f, 0.22f, 0.22f))
+        // EUC dimensions as box: width ~0.12m, height ~0.44m, depth ~0.44m
+        eucShape = btBoxShape(Vector3(0.06f, 0.22f, 0.22f))
 
         val eucMass = 20f  // 20 kg EUC
         val eucInertia = Vector3()
@@ -498,7 +498,7 @@ class RagdollPhysics : Disposable {
      * Get current EUC transform for rendering.
      */
     fun getEucTransform(): Matrix4? {
-        if (!isActive || eucBody == null) return null
+        if ((!isActive && !isFrozen) || eucBody == null) return null
         eucMotionState?.getWorldTransform(tempMatrix)
         return tempMatrix
     }
@@ -507,7 +507,7 @@ class RagdollPhysics : Disposable {
      * Get EUC position only.
      */
     fun getEucPosition(out: Vector3): Vector3 {
-        if (!isActive || eucBody == null) return out.setZero()
+        if ((!isActive && !isFrozen) || eucBody == null) return out.setZero()
         eucMotionState?.getWorldTransform(tempMatrix)
         tempMatrix.getTranslation(out)
         return out
