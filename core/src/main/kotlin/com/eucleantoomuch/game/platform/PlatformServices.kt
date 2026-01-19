@@ -72,6 +72,14 @@ interface PlatformServices {
      * Quick frequency sweep simulating air rushing past.
      */
     fun playWhooshSound()
+
+    // === Pigeon Sound Effect ===
+
+    /**
+     * Play pigeon wing flapping sound when pigeons fly off.
+     * Short fluttering/cooing sound.
+     */
+    fun playPigeonFlyOffSound()
 }
 
 /**
@@ -111,6 +119,10 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun playWhooshSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playPigeonFlyOffSound() {
         // No-op on desktop/unsupported platforms
     }
 }

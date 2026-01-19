@@ -69,7 +69,8 @@ class EucGame(
     private var riderEntity: Entity? = null
     private var leftArmEntity: Entity? = null
     private var rightArmEntity: Entity? = null
-    private var countdownTimer = 3f
+    private var countdownTimer = 2f
+    private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
 
     // Systems that need direct access
@@ -162,7 +163,7 @@ class EucGame(
         engine.addSystem(MovementSystem())
         engine.addSystem(PedestrianAISystem())
         engine.addSystem(CarAISystem())
-        engine.addSystem(PigeonSystem(models))
+        engine.addSystem(PigeonSystem(models, platformServices))
         engine.addSystem(ArmAnimationSystem())
         engine.addSystem(HeadAnimationSystem())
         engine.addSystem(collisionSystem)
@@ -475,10 +476,25 @@ class EucGame(
         renderer.render()
 
         // Render countdown overlay
-        hud.renderCountdown(countdownTimer.toInt() + 1)
+        val currentSecond = countdownTimer.toInt() + 1
+        hud.renderCountdown(currentSecond)
+
+        // Play beep on each new second (different tones: 3=low, 2=mid, 1=high)
+        if (currentSecond != lastCountdownSecond && currentSecond in 1..3) {
+            lastCountdownSecond = currentSecond
+            val frequency = when (currentSecond) {
+                3 -> 400   // Low tone
+                2 -> 600   // Mid tone
+                1 -> 800   // High tone
+                else -> 500
+            }
+            platformServices.playBeep(frequency, 100)
+        }
 
         countdownTimer -= delta
         if (countdownTimer <= 0) {
+            // Play final "GO" beep - highest tone
+            platformServices.playBeep(1000, 150)
             // Start motor sound when gameplay begins
             motorSoundManager.start()
             stateManager.transition(GameState.Playing(session))
@@ -672,8 +688,9 @@ class EucGame(
         // Generate initial world
         worldGenerator.update(0f, 0f)
 
-        // Start countdown
-        countdownTimer = 3f
+        // Start countdown (faster: 2 seconds total)
+        countdownTimer = 2f
+        lastCountdownSecond = -1  // Reset for beep tracking
         session.reset()
         hud.reset()
         isNewHighScore = false

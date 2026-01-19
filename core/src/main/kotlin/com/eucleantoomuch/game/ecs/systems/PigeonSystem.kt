@@ -10,6 +10,7 @@ import com.badlogic.gdx.math.Vector3
 import kotlin.math.sqrt
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.*
+import com.eucleantoomuch.game.platform.PlatformServices
 import com.eucleantoomuch.game.rendering.ProceduralModels
 
 /**
@@ -19,7 +20,8 @@ import com.eucleantoomuch.game.rendering.ProceduralModels
  * - Flying away and being removed
  */
 class PigeonSystem(
-    private val models: ProceduralModels
+    private val models: ProceduralModels,
+    private val platformServices: PlatformServices
 ) : EntitySystem(5) {
 
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
@@ -236,6 +238,9 @@ class PigeonSystem(
             flyingModel?.let { flying ->
                 model.modelInstance = ModelInstance(flying.model)
             }
+
+            // Play wing flapping sound
+            platformServices.playPigeonFlyOffSound()
 
             // Face flight direction
             transform.yaw = MathUtils.atan2(pigeon.flightDirection.x, pigeon.flightDirection.z) * MathUtils.radiansToDegrees

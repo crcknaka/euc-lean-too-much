@@ -77,7 +77,7 @@ class GameRenderer(
     init {
         postProcessing.initialize()
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
-        camera.far = 300f
+        camera.far = 400f   // Larger far distance = weaker fog effect
         camera.update()
 
         // Create head model instance for animated rendering
@@ -85,7 +85,7 @@ class GameRenderer(
     }
 
     fun setCameraFar(distance: Float) {
-        camera.far = distance + 50f  // Add buffer beyond render distance
+        camera.far = distance + 150f  // Larger buffer = weaker fog effect
         camera.update()
     }
 

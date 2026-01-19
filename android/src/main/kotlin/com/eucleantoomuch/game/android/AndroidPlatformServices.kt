@@ -610,4 +610,117 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
             }
         }.start()
     }
+
+    // === Pigeon Fly-Off Sound Implementation ===
+
+    override fun playPigeonFlyOffSound() {
+        Thread {
+            try {
+                // Wing flapping sound: 200-300ms
+                val durationMs = 250
+                val numSamples = sampleRate * durationMs / 1000
+                val samples = ShortArray(numSamples)
+
+                val volume = 0.5f
+
+                // Generate wing flapping sound:
+                // Multiple quick frequency bursts simulating wing beats
+                var filterState = 0f
+                var phase1 = 0.0
+                var phase2 = 0.0
+
+                for (i in 0 until numSamples) {
+                    val t = i.toFloat() / numSamples
+
+                    // Envelope: quick attack, sustain with flutter, fade
+                    val envelope = when {
+                        t < 0.05f -> t / 0.05f  // Quick attack
+                        t < 0.7f -> 1f - (t - 0.05f) * 0.2f  // Slight decay during flutter
+                        else -> (1f - t) / 0.3f  // Fade out
+                    }
+
+                    // Wing beat modulation (3-4 beats during the sound)
+                    val beatFreq = 15f  // Hz - wing beat rate
+                    val beatMod = (sin(2.0 * Math.PI * beatFreq * i / sampleRate) * 0.5 + 0.5).toFloat()
+
+                    // Raw noise for flutter sound
+                    val noise = Random.nextFloat() * 2f - 1f
+
+                    // Bandpass filtered noise centered around 800-1500 Hz (wing flutter)
+                    val centerFreq = 800f + beatMod * 700f
+                    val filterCoeff = (centerFreq / sampleRate).coerceIn(0.05f, 0.3f)
+                    filterState += (noise - filterState) * filterCoeff
+
+                    // Add a subtle "coo" tone underneath (pigeon vocalization)
+                    // Low frequency warble around 300-500 Hz
+                    val cooFreq = 350.0 + sin(2.0 * Math.PI * 5.0 * i / sampleRate) * 100.0
+                    val coo = sin(phase1) * 0.15f * (1f - t * 0.5f)  // Fades during sound
+                    phase1 += 2.0 * Math.PI * cooFreq / sampleRate
+
+                    // Higher harmonic for brightness
+                    val flutter = sin(phase2) * beatMod * 0.1f
+                    phase2 += 2.0 * Math.PI * (centerFreq * 2.0) / sampleRate
+
+                    // Mix components
+                    val mixed = (filterState * 0.6f + coo.toFloat() + flutter.toFloat()) * beatMod * envelope * volume
+
+                    samples[i] = (mixed * Short.MAX_VALUE).toInt().coerceIn(-32768, 32767).toShort()
+                }
+
+                // Apply fade out to last 10% to avoid click
+                val fadeStart = (numSamples * 0.9f).toInt()
+                for (i in fadeStart until numSamples) {
+                    val fade = 1f - (i - fadeStart).toFloat() / (numSamples - fadeStart)
+                    samples[i] = (samples[i] * fade).toInt().toShort()
+                }
+
+                val bufferSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+
+                val track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    AudioTrack.Builder()
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_GAME)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(sampleRate)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(maxOf(bufferSize, samples.size * 2))
+                        .setTransferMode(AudioTrack.MODE_STATIC)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    AudioTrack(
+                        AudioManager.STREAM_MUSIC,
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        maxOf(bufferSize, samples.size * 2),
+                        AudioTrack.MODE_STATIC
+                    )
+                }
+
+                track.write(samples, 0, samples.size)
+                track.play()
+
+                // Wait for playback, then release
+                Thread.sleep(durationMs.toLong() + 50)
+                track.stop()
+                track.release()
+
+            } catch (e: Exception) {
+                // Audio errors not critical
+            }
+        }.start()
+    }
 }
