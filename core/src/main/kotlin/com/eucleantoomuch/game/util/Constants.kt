@@ -18,7 +18,7 @@ object Constants {
 
     // Puddle effect
     const val PUDDLE_DURATION = 3f          // seconds of control loss
-    const val PUDDLE_CONTROL_FACTOR = 0.3f  // 30% control when in puddle
+    const val PUDDLE_CONTROL_FACTOR = 0.6f  // 60% control when in puddle
 
     // Input
     const val INPUT_SMOOTHING = 0.2f

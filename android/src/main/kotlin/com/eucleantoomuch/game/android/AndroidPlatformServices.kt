@@ -513,4 +513,101 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
             }
         }.start()
     }
+
+    // === Whoosh Sound Implementation ===
+
+    override fun playWhooshSound() {
+        Thread {
+            try {
+                // Short whoosh: 100-150ms
+                val durationMs = 120
+                val numSamples = sampleRate * durationMs / 1000
+                val samples = ShortArray(numSamples)
+
+                val volume = 0.6f
+
+                // Whoosh: filtered noise with frequency sweep
+                // Start with higher frequency, sweep down quickly
+                var filterState = 0f
+                var filterState2 = 0f
+
+                for (i in 0 until numSamples) {
+                    val t = i.toFloat() / numSamples
+
+                    // Envelope: quick rise, sustained, quick fall
+                    val envelope = when {
+                        t < 0.1f -> t / 0.1f  // Quick attack
+                        t < 0.6f -> 1f  // Sustain
+                        else -> 1f - (t - 0.6f) / 0.4f  // Fade out
+                    }
+
+                    // Raw noise
+                    val noise = Random.nextFloat() * 2f - 1f
+
+                    // Bandpass filter with sweeping center frequency
+                    // Start high (~3000 Hz), sweep down to ~500 Hz
+                    val centerFreq = 3000f - t * 2500f
+                    val filterCoeff = (centerFreq / sampleRate).coerceIn(0.01f, 0.3f)
+
+                    // Simple resonant filter
+                    filterState += (noise - filterState) * filterCoeff
+                    filterState2 += (filterState - filterState2) * filterCoeff * 0.8f
+
+                    // Add some stereo-like depth with phase shift
+                    val doppler = sin(2.0 * Math.PI * (200.0 + t * 100.0) * i / sampleRate).toFloat() * 0.15f
+
+                    val filtered = (filterState - filterState2 * 0.5f + doppler) * envelope * volume
+
+                    samples[i] = (filtered * Short.MAX_VALUE).toInt().coerceIn(-32768, 32767).toShort()
+                }
+
+                val bufferSize = AudioTrack.getMinBufferSize(
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT
+                )
+
+                val track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    AudioTrack.Builder()
+                        .setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_GAME)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        .setAudioFormat(
+                            AudioFormat.Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(sampleRate)
+                                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                                .build()
+                        )
+                        .setBufferSizeInBytes(maxOf(bufferSize, samples.size * 2))
+                        .setTransferMode(AudioTrack.MODE_STATIC)
+                        .build()
+                } else {
+                    @Suppress("DEPRECATION")
+                    AudioTrack(
+                        AudioManager.STREAM_MUSIC,
+                        sampleRate,
+                        AudioFormat.CHANNEL_OUT_MONO,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                        maxOf(bufferSize, samples.size * 2),
+                        AudioTrack.MODE_STATIC
+                    )
+                }
+
+                track.write(samples, 0, samples.size)
+                track.play()
+
+                // Wait for playback, then release
+                Thread.sleep(durationMs.toLong() + 50)
+                track.stop()
+                track.release()
+
+            } catch (e: Exception) {
+                // Audio errors not critical
+            }
+        }.start()
+    }
 }

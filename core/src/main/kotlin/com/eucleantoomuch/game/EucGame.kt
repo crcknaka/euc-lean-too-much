@@ -204,6 +204,11 @@ class EucGame(
                 platformServices.playBeep(frequencyHz, durationMs)
             }
         }
+        UIFeedback.whooshProvider = object : UIFeedback.WhooshProvider {
+            override fun playWhoosh() {
+                platformServices.playWhooshSound()
+            }
+        }
 
         // Start at menu
         stateManager.transition(GameState.Menu)

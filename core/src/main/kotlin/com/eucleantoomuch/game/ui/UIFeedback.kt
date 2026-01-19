@@ -28,6 +28,13 @@ object UIFeedback : Disposable {
         fun playBeep(frequencyHz: Int, durationMs: Int)
     }
 
+    interface WhooshProvider {
+        fun playWhoosh()
+    }
+
+    // Whoosh provider for near miss sound
+    var whooshProvider: WhooshProvider? = null
+
     /**
      * Initialize sound assets. Safe to call multiple times.
      */
@@ -157,16 +164,14 @@ object UIFeedback : Disposable {
     }
 
     /**
-     * Near miss sound - quick "whoosh" feeling when passing close to pedestrian.
-     * Rising tone with haptic for dramatic effect.
+     * Near miss sound - quick "whoosh" feeling when passing close to pedestrian/car.
+     * Synthesized whoosh sound with haptic for dramatic effect.
      */
     fun nearMiss() {
         if (!enabled) return
 
-        // Quick rising tone for "close call" feel
-        beepProvider?.playBeep(400, 30)
-        beepProvider?.playBeep(800, 40)
-        beepProvider?.playBeep(1200, 30)
+        // Play synthesized whoosh sound
+        whooshProvider?.playWhoosh()
 
         hapticProvider?.let {
             if (it.hasVibrator()) {

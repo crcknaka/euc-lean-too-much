@@ -64,6 +64,14 @@ interface PlatformServices {
      * @param intensity Impact intensity (0.3 to 1.5), affects volume and pitch
      */
     fun playCrashSound(intensity: Float)
+
+    // === Whoosh Sound Effect ===
+
+    /**
+     * Play a whoosh/swoosh sound effect for near misses.
+     * Quick frequency sweep simulating air rushing past.
+     */
+    fun playWhooshSound()
 }
 
 /**
@@ -99,6 +107,10 @@ class DefaultPlatformServices : PlatformServices {
     override fun isMotorSoundPlaying(): Boolean = false
 
     override fun playCrashSound(intensity: Float) {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playWhooshSound() {
         // No-op on desktop/unsupported platforms
     }
 }
