@@ -81,45 +81,63 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         // Arms forward pose: arms extend forward based on acceleration (forward lean)
         // When accelerating hard, arms stretch forward for balance
         // When cruising (no acceleration), arms hang down naturally
+        // During sharp turns, inner arm drops more than outer arm
 
         // Forward lean goes from -1 (braking) to +1 (accelerating)
         // Only extend arms forward when accelerating (positive lean)
         val accelFactor = euc.visualForwardLean.coerceIn(0f, 1f)
 
+        // Turn detection - sideLean: negative = left turn, positive = right turn
+        val turnIntensity = kotlin.math.abs(euc.visualSideLean)
+
+        // Inner arm drops more during turns (the arm on the turn side)
+        // Left turn (negative sideLean) -> left arm drops more
+        // Right turn (positive sideLean) -> right arm drops more
+        val leftTurnDrop = (-euc.visualSideLean).coerceIn(0f, 1f)   // Higher in left turns
+        val rightTurnDrop = euc.visualSideLean.coerceIn(0f, 1f)     // Higher in right turns
+
+        // Base dampen for both arms during any turn
+        val baseTurnDampen = (1f - turnIntensity * 0.8f).coerceIn(0f, 1f)
+
+        // Per-arm dampen: inner arm drops more
+        val leftDampen = baseTurnDampen * (1f - leftTurnDrop * 0.7f)
+        val rightDampen = baseTurnDampen * (1f - rightTurnDrop * 0.7f)
+
+        // Effective acceleration factor per arm
+        val leftEffectiveAccel = accelFactor * leftDampen
+        val rightEffectiveAccel = accelFactor * rightDampen
+
         // Yaw: how far out to side (0 = down at sides, 90 = horizontal out)
-        // Keep arms close to body
-        val targetYaw = MathUtils.lerp(15f, 5f, accelFactor)  // Arms stay close to body
+        val turnSpread = turnIntensity * 15f
+        val leftTargetYaw = MathUtils.lerp(15f, 5f, leftEffectiveAccel) + turnSpread
+        val rightTargetYaw = MathUtils.lerp(15f, 5f, rightEffectiveAccel) + turnSpread
 
         // Pitch: forward/backward (negative = forward, positive = backward)
-        // When accelerating hard, arms stretch fully forward
-        val targetPitch = MathUtils.lerp(0f, -180f, accelFactor)  // Arms reach forward (negative pitch)
+        val leftTargetPitch = MathUtils.lerp(0f, -180f, leftEffectiveAccel)
+        val rightTargetPitch = MathUtils.lerp(0f, -180f, rightEffectiveAccel)
 
         // Minimal idle sway - very subtle
         val swingTime = arm.balanceTime * 1.2f
-        val idleSway = MathUtils.sin(swingTime) * 3f * (1f - accelFactor)  // Less sway when accelerating
+        val idleSway = MathUtils.sin(swingTime) * 3f * (1f - accelFactor)
 
-        // Turn response when not accelerating - BOTH arms swing in SAME direction (inertia effect)
-        val turnSwing = -euc.visualSideLean * 40f * (1f - accelFactor * 0.7f)
-
-        // Dynamic turn response when accelerating - opposite arms react via pitch
-        // Left turn (negative sideLean) -> left arm drops (less forward), right stays up
-        // Right turn (positive sideLean) -> right arm drops (less forward), left stays up
-        val turnPitchDrop = euc.visualSideLean * 40f * accelFactor  // Only when accelerating
+        // Turn response - arms swing to opposite side of turn for balance
+        val turnSwing = -euc.visualSideLean * 25f
 
         // Forearm bend: straight when reaching forward, slightly bent when relaxed
-        val forearmBend = MathUtils.lerp(10f, 0f, accelFactor)
+        val leftForearmBend = MathUtils.lerp(10f, 0f, leftEffectiveAccel)
+        val rightForearmBend = MathUtils.lerp(10f, 0f, rightEffectiveAccel)
 
-        // Left arm - in left turn pitch goes toward 0 (drops down)
-        arm.leftArmYaw = targetYaw + idleSway + turnSwing
-        arm.leftArmPitch = targetPitch + turnPitchDrop  // positive turnPitchDrop = less forward = lower
+        // Left arm - drops more in left turns
+        arm.leftArmYaw = leftTargetYaw + idleSway + turnSwing
+        arm.leftArmPitch = leftTargetPitch
         arm.leftArmRoll = 0f
-        arm.leftForearmBend = forearmBend
+        arm.leftForearmBend = leftForearmBend
 
-        // Right arm - in right turn pitch goes toward 0 (drops down)
-        arm.rightArmYaw = targetYaw + idleSway + turnSwing
-        arm.rightArmPitch = targetPitch - turnPitchDrop  // negative = less forward = lower
+        // Right arm - drops more in right turns
+        arm.rightArmYaw = rightTargetYaw + idleSway + turnSwing
+        arm.rightArmPitch = rightTargetPitch
         arm.rightArmRoll = 0f
-        arm.rightForearmBend = forearmBend
+        arm.rightForearmBend = rightForearmBend
     }
 
     private fun calculateBehindBackPose(arm: ArmComponent, euc: EucComponent) {
