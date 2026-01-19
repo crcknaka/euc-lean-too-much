@@ -47,6 +47,7 @@ import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 import com.eucleantoomuch.game.ui.DebugMenu
 import com.eucleantoomuch.game.ui.DebugConfig
+import com.eucleantoomuch.game.physics.RagdollPhysics
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -253,8 +254,14 @@ class EucGame(
 
         // Initialize ragdoll physics and renderer
         try {
-            ragdollPhysics = com.eucleantoomuch.game.physics.RagdollPhysics()
+            ragdollPhysics = RagdollPhysics()
             ragdollRenderer = com.eucleantoomuch.game.physics.RagdollRenderer()
+
+            // Set up collision callback for ragdoll hitting objects during flight
+            ragdollPhysics?.onRagdollCollision = { colliderType ->
+                playRagdollCollisionSound(colliderType)
+            }
+
             Gdx.app.log("EucGame", "Ragdoll physics initialized")
         } catch (e: Exception) {
             Gdx.app.error("EucGame", "Failed to initialize ragdoll physics: ${e.message}")
@@ -1500,16 +1507,19 @@ class EucGame(
 
             // Check obstacle type for special handling
             val obstacle = obstacleMapper.get(entity)
+            val colliderType = obstacleTypeToColliderType(obstacle?.type)
+
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
                 // Street lights are thin cylinders
                 physics.addCylinderCollider(
                     tempColliderPos,
                     0.15f,  // thin pole
-                    collider.halfExtents.y * 2f
+                    collider.halfExtents.y * 2f,
+                    colliderType
                 )
             } else {
                 // Default: box collider
-                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, colliderType)
             }
             colliderCount++
         }
@@ -1534,12 +1544,12 @@ class EucGame(
                     transform.position.y + collider.halfExtents.y,
                     transform.position.z
                 )
-                physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw)
+                physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
             } else {
                 // Default car size if no collider
                 tempColliderPos.set(transform.position.x, transform.position.y + 0.7f, transform.position.z)
                 tempHalfExtents.set(1.0f, 0.7f, 2.2f)
-                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
             }
             colliderCount++
         }
@@ -1601,10 +1611,12 @@ class EucGame(
 
             // Check obstacle type for special handling
             val obstacle = obstacleMapper.get(entity)
+            val colliderType = obstacleTypeToColliderType(obstacle?.type)
+
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
-                physics.addCylinderCollider(tempColliderPos, 0.15f, collider.halfExtents.y * 2f)
+                physics.addCylinderCollider(tempColliderPos, 0.15f, collider.halfExtents.y * 2f, colliderType)
             } else {
-                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, colliderType)
             }
 
             addedColliderEntities.add(entity)
@@ -1630,7 +1642,7 @@ class EucGame(
                 transform.position.y + collider.halfExtents.y,
                 transform.position.z
             )
-            physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw)
+            physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
 
             addedColliderEntities.add(entity)
             newColliderCount++
@@ -1687,6 +1699,34 @@ class EucGame(
                 // Correct the Y position for model (physics is centered at hip)
                 modelComponent.modelInstance?.transform?.translate(0f, -0.85f, 0f)
             }
+        }
+    }
+
+    /**
+     * Play appropriate sound when ragdoll collides with an object during flight.
+     */
+    private fun playRagdollCollisionSound(colliderType: RagdollPhysics.ColliderType) {
+        when (colliderType) {
+            RagdollPhysics.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
+            RagdollPhysics.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
+            RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound()
+            RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound()
+            RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound()
+            RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts handled by fall animation */ }
+        }
+        Gdx.app.log("EucGame", "Ragdoll collision sound: $colliderType")
+    }
+
+    /**
+     * Convert ObstacleType to RagdollPhysics.ColliderType for physics collisions.
+     */
+    private fun obstacleTypeToColliderType(obstacleType: ObstacleType?): RagdollPhysics.ColliderType {
+        return when (obstacleType) {
+            ObstacleType.STREET_LIGHT -> RagdollPhysics.ColliderType.STREET_LIGHT
+            ObstacleType.RECYCLE_BIN -> RagdollPhysics.ColliderType.RECYCLE_BIN
+            ObstacleType.CAR -> RagdollPhysics.ColliderType.CAR
+            ObstacleType.PEDESTRIAN -> RagdollPhysics.ColliderType.PEDESTRIAN
+            else -> RagdollPhysics.ColliderType.GENERIC
         }
     }
 

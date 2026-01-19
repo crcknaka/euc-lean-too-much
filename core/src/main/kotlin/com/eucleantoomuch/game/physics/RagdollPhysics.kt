@@ -69,11 +69,32 @@ class RagdollPhysics : Disposable {
     // Static world colliders (obstacles, cars, etc.)
     private val worldColliders = mutableListOf<StaticCollider>()
 
+    /**
+     * Types of objects that can collide with ragdoll during flight.
+     */
+    enum class ColliderType {
+        GROUND,
+        STREET_LIGHT,
+        RECYCLE_BIN,
+        CAR,
+        PEDESTRIAN,
+        GENERIC
+    }
+
     data class StaticCollider(
         val shape: btCollisionShape,
         val body: btRigidBody,
-        val motionState: btDefaultMotionState
+        val motionState: btDefaultMotionState,
+        val type: ColliderType = ColliderType.GENERIC
     )
+
+    // Collision callback - called when ragdoll hits something during flight
+    var onRagdollCollision: ((ColliderType) -> Unit)? = null
+
+    // Track which colliders have already triggered sound (to avoid spam)
+    private val triggeredColliders = mutableSetOf<btRigidBody>()
+    private var lastCollisionTime = 0f
+    private val minCollisionInterval = 0.15f  // Minimum time between collision sounds
 
     // Pedestrian ragdoll bodies (simple box physics, uses original model)
     data class PedestrianBody(
@@ -512,6 +533,84 @@ class RagdollPhysics : Disposable {
 
         // Step physics world (max 4 substeps for stability)
         dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
+
+        // Check for collisions and trigger sounds
+        if (isActive) {
+            lastCollisionTime += delta
+            checkRagdollCollisions()
+        }
+    }
+
+    /**
+     * Check contact manifolds for ragdoll collisions with world objects.
+     */
+    private fun checkRagdollCollisions() {
+        if (onRagdollCollision == null) return
+
+        val numManifolds = dispatcher.numManifolds
+
+        for (i in 0 until numManifolds) {
+            val manifold = dispatcher.getManifoldByIndexInternal(i)
+            val numContacts = manifold.numContacts
+
+            if (numContacts == 0) continue
+
+            // Get the two bodies involved
+            val body0 = manifold.body0 as? btRigidBody ?: continue
+            val body1 = manifold.body1 as? btRigidBody ?: continue
+
+            // Check if one is a ragdoll part and the other is a world collider
+            val ragdollBody = findRagdollBody(body0, body1)
+            val worldBody = if (ragdollBody == body0) body1 else if (ragdollBody == body1) body0 else null
+
+            if (ragdollBody == null || worldBody == null) continue
+
+            // Find the collider type
+            val collider = worldColliders.find { it.body == worldBody }
+
+            // Skip if already triggered for this collider or if ground
+            if (collider != null) {
+                if (collider.type == ColliderType.GROUND) continue
+                if (worldBody in triggeredColliders) continue
+
+                // Check if enough time has passed since last collision sound
+                if (lastCollisionTime < minCollisionInterval) continue
+
+                // Check contact impulse - only trigger for significant impacts
+                var maxImpulse = 0f
+                for (j in 0 until numContacts) {
+                    val pt = manifold.getContactPoint(j)
+                    val impulse = pt.appliedImpulse
+                    if (impulse > maxImpulse) maxImpulse = impulse
+                }
+
+                // Only trigger sound for significant impacts
+                if (maxImpulse > 5f) {
+                    triggeredColliders.add(worldBody)
+                    lastCollisionTime = 0f
+                    onRagdollCollision?.invoke(collider.type)
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if a body is part of the player ragdoll (or EUC).
+     */
+    private fun findRagdollBody(body0: btRigidBody, body1: btRigidBody): btRigidBody? {
+        val ragdollBodies = listOfNotNull(
+            eucBody, head.body, torso.body,
+            leftUpperArm.body, leftLowerArm.body,
+            rightUpperArm.body, rightLowerArm.body,
+            leftUpperLeg.body, leftLowerLeg.body,
+            rightUpperLeg.body, rightLowerLeg.body
+        )
+
+        return when {
+            body0 in ragdollBodies -> body0
+            body1 in ragdollBodies -> body1
+            else -> null
+        }
     }
 
     /**
@@ -582,8 +681,9 @@ class RagdollPhysics : Disposable {
      * @param position Center position of the box
      * @param halfExtents Half-size in each dimension (width/2, height/2, depth/2)
      * @param yaw Rotation around Y axis in degrees
+     * @param type Type of obstacle for collision sounds
      */
-    fun addBoxCollider(position: Vector3, halfExtents: Vector3, yaw: Float = 0f) {
+    fun addBoxCollider(position: Vector3, halfExtents: Vector3, yaw: Float = 0f, type: ColliderType = ColliderType.GENERIC) {
         val shape = btBoxShape(halfExtents)
 
         tempMatrix.idt()
@@ -599,7 +699,7 @@ class RagdollPhysics : Disposable {
         body.restitution = 0.3f
 
         dynamicsWorld.addRigidBody(body)
-        worldColliders.add(StaticCollider(shape, body, motionState))
+        worldColliders.add(StaticCollider(shape, body, motionState, type))
         info.dispose()
     }
 
@@ -608,8 +708,9 @@ class RagdollPhysics : Disposable {
      * @param position Center position
      * @param radius Radius of cylinder
      * @param height Height of cylinder
+     * @param type Type of obstacle for collision sounds
      */
-    fun addCylinderCollider(position: Vector3, radius: Float, height: Float) {
+    fun addCylinderCollider(position: Vector3, radius: Float, height: Float, type: ColliderType = ColliderType.STREET_LIGHT) {
         val shape = btCylinderShape(Vector3(radius, height / 2f, radius))
 
         tempMatrix.idt()
@@ -622,7 +723,7 @@ class RagdollPhysics : Disposable {
         body.restitution = 0.2f
 
         dynamicsWorld.addRigidBody(body)
-        worldColliders.add(StaticCollider(shape, body, motionState))
+        worldColliders.add(StaticCollider(shape, body, motionState, type))
         info.dispose()
     }
 
@@ -637,6 +738,8 @@ class RagdollPhysics : Disposable {
             collider.shape.dispose()
         }
         worldColliders.clear()
+        triggeredColliders.clear()
+        lastCollisionTime = 0f
     }
 
     /**
