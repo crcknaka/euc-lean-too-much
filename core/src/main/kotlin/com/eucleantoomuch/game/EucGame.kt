@@ -1348,6 +1348,10 @@ class EucGame(
         val collidables = engine.getEntitiesFor(Families.collidable)
         for (i in 0 until collidables.size()) {
             val entity = collidables[i]
+
+            // Skip player and rider entities - they shouldn't collide with themselves
+            if (entity == playerEntity || entity == riderEntity) continue
+
             val transform = transformMapperForCollider.get(entity) ?: continue
             val collider = colliderMapper.get(entity) ?: continue
 

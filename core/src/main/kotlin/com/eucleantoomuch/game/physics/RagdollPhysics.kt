@@ -167,11 +167,13 @@ class RagdollPhysics : Disposable {
         eucBody!!.restitution = 0.3f
         eucBody!!.setDamping(0.05f, 0.2f)
 
-        // Apply initial velocity
+        // Apply initial velocity - based on lean direction
         val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.7f
         val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.7f
-        val sideKick = sideLean * 4f
-        val upKick = 1.5f + kotlin.math.abs(forwardLean) * 2f
+        val sideKick = sideLean * 3f
+        // Only add upward kick if there's significant lean (collision), otherwise just continue momentum
+        val leanMagnitude = kotlin.math.sqrt(sideLean * sideLean + forwardLean * forwardLean)
+        val upKick = if (leanMagnitude > 0.3f) 1f + leanMagnitude * 1.5f else 0.5f
 
         eucBody!!.linearVelocity = Vector3(forwardX + sideKick, upKick, forwardZ)
         eucBody!!.angularVelocity = Vector3(
@@ -450,18 +452,25 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // Calculate base velocity (thrown forward)
-        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 1.3f
-        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 1.3f
+        // Calculate lean magnitude to determine fall type
+        val leanMagnitude = kotlin.math.sqrt(sideLean * sideLean + forwardLean * forwardLean)
+        val isHardFall = leanMagnitude > 0.3f  // Collision vs wobble/speed fall
+
+        // Calculate base velocity (continue forward momentum)
+        val velocityMultiplier = if (isHardFall) 1.3f else 1.0f
+        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * velocityMultiplier
+        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * velocityMultiplier
         val sideVel = sideLean * 2f
-        val upVel = 1f + kotlin.math.abs(forwardLean) * 1.5f
+        // Only significant upward velocity on hard falls (collisions)
+        val upVel = if (isHardFall) 0.5f + leanMagnitude * 1.5f else 0.2f
 
         val baseLinearVelocity = Vector3(forwardX + sideVel, upVel, forwardZ)
 
-        // Angular velocity (tumbling)
-        val tumbleX = playerVelocity * 0.4f + forwardLean * 2f  // Forward tumble
-        val tumbleY = sideLean * 1.5f
-        val tumbleZ = sideLean * 0.5f
+        // Angular velocity (tumbling) - more on hard falls
+        val tumbleFactor = if (isHardFall) 1.0f else 0.5f
+        val tumbleX = (playerVelocity * 0.3f + forwardLean * 2f) * tumbleFactor  // Forward tumble
+        val tumbleY = sideLean * 1.5f * tumbleFactor
+        val tumbleZ = sideLean * 0.5f * tumbleFactor
         val baseAngularVelocity = Vector3(tumbleX, tumbleY, tumbleZ)
 
         // Apply to all body parts with slight variations
