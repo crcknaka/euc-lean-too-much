@@ -576,8 +576,8 @@ class EucGame(
             val tintLevel = ((eucComponent.pwm - tintStart) / (tintMax - tintStart)).coerceIn(0f, 1f)
             renderer.postProcessing.dangerTint = tintLevel
 
-            // Chromatic aberration during wobble
-            renderer.postProcessing.chromaticAberration = eucComponent.wobbleIntensity * 1.5f
+            // Chromatic aberration disabled
+            // renderer.postProcessing.chromaticAberration = eucComponent.wobbleIntensity * 1.5f
         }
 
         // Update music fade

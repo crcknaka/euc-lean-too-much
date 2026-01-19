@@ -73,7 +73,7 @@ class PostProcessing : Disposable {
         // Chromatic aberration
         uniform float u_chromatic;
 
-        const int BLUR_SAMPLES = 12;
+        const int BLUR_SAMPLES = 6;
 
         void main() {
             vec2 center = vec2(0.5, 0.5);
