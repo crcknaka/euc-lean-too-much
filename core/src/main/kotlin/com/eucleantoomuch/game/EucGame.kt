@@ -932,7 +932,7 @@ class EucGame(
     private val pedestrianImpactDir = com.badlogic.gdx.math.Vector3()
 
     private fun startPedestrianRagdoll(pedestrianEntity: com.badlogic.ashley.core.Entity) {
-        Gdx.app.log("EucGame", "startPedestrianRagdoll called, useRagdollPhysics=$useRagdollPhysics, ragdollPhysics=${ragdollPhysics != null}")
+        // Early exit without logging to reduce overhead
         if (!useRagdollPhysics || ragdollPhysics == null) return
 
         val pedestrianComponent = pedestrianEntity.getComponent(
@@ -940,10 +940,7 @@ class EucGame(
         ) ?: return
 
         // Don't ragdoll if already ragdolling
-        if (pedestrianComponent.isRagdolling) {
-            Gdx.app.log("EucGame", "Pedestrian already ragdolling, skipping")
-            return
-        }
+        if (pedestrianComponent.isRagdolling) return
 
         val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
@@ -957,38 +954,69 @@ class EucGame(
             kotlin.math.cos(yawRad)
         )
 
-        // Add pedestrian ragdoll body
+        // Hide models first to avoid any visual glitch
+        val modelComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
+        )
+        modelComponent?.visible = false
+
+        val shadowComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
+        )
+        shadowComponent?.visible = false
+
+        // Extract shirt color from pedestrian model for ragdoll rendering
+        val shirtColor = extractPedestrianShirtColor(modelComponent?.modelInstance)
+            ?: com.badlogic.gdx.graphics.Color.GREEN
+
+        // Add pedestrian ragdoll body (this is the heavy operation)
         val bodyIndex = ragdollPhysics!!.addPedestrianRagdoll(
             position = pedestrianTransform.position,
             yaw = pedestrianTransform.yaw,
             playerVelocity = eucComponent.speed,
             playerDirection = pedestrianImpactDir,
-            entityIndex = pedestrianEntity.hashCode()
+            entityIndex = pedestrianEntity.hashCode(),
+            shirtColor = shirtColor
         )
 
         // Mark pedestrian as ragdolling
         pedestrianComponent.isRagdolling = true
         pedestrianComponent.ragdollBodyIndex = bodyIndex
         pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+    }
 
-        // Hide the original pedestrian model so only ragdoll is visible
-        val modelComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
-        )
-        if (modelComponent != null) {
-            modelComponent.visible = false
-            Gdx.app.log("EucGame", "Hid pedestrian model for ragdoll")
+    /**
+     * Extract shirt color from pedestrian model instance for ragdoll rendering.
+     */
+    private fun extractPedestrianShirtColor(modelInstance: com.badlogic.gdx.graphics.g3d.ModelInstance?): com.badlogic.gdx.graphics.Color? {
+        if (modelInstance == null) return null
+
+        // Find the torso material and extract its color
+        for (material in modelInstance.materials) {
+            val id = material.id?.lowercase() ?: ""
+            if (id.contains("torso") || id.contains("shirt") || id.contains("upper")) {
+                val colorAttr = material.get(com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute.Diffuse)
+                    as? com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
+                if (colorAttr != null) return colorAttr.color
+            }
         }
 
-        // Also hide the shadow
-        val shadowComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
-        )
-        if (shadowComponent != null) {
-            shadowComponent.visible = false
+        // Fallback: return first material color that's not skin/pants/hair
+        for (material in modelInstance.materials) {
+            val colorAttr = material.get(com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute.Diffuse)
+                as? com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
+            if (colorAttr != null) {
+                val c = colorAttr.color
+                // Skip skin-like colors (high R, medium G, low-medium B)
+                if (c.r > 0.7f && c.g > 0.5f && c.b > 0.4f) continue
+                // Skip pants-like colors (dark)
+                if (c.r < 0.35f && c.g < 0.35f && c.b < 0.45f) continue
+                // Skip hair-like colors (brown)
+                if (c.r < 0.4f && c.g < 0.3f && c.b < 0.2f) continue
+                return c
+            }
         }
-
-        Gdx.app.log("EucGame", "Started pedestrian ragdoll, index=$bodyIndex")
+        return null
     }
 
     private fun handlePlayerFall() {

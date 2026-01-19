@@ -30,13 +30,11 @@ class RagdollRenderer : Disposable {
     private lateinit var upperLegModel: Model
     private lateinit var lowerLegModel: Model
 
-    // Body part models - pedestrian ragdoll (smaller scale)
+    // Body part models - pedestrian ragdoll (simplified 6-part)
     private lateinit var pedHeadModel: Model
     private lateinit var pedTorsoModel: Model
-    private lateinit var pedUpperArmModel: Model
-    private lateinit var pedLowerArmModel: Model
-    private lateinit var pedUpperLegModel: Model
-    private lateinit var pedLowerLegModel: Model
+    private lateinit var pedArmModel: Model   // Single arm model (used for both arms)
+    private lateinit var pedLegModel: Model   // Single leg model (used for both legs)
 
     // Model instances (reused each frame) - player
     private val headInstance: ModelInstance
@@ -53,18 +51,14 @@ class RagdollRenderer : Disposable {
     // Model instances for pedestrians (multiple sets for multiple pedestrians)
     private val pedestrianInstances = mutableListOf<PedestrianModelInstances>()
 
-    // Helper class to hold all instances for one pedestrian
+    // Helper class to hold all instances for one pedestrian (simplified 6-part)
     private data class PedestrianModelInstances(
         val head: ModelInstance,
         val torso: ModelInstance,
-        val leftUpperArm: ModelInstance,
-        val leftLowerArm: ModelInstance,
-        val rightUpperArm: ModelInstance,
-        val rightLowerArm: ModelInstance,
-        val leftUpperLeg: ModelInstance,
-        val leftLowerLeg: ModelInstance,
-        val rightUpperLeg: ModelInstance,
-        val rightLowerLeg: ModelInstance
+        val leftArm: ModelInstance,
+        val rightArm: ModelInstance,
+        val leftLeg: ModelInstance,
+        val rightLeg: ModelInstance
     )
 
     // Colors for body parts - match ProceduralModels colors exactly
@@ -193,30 +187,18 @@ class RagdollRenderer : Disposable {
             attrs
         )
 
-        // Upper arm - box
-        pedUpperArmModel = modelBuilder.createBox(
-            0.07f * scale, 0.28f * scale, 0.07f * scale,
+        // Single arm model (combined upper + lower arm length)
+        val armLength = 0.28f * scale + 0.25f * scale  // Upper + lower
+        pedArmModel = modelBuilder.createBox(
+            0.07f * scale, armLength, 0.07f * scale,
             opaqueMaterial(pedShirtColor),
             attrs
         )
 
-        // Lower arm (forearm + hand)
-        pedLowerArmModel = modelBuilder.createBox(
-            0.06f * scale, 0.25f * scale, 0.06f * scale,
-            opaqueMaterial(pedSkinColor),
-            attrs
-        )
-
-        // Upper leg - box (shorter legs)
-        pedUpperLegModel = modelBuilder.createBox(
-            0.10f * scale, 0.40f * scale * legScale, 0.10f * scale,
-            opaqueMaterial(pedPantsColor),
-            attrs
-        )
-
-        // Lower leg - box (shorter legs)
-        pedLowerLegModel = modelBuilder.createBox(
-            0.08f * scale, 0.40f * scale * legScale, 0.08f * scale,
+        // Single leg model (combined upper + lower leg length, shorter)
+        val legLength = 0.40f * scale * legScale + 0.40f * scale * legScale  // Upper + lower
+        pedLegModel = modelBuilder.createBox(
+            0.10f * scale, legLength, 0.10f * scale,
             opaqueMaterial(pedPantsColor),
             attrs
         )
@@ -230,14 +212,10 @@ class RagdollRenderer : Disposable {
             pedestrianInstances.add(PedestrianModelInstances(
                 head = ModelInstance(pedHeadModel),
                 torso = ModelInstance(pedTorsoModel),
-                leftUpperArm = ModelInstance(pedUpperArmModel),
-                leftLowerArm = ModelInstance(pedLowerArmModel),
-                rightUpperArm = ModelInstance(pedUpperArmModel),
-                rightLowerArm = ModelInstance(pedLowerArmModel),
-                leftUpperLeg = ModelInstance(pedUpperLegModel),
-                leftLowerLeg = ModelInstance(pedLowerLegModel),
-                rightUpperLeg = ModelInstance(pedUpperLegModel),
-                rightLowerLeg = ModelInstance(pedLowerLegModel)
+                leftArm = ModelInstance(pedArmModel),
+                rightArm = ModelInstance(pedArmModel),
+                leftLeg = ModelInstance(pedLegModel),
+                rightLeg = ModelInstance(pedLegModel)
             ))
         }
     }
@@ -306,7 +284,7 @@ class RagdollRenderer : Disposable {
     }
 
     /**
-     * Render all pedestrian ragdolls.
+     * Render all pedestrian ragdolls (simplified 6-part).
      */
     fun renderPedestrians(modelBatch: ModelBatch, ragdollPhysics: RagdollPhysics, environment: Environment) {
         val pedCount = ragdollPhysics.getPedestrianCount()
@@ -316,6 +294,12 @@ class RagdollRenderer : Disposable {
 
         for (i in 0 until pedCount) {
             val instances = pedestrianInstances[i]
+
+            // Get shirt color for this pedestrian and update torso/arm materials
+            val shirtColor = ragdollPhysics.getPedestrianShirtColor(i) ?: pedShirtColor
+            updateMaterialColor(instances.torso, shirtColor)
+            updateMaterialColor(instances.leftArm, shirtColor)
+            updateMaterialColor(instances.rightArm, shirtColor)
 
             // Head
             ragdollPhysics.getPedestrianHeadTransform(i)?.let { transform ->
@@ -329,45 +313,39 @@ class RagdollRenderer : Disposable {
                 modelBatch.render(instances.torso, environment)
             }
 
-            // Left arm
-            ragdollPhysics.getPedestrianLeftUpperArmTransform(i)?.let { transform ->
-                instances.leftUpperArm.transform.set(transform)
-                modelBatch.render(instances.leftUpperArm, environment)
-            }
-            ragdollPhysics.getPedestrianLeftLowerArmTransform(i)?.let { transform ->
-                instances.leftLowerArm.transform.set(transform)
-                modelBatch.render(instances.leftLowerArm, environment)
+            // Left arm (single piece)
+            ragdollPhysics.getPedestrianLeftArmTransform(i)?.let { transform ->
+                instances.leftArm.transform.set(transform)
+                modelBatch.render(instances.leftArm, environment)
             }
 
-            // Right arm
-            ragdollPhysics.getPedestrianRightUpperArmTransform(i)?.let { transform ->
-                instances.rightUpperArm.transform.set(transform)
-                modelBatch.render(instances.rightUpperArm, environment)
-            }
-            ragdollPhysics.getPedestrianRightLowerArmTransform(i)?.let { transform ->
-                instances.rightLowerArm.transform.set(transform)
-                modelBatch.render(instances.rightLowerArm, environment)
+            // Right arm (single piece)
+            ragdollPhysics.getPedestrianRightArmTransform(i)?.let { transform ->
+                instances.rightArm.transform.set(transform)
+                modelBatch.render(instances.rightArm, environment)
             }
 
-            // Left leg
-            ragdollPhysics.getPedestrianLeftUpperLegTransform(i)?.let { transform ->
-                instances.leftUpperLeg.transform.set(transform)
-                modelBatch.render(instances.leftUpperLeg, environment)
-            }
-            ragdollPhysics.getPedestrianLeftLowerLegTransform(i)?.let { transform ->
-                instances.leftLowerLeg.transform.set(transform)
-                modelBatch.render(instances.leftLowerLeg, environment)
+            // Left leg (single piece)
+            ragdollPhysics.getPedestrianLeftLegTransform(i)?.let { transform ->
+                instances.leftLeg.transform.set(transform)
+                modelBatch.render(instances.leftLeg, environment)
             }
 
-            // Right leg
-            ragdollPhysics.getPedestrianRightUpperLegTransform(i)?.let { transform ->
-                instances.rightUpperLeg.transform.set(transform)
-                modelBatch.render(instances.rightUpperLeg, environment)
+            // Right leg (single piece)
+            ragdollPhysics.getPedestrianRightLegTransform(i)?.let { transform ->
+                instances.rightLeg.transform.set(transform)
+                modelBatch.render(instances.rightLeg, environment)
             }
-            ragdollPhysics.getPedestrianRightLowerLegTransform(i)?.let { transform ->
-                instances.rightLowerLeg.transform.set(transform)
-                modelBatch.render(instances.rightLowerLeg, environment)
-            }
+        }
+    }
+
+    /**
+     * Update the diffuse color of a model instance's first material.
+     */
+    private fun updateMaterialColor(instance: ModelInstance, color: Color) {
+        if (instance.materials.size > 0) {
+            val colorAttr = instance.materials[0].get(ColorAttribute.Diffuse) as? ColorAttribute
+            colorAttr?.color?.set(color)
         }
     }
 
@@ -381,9 +359,7 @@ class RagdollRenderer : Disposable {
 
         pedHeadModel.dispose()
         pedTorsoModel.dispose()
-        pedUpperArmModel.dispose()
-        pedLowerArmModel.dispose()
-        pedUpperLegModel.dispose()
-        pedLowerLegModel.dispose()
+        pedArmModel.dispose()
+        pedLegModel.dispose()
     }
 }
