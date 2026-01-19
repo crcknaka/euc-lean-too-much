@@ -69,6 +69,10 @@ class GameRenderer(
     var activeRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
     var activeRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
 
+    // Pedestrian ragdoll renderer (always active for fallen pedestrians during gameplay)
+    var pedestrianRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
+    var pedestrianRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+
     // Sky color
     private val skyR = 0.5f
     private val skyG = 0.7f
@@ -261,6 +265,15 @@ class GameRenderer(
             // Make sure blending is disabled for opaque ragdoll rendering
             Gdx.gl.glDisable(GL20.GL_BLEND)
             activeRagdollRenderer!!.render(modelBatch, activeRagdollPhysics!!, environment)
+        }
+
+        // Render pedestrian ragdolls (separate from player ragdoll, active during gameplay)
+        if (pedestrianRagdollPhysics != null && pedestrianRagdollRenderer != null) {
+            val pedCount = pedestrianRagdollPhysics!!.getPedestrianCount()
+            if (pedCount > 0) {
+                Gdx.gl.glDisable(GL20.GL_BLEND)
+                pedestrianRagdollRenderer!!.renderPedestrians(modelBatch, pedestrianRagdollPhysics!!, environment)
+            }
         }
 
         modelBatch.end()

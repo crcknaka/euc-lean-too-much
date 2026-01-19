@@ -262,6 +262,10 @@ class EucGame(
                 playRagdollCollisionSound(colliderType)
             }
 
+            // Set up pedestrian ragdoll rendering (always active during gameplay)
+            renderer.pedestrianRagdollRenderer = ragdollRenderer
+            renderer.pedestrianRagdollPhysics = ragdollPhysics
+
             Gdx.app.log("EucGame", "Ragdoll physics initialized")
         } catch (e: Exception) {
             Gdx.app.error("EucGame", "Failed to initialize ragdoll physics: ${e.message}")
@@ -441,6 +445,9 @@ class EucGame(
                 cameraPosition = renderer.cameraController.getCameraPosition(),
                 cameraYaw = renderer.cameraController.getCameraYaw()
             )
+
+            // Render debug toggle button (when menu is closed)
+            debugMenu.renderDebugButton()
 
             // Render debug menu panel (if open)
             debugMenu.render()
@@ -1667,6 +1674,7 @@ class EucGame(
 
     /**
      * Update positions of falling pedestrians from ragdoll physics.
+     * Hides original model and uses ragdoll renderer for articulated body.
      */
     private fun updateFallingPedestrians() {
         if (ragdollPhysics == null) return
@@ -1683,21 +1691,19 @@ class EucGame(
             val transform = entity.getComponent(TransformComponent::class.java) ?: continue
             val modelComponent = entity.getComponent(ModelComponent::class.java) ?: continue
 
-            // Get physics transform
+            // Hide original pedestrian model - ragdoll renderer will draw the articulated body
+            modelComponent.visible = false
+
+            // Get physics transform (torso position)
             val physicsTransform = ragdollPhysics!!.getPedestrianTransform(pedestrianComponent.ragdollBodyIndex)
             if (physicsTransform != null) {
                 // Extract position from physics
                 physicsTransform.getTranslation(pedestrianTempPos)
 
-                // Update entity transform position
+                // Update entity transform position (for culling/tracking)
                 transform.position.set(pedestrianTempPos)
-                // Offset Y down by half height since physics center is at hip level
-                transform.position.y = pedestrianTempPos.y - 0.85f
-
-                // Update model instance transform directly for rotation
-                modelComponent.modelInstance?.transform?.set(physicsTransform)
-                // Correct the Y position for model (physics is centered at hip)
-                modelComponent.modelInstance?.transform?.translate(0f, -0.85f, 0f)
+                // Offset Y down by half torso height since physics center is at torso
+                transform.position.y = pedestrianTempPos.y - 0.25f
             }
         }
     }

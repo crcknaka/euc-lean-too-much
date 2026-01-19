@@ -96,7 +96,24 @@ class RagdollPhysics : Disposable {
     private var lastCollisionTime = 0f
     private val minCollisionInterval = 0.15f  // Minimum time between collision sounds
 
-    // Pedestrian ragdoll bodies (simple box physics, uses original model)
+    // Pedestrian ragdoll bodies - full articulated ragdoll like player
+    data class PedestrianRagdoll(
+        val head: BodyPart = BodyPart(),
+        val torso: BodyPart = BodyPart(),
+        val leftUpperArm: BodyPart = BodyPart(),
+        val leftLowerArm: BodyPart = BodyPart(),
+        val rightUpperArm: BodyPart = BodyPart(),
+        val rightLowerArm: BodyPart = BodyPart(),
+        val leftUpperLeg: BodyPart = BodyPart(),
+        val leftLowerLeg: BodyPart = BodyPart(),
+        val rightUpperLeg: BodyPart = BodyPart(),
+        val rightLowerLeg: BodyPart = BodyPart(),
+        val constraints: MutableList<btTypedConstraint> = mutableListOf(),
+        var entityIndex: Int = -1
+    )
+    private val pedestrianRagdolls = mutableListOf<PedestrianRagdoll>()
+
+    // Legacy simple pedestrian bodies (kept for compatibility)
     data class PedestrianBody(
         var shape: btCollisionShape? = null,
         var body: btRigidBody? = null,
@@ -529,7 +546,7 @@ class RagdollPhysics : Disposable {
      */
     fun update(delta: Float) {
         // Run simulation if main ragdoll is active or there are pedestrian ragdolls
-        if (!isActive && pedestrianBodies.isEmpty()) return
+        if (!isActive && pedestrianRagdolls.isEmpty()) return
 
         // Step physics world (max 4 substeps for stability)
         dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
@@ -743,13 +760,13 @@ class RagdollPhysics : Disposable {
     }
 
     /**
-     * Add a pedestrian ragdoll body (simple box that falls when hit).
-     * @param position Center position of the pedestrian
+     * Add a full articulated pedestrian ragdoll (with head, torso, arms, legs).
+     * @param position Center position of the pedestrian (feet level)
      * @param yaw Rotation around Y axis in degrees
      * @param playerVelocity Player's speed at collision (used for impact force)
      * @param playerDirection Direction player was moving (normalized)
      * @param entityIndex Index to track which entity this belongs to
-     * @return Index of the created pedestrian body
+     * @return Index of the created pedestrian ragdoll
      */
     fun addPedestrianRagdoll(
         position: Vector3,
@@ -758,81 +775,449 @@ class RagdollPhysics : Disposable {
         playerDirection: Vector3,
         entityIndex: Int
     ): Int {
-        // Pedestrian dimensions: width 0.5m, height 1.7m
-        val halfWidth = 0.25f
-        val halfHeight = 0.85f
-        val halfDepth = 0.2f
+        val ragdoll = PedestrianRagdoll(entityIndex = entityIndex)
 
-        val shape = btBoxShape(Vector3(halfWidth, halfHeight, halfDepth))
-        val mass = 70f  // ~70kg human
+        val yawRad = Math.toRadians(yaw.toDouble()).toFloat()
+
+        // Pedestrian scale (slightly smaller than player)
+        val scale = 1.0f
+
+        // Base position (hip level)
+        val baseX = position.x
+        val baseY = position.y + 0.9f * scale  // Hip height
+        val baseZ = position.z
+
+        // Body dimensions
+        val torsoWidth = 0.15f * scale
+        val torsoHeight = 0.5f * scale
+        val torsoDepth = 0.1f * scale
+        val headRadius = 0.1f * scale
+        val upperArmRadius = 0.035f * scale
+        val upperArmLength = 0.28f * scale
+        val lowerArmRadius = 0.03f * scale
+        val lowerArmLength = 0.25f * scale
+        val upperLegRadius = 0.05f * scale
+        val upperLegLength = 0.4f * scale
+        val lowerLegRadius = 0.04f * scale
+        val lowerLegLength = 0.4f * scale
+
+        // Masses (lighter than player, realistic)
+        val torsoMass = 25f
+        val headMass = 4f
+        val upperArmMass = 2f
+        val lowerArmMass = 1.2f
+        val upperLegMass = 7f
+        val lowerLegMass = 3.5f
+
+        // Create torso
+        createPedestrianBodyPart(
+            ragdoll.torso, btBoxShape(Vector3(torsoWidth, torsoHeight / 2, torsoDepth)), torsoMass,
+            baseX, baseY + torsoHeight / 2, baseZ, yaw
+        )
+
+        // Create head
+        createPedestrianBodyPart(
+            ragdoll.head, btSphereShape(headRadius), headMass,
+            baseX, baseY + torsoHeight + headRadius * 0.8f, baseZ, yaw
+        )
+
+        // Arms - positioned at shoulder level
+        val shoulderY = baseY + torsoHeight - 0.05f * scale
+        val shoulderOffset = torsoWidth + 0.02f * scale
+
+        // Left arm
+        createPedestrianBodyPart(
+            ragdoll.leftUpperArm, btBoxShape(Vector3(upperArmRadius, upperArmLength / 2, upperArmRadius)), upperArmMass,
+            baseX - shoulderOffset, shoulderY - upperArmLength / 2, baseZ, yaw
+        )
+        createPedestrianBodyPart(
+            ragdoll.leftLowerArm, btBoxShape(Vector3(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)), lowerArmMass,
+            baseX - shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, baseZ, yaw
+        )
+
+        // Right arm
+        createPedestrianBodyPart(
+            ragdoll.rightUpperArm, btBoxShape(Vector3(upperArmRadius, upperArmLength / 2, upperArmRadius)), upperArmMass,
+            baseX + shoulderOffset, shoulderY - upperArmLength / 2, baseZ, yaw
+        )
+        createPedestrianBodyPart(
+            ragdoll.rightLowerArm, btBoxShape(Vector3(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)), lowerArmMass,
+            baseX + shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, baseZ, yaw
+        )
+
+        // Legs - positioned at hip level
+        val hipOffset = 0.08f * scale
+
+        // Left leg
+        createPedestrianBodyPart(
+            ragdoll.leftUpperLeg, btBoxShape(Vector3(upperLegRadius, upperLegLength / 2, upperLegRadius)), upperLegMass,
+            baseX - hipOffset, baseY - upperLegLength / 2, baseZ, yaw
+        )
+        createPedestrianBodyPart(
+            ragdoll.leftLowerLeg, btBoxShape(Vector3(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)), lowerLegMass,
+            baseX - hipOffset, baseY - upperLegLength - lowerLegLength / 2, baseZ, yaw
+        )
+
+        // Right leg
+        createPedestrianBodyPart(
+            ragdoll.rightUpperLeg, btBoxShape(Vector3(upperLegRadius, upperLegLength / 2, upperLegRadius)), upperLegMass,
+            baseX + hipOffset, baseY - upperLegLength / 2, baseZ, yaw
+        )
+        createPedestrianBodyPart(
+            ragdoll.rightLowerLeg, btBoxShape(Vector3(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)), lowerLegMass,
+            baseX + hipOffset, baseY - upperLegLength - lowerLegLength / 2, baseZ, yaw
+        )
+
+        // Create constraints between body parts
+        createPedestrianConstraints(ragdoll, torsoHeight / 2, torsoWidth, upperArmLength, lowerArmLength, upperLegLength, lowerLegLength, hipOffset, scale)
+
+        // Apply initial velocities from impact
+        applyPedestrianImpactVelocities(ragdoll, playerVelocity, playerDirection, yawRad)
+
+        pedestrianRagdolls.add(ragdoll)
+
+        Gdx.app.log("RagdollPhysics", "Added articulated pedestrian ragdoll at $position, velocity=$playerVelocity")
+
+        return pedestrianRagdolls.size - 1
+    }
+
+    private fun createPedestrianBodyPart(
+        part: BodyPart,
+        shape: btCollisionShape,
+        mass: Float,
+        x: Float, y: Float, z: Float,
+        yaw: Float
+    ) {
+        part.shape = shape
 
         val inertia = Vector3()
         shape.calculateLocalInertia(mass, inertia)
 
-        // Initial transform - center of mass at hip height
         tempMatrix.idt()
-        tempMatrix.translate(position.x, position.y + halfHeight, position.z)
+        tempMatrix.translate(x, y, z)
         tempMatrix.rotate(Vector3.Y, yaw)
 
-        val motionState = btDefaultMotionState(tempMatrix)
-        val info = btRigidBody.btRigidBodyConstructionInfo(mass, motionState, shape, inertia)
-        val body = btRigidBody(info)
-        body.friction = 0.6f
-        body.restitution = 0.1f
-        body.setDamping(0.1f, 0.3f)
-        body.activationState = 4  // DISABLE_DEACTIVATION
+        part.motionState = btDefaultMotionState(tempMatrix)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, part.motionState, shape, inertia)
+        part.body = btRigidBody(info)
+        part.body!!.friction = 0.6f
+        part.body!!.restitution = 0.1f
+        part.body!!.setDamping(0.1f, 0.3f)
+        part.body!!.activationState = 4  // DISABLE_DEACTIVATION
 
-        // Apply impact force from player collision (realistic - pedestrian stumbles/falls, doesn't fly)
-        val impactForce = playerVelocity * 25f  // Much lower - realistic stumble
-        val upwardForce = 0.5f + playerVelocity * 0.05f  // Minimal upward - just enough to start falling
-
-        body.linearVelocity = Vector3(
-            playerDirection.x * impactForce * 0.5f,
-            upwardForce,
-            playerDirection.z * impactForce * 0.5f
-        )
-
-        // Add some spin/tumble (reduced for realism)
-        body.angularVelocity = Vector3(
-            playerVelocity * 0.2f,  // Tumble forward
-            playerDirection.x * 0.5f,  // Slight spin based on impact direction
-            -playerDirection.z * 0.1f
-        )
-
-        dynamicsWorld.addRigidBody(body)
+        dynamicsWorld.addRigidBody(part.body)
         info.dispose()
+    }
 
-        val pedestrianBody = PedestrianBody(shape, body, motionState, entityIndex)
-        pedestrianBodies.add(pedestrianBody)
+    private fun createPedestrianConstraints(
+        ragdoll: PedestrianRagdoll,
+        torsoHalfHeight: Float,
+        torsoWidth: Float,
+        upperArmLength: Float,
+        lowerArmLength: Float,
+        upperLegLength: Float,
+        lowerLegLength: Float,
+        hipOffset: Float,
+        scale: Float
+    ) {
+        // Neck joint (head to torso)
+        createPedestrianConeTwistConstraint(
+            ragdoll, ragdoll.torso.body!!, ragdoll.head.body!!,
+            Vector3(0f, torsoHalfHeight, 0f),
+            Vector3(0f, -0.1f * scale, 0f),
+            40f, 40f, 30f
+        )
 
-        Gdx.app.log("RagdollPhysics", "Added pedestrian ragdoll at ${position}, velocity=$playerVelocity")
+        // Left shoulder
+        createPedestrianConeTwistConstraint(
+            ragdoll, ragdoll.torso.body!!, ragdoll.leftUpperArm.body!!,
+            Vector3(-torsoWidth, torsoHalfHeight - 0.05f * scale, 0f),
+            Vector3(0f, upperArmLength / 2, 0f),
+            90f, 60f, 45f
+        )
 
-        return pedestrianBodies.size - 1
+        // Left elbow
+        createPedestrianHingeConstraint(
+            ragdoll, ragdoll.leftUpperArm.body!!, ragdoll.leftLowerArm.body!!,
+            Vector3(0f, -upperArmLength / 2, 0f),
+            Vector3(0f, lowerArmLength / 2, 0f),
+            Vector3.X, 0f, 140f
+        )
+
+        // Right shoulder
+        createPedestrianConeTwistConstraint(
+            ragdoll, ragdoll.torso.body!!, ragdoll.rightUpperArm.body!!,
+            Vector3(torsoWidth, torsoHalfHeight - 0.05f * scale, 0f),
+            Vector3(0f, upperArmLength / 2, 0f),
+            90f, 60f, 45f
+        )
+
+        // Right elbow
+        createPedestrianHingeConstraint(
+            ragdoll, ragdoll.rightUpperArm.body!!, ragdoll.rightLowerArm.body!!,
+            Vector3(0f, -upperArmLength / 2, 0f),
+            Vector3(0f, lowerArmLength / 2, 0f),
+            Vector3.X, 0f, 140f
+        )
+
+        // Left hip
+        createPedestrianConeTwistConstraint(
+            ragdoll, ragdoll.torso.body!!, ragdoll.leftUpperLeg.body!!,
+            Vector3(-hipOffset, -torsoHalfHeight, 0f),
+            Vector3(0f, upperLegLength / 2, 0f),
+            60f, 45f, 30f
+        )
+
+        // Left knee
+        createPedestrianHingeConstraint(
+            ragdoll, ragdoll.leftUpperLeg.body!!, ragdoll.leftLowerLeg.body!!,
+            Vector3(0f, -upperLegLength / 2, 0f),
+            Vector3(0f, lowerLegLength / 2, 0f),
+            Vector3.X, 0f, 140f
+        )
+
+        // Right hip
+        createPedestrianConeTwistConstraint(
+            ragdoll, ragdoll.torso.body!!, ragdoll.rightUpperLeg.body!!,
+            Vector3(hipOffset, -torsoHalfHeight, 0f),
+            Vector3(0f, upperLegLength / 2, 0f),
+            60f, 45f, 30f
+        )
+
+        // Right knee
+        createPedestrianHingeConstraint(
+            ragdoll, ragdoll.rightUpperLeg.body!!, ragdoll.rightLowerLeg.body!!,
+            Vector3(0f, -upperLegLength / 2, 0f),
+            Vector3(0f, lowerLegLength / 2, 0f),
+            Vector3.X, 0f, 140f
+        )
+    }
+
+    private fun createPedestrianConeTwistConstraint(
+        ragdoll: PedestrianRagdoll,
+        bodyA: btRigidBody, bodyB: btRigidBody,
+        pivotA: Vector3, pivotB: Vector3,
+        swingSpan1: Float, swingSpan2: Float, twistSpan: Float
+    ) {
+        tempMatrix.idt()
+        tempMatrix.translate(pivotA)
+        tempMatrix2.idt()
+        tempMatrix2.translate(pivotB)
+
+        val constraint = btConeTwistConstraint(bodyA, bodyB, tempMatrix, tempMatrix2)
+        constraint.setLimit(
+            Math.toRadians(swingSpan1.toDouble()).toFloat(),
+            Math.toRadians(swingSpan2.toDouble()).toFloat(),
+            Math.toRadians(twistSpan.toDouble()).toFloat()
+        )
+
+        dynamicsWorld.addConstraint(constraint, true)
+        ragdoll.constraints.add(constraint)
+    }
+
+    private fun createPedestrianHingeConstraint(
+        ragdoll: PedestrianRagdoll,
+        bodyA: btRigidBody, bodyB: btRigidBody,
+        pivotA: Vector3, pivotB: Vector3,
+        axis: Vector3,
+        lowLimit: Float, highLimit: Float
+    ) {
+        val constraint = btHingeConstraint(bodyA, bodyB, pivotA, pivotB, axis, axis)
+        constraint.setLimit(
+            Math.toRadians(lowLimit.toDouble()).toFloat(),
+            Math.toRadians(highLimit.toDouble()).toFloat()
+        )
+
+        dynamicsWorld.addConstraint(constraint, true)
+        ragdoll.constraints.add(constraint)
+    }
+
+    private fun applyPedestrianImpactVelocities(
+        ragdoll: PedestrianRagdoll,
+        playerVelocity: Float,
+        playerDirection: Vector3,
+        yawRad: Float
+    ) {
+        // Calculate impact force (realistic stumble, not flying)
+        val impactForce = playerVelocity * 1.5f  // Realistic stumble force
+        val upwardForce = 0.3f + playerVelocity * 0.03f  // Minimal upward
+
+        val baseLinearVelocity = Vector3(
+            playerDirection.x * impactForce,
+            upwardForce,
+            playerDirection.z * impactForce
+        )
+
+        // Angular velocity (tumbling)
+        val tumbleX = playerVelocity * 0.3f  // Forward tumble
+        val tumbleY = playerDirection.x * 0.5f
+        val tumbleZ = -playerDirection.z * 0.2f
+        val baseAngularVelocity = Vector3(tumbleX, tumbleY, tumbleZ)
+
+        // Apply to all body parts with variations
+        applyVelocityToPedestrianPart(ragdoll.torso, baseLinearVelocity, baseAngularVelocity, 1.0f)
+        applyVelocityToPedestrianPart(ragdoll.head, baseLinearVelocity, baseAngularVelocity, 1.1f)
+        applyVelocityToPedestrianPart(ragdoll.leftUpperArm, baseLinearVelocity, baseAngularVelocity, 0.9f)
+        applyVelocityToPedestrianPart(ragdoll.leftLowerArm, baseLinearVelocity, baseAngularVelocity, 0.85f)
+        applyVelocityToPedestrianPart(ragdoll.rightUpperArm, baseLinearVelocity, baseAngularVelocity, 0.9f)
+        applyVelocityToPedestrianPart(ragdoll.rightLowerArm, baseLinearVelocity, baseAngularVelocity, 0.85f)
+        applyVelocityToPedestrianPart(ragdoll.leftUpperLeg, baseLinearVelocity, baseAngularVelocity, 0.8f)
+        applyVelocityToPedestrianPart(ragdoll.leftLowerLeg, baseLinearVelocity, baseAngularVelocity, 0.7f)
+        applyVelocityToPedestrianPart(ragdoll.rightUpperLeg, baseLinearVelocity, baseAngularVelocity, 0.8f)
+        applyVelocityToPedestrianPart(ragdoll.rightLowerLeg, baseLinearVelocity, baseAngularVelocity, 0.7f)
+    }
+
+    private fun applyVelocityToPedestrianPart(part: BodyPart, linearVel: Vector3, angularVel: Vector3, factor: Float) {
+        part.body?.let {
+            it.linearVelocity = Vector3(linearVel.x * factor, linearVel.y * factor, linearVel.z * factor)
+            it.angularVelocity = Vector3(angularVel.x * factor, angularVel.y * factor, angularVel.z * factor)
+        }
     }
 
     /**
-     * Get transform for a pedestrian ragdoll body.
-     * Pedestrian ragdolls work independently of main ragdoll state.
+     * Get torso transform for a pedestrian ragdoll (main body position).
      * @param index Index returned by addPedestrianRagdoll
      * @return Transform matrix or null if invalid
      */
     fun getPedestrianTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianBodies.size) return null
-
-        val pedestrian = pedestrianBodies[index]
-        pedestrian.motionState?.getWorldTransform(tempMatrix)
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.torso.motionState?.getWorldTransform(tempMatrix)
         return tempMatrix
     }
 
     /**
-     * Get number of active pedestrian ragdoll bodies.
+     * Get head transform for a pedestrian ragdoll.
      */
-    fun getPedestrianCount(): Int = pedestrianBodies.size
+    fun getPedestrianHeadTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.head.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
 
     /**
-     * Clear all pedestrian ragdoll bodies.
+     * Get torso transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianTorsoTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.torso.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get left upper arm transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianLeftUpperArmTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.leftUpperArm.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get left lower arm transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianLeftLowerArmTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.leftLowerArm.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get right upper arm transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianRightUpperArmTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.rightUpperArm.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get right lower arm transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianRightLowerArmTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.rightLowerArm.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get left upper leg transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianLeftUpperLegTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.leftUpperLeg.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get left lower leg transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianLeftLowerLegTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.leftLowerLeg.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get right upper leg transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianRightUpperLegTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.rightUpperLeg.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get right lower leg transform for a pedestrian ragdoll.
+     */
+    fun getPedestrianRightLowerLegTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= pedestrianRagdolls.size) return null
+        val ragdoll = pedestrianRagdolls[index]
+        ragdoll.rightLowerLeg.motionState?.getWorldTransform(tempMatrix)
+        return tempMatrix
+    }
+
+    /**
+     * Get number of active pedestrian ragdolls.
+     */
+    fun getPedestrianCount(): Int = pedestrianRagdolls.size
+
+    /**
+     * Clear all pedestrian ragdolls.
      */
     private fun clearPedestrianBodies() {
+        for (ragdoll in pedestrianRagdolls) {
+            // Remove constraints first
+            for (constraint in ragdoll.constraints) {
+                dynamicsWorld.removeConstraint(constraint)
+                constraint.dispose()
+            }
+            ragdoll.constraints.clear()
+
+            // Remove body parts
+            cleanupPart(ragdoll.head)
+            cleanupPart(ragdoll.torso)
+            cleanupPart(ragdoll.leftUpperArm)
+            cleanupPart(ragdoll.leftLowerArm)
+            cleanupPart(ragdoll.rightUpperArm)
+            cleanupPart(ragdoll.rightLowerArm)
+            cleanupPart(ragdoll.leftUpperLeg)
+            cleanupPart(ragdoll.leftLowerLeg)
+            cleanupPart(ragdoll.rightUpperLeg)
+            cleanupPart(ragdoll.rightLowerLeg)
+        }
+        pedestrianRagdolls.clear()
+
+        // Also clear legacy simple bodies
         for (pedestrian in pedestrianBodies) {
             pedestrian.body?.let {
                 dynamicsWorld.removeRigidBody(it)

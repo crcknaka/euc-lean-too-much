@@ -49,8 +49,12 @@ class DebugMenu(private val engine: Engine) : Disposable {
     private var selectedOption = 0
     private var touchCooldown = 0f
 
-    // Triple-finger touch detection
+    // Triple-finger touch detection (backup method)
     private var wasThreeFingerTouch = false
+
+    // Debug toggle button (always visible when DEBUG_MENU_ENABLED)
+    private var debugButtonRect = Rectangle()
+    private val debugButtonSize = 50f  // Base size before scaling
 
     // Debug options state
     var showColliders = false
@@ -180,6 +184,76 @@ class DebugMenu(private val engine: Engine) : Disposable {
     }
 
     /**
+     * Render the debug toggle button (always visible when DEBUG_MENU_ENABLED).
+     * Call this every frame after game UI.
+     */
+    fun renderDebugButton() {
+        if (!DebugConfig.DEBUG_MENU_ENABLED) return
+        if (isOpen) return  // Don't show button when menu is open
+
+        UIFonts.initialize()
+
+        val scale = UITheme.Dimensions.scale()
+        val btnSize = debugButtonSize * scale
+        val margin = 15f * scale
+
+        // Position in top-right corner
+        debugButtonRect.set(
+            ui.screenWidth - btnSize - margin,
+            ui.screenHeight - btnSize - margin,
+            btnSize,
+            btnSize
+        )
+
+        // Draw button background (filled)
+        ui.beginShapes()
+        ui.roundedRect(
+            debugButtonRect.x, debugButtonRect.y,
+            debugButtonRect.width, debugButtonRect.height,
+            8f * scale,
+            UITheme.withAlpha(UITheme.surface, 0.7f)
+        )
+        ui.endShapes()
+
+        // Draw border (line mode requires separate begin/end)
+        ui.shapes.begin(ShapeRenderer.ShapeType.Line)
+        ui.shapes.color = UITheme.withAlpha(UITheme.accent, 0.8f)
+        ui.shapes.rect(
+            debugButtonRect.x, debugButtonRect.y,
+            debugButtonRect.width, debugButtonRect.height
+        )
+        ui.shapes.end()
+
+        // Draw "DBG" text
+        ui.beginBatch()
+        ui.textCentered(
+            "DBG",
+            debugButtonRect.x + debugButtonRect.width / 2,
+            debugButtonRect.y + debugButtonRect.height / 2,
+            UIFonts.caption,
+            UITheme.accent
+        )
+        ui.endBatch()
+
+        // Handle touch on button
+        handleDebugButtonTouch()
+    }
+
+    private fun handleDebugButtonTouch() {
+        if (touchCooldown > 0f) return
+        if (!Gdx.input.justTouched()) return
+
+        val touchX = Gdx.input.x.toFloat()
+        val touchY = ui.screenHeight - Gdx.input.y.toFloat()  // Flip Y
+
+        if (debugButtonRect.contains(touchX, touchY)) {
+            isOpen = true
+            touchCooldown = 0.3f
+            Gdx.app.log("DebugMenu", "Opened by touch button")
+        }
+    }
+
+    /**
      * Render the debug menu overlay.
      * Call this after game rendering but before UI.
      */
@@ -294,7 +368,7 @@ class DebugMenu(private val engine: Engine) : Disposable {
         UIFonts.caption.color = UITheme.textMuted
         UIFonts.caption.draw(ui.batch, "F3: Toggle menu | Enter: Select | Esc: Close",
             panelX + 20f * scale, panelY + 30f * scale)
-        UIFonts.caption.draw(ui.batch, "Touch with 4 fingers to toggle on mobile",
+        UIFonts.caption.draw(ui.batch, "Tap DBG button (top-right) to toggle on mobile",
             panelX + 20f * scale, panelY + 50f * scale)
 
         ui.endBatch()
