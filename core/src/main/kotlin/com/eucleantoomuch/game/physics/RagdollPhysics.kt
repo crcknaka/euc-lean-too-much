@@ -779,12 +779,13 @@ class RagdollPhysics : Disposable {
 
         val yawRad = Math.toRadians(yaw.toDouble()).toFloat()
 
-        // Pedestrian scale (slightly smaller than player)
-        val scale = 1.0f
+        // Pedestrian scale (1.7x for better visibility)
+        val scale = 1.7f
+        val legScale = 0.85f  // Shorter legs
 
         // Base position (hip level)
         val baseX = position.x
-        val baseY = position.y + 0.9f * scale  // Hip height
+        val baseY = position.y + 0.9f * scale * legScale  // Hip height (lower due to shorter legs)
         val baseZ = position.z
 
         // Body dimensions
@@ -797,9 +798,9 @@ class RagdollPhysics : Disposable {
         val lowerArmRadius = 0.03f * scale
         val lowerArmLength = 0.25f * scale
         val upperLegRadius = 0.05f * scale
-        val upperLegLength = 0.4f * scale
+        val upperLegLength = 0.4f * scale * legScale
         val lowerLegRadius = 0.04f * scale
-        val lowerLegLength = 0.4f * scale
+        val lowerLegLength = 0.4f * scale * legScale
 
         // Masses (lighter than player, realistic)
         val torsoMass = 25f

@@ -572,7 +572,8 @@ class ProceduralModels : Disposable {
      */
     fun createPedestrianModel(shirtColor: Color = pedestrianColor): Model {
         modelBuilder.begin()
-        val scale = 1.0f  // Match ragdoll scale
+        val scale = 1.7f  // 1.7x size for better visibility
+        val legScale = 0.85f  // Shorter legs
 
         val shirtMaterial = Material(ColorAttribute.createDiffuse(shirtColor))
         val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.25f, 0.25f, 0.35f, 1f)))  // Dark pants
@@ -588,12 +589,12 @@ class ProceduralModels : Disposable {
         val lowerArmWidth = 0.03f * scale
         val lowerArmLength = 0.25f * scale
         val upperLegWidth = 0.05f * scale
-        val upperLegLength = 0.4f * scale
+        val upperLegLength = 0.4f * scale * legScale
         val lowerLegWidth = 0.04f * scale
-        val lowerLegLength = 0.4f * scale
+        val lowerLegLength = 0.4f * scale * legScale
 
         // Base Y positions
-        val hipY = 0.9f * scale
+        val hipY = 0.9f * scale * legScale  // Lower hip due to shorter legs
         val torsoY = hipY + torsoHeight / 2
         val headY = hipY + torsoHeight + 0.09f * scale * 0.8f
         val shoulderY = hipY + torsoHeight - 0.05f * scale
@@ -673,25 +674,27 @@ class ProceduralModels : Disposable {
     }
 
     private fun createPedestrianBodyPartModel(partName: String, shirtColor: Color): Model {
+        val scale = 1.7f  // 1.7x size to match pedestrian model
+        val legScale = 0.85f  // Shorter legs
         val shirtMaterial = Material(ColorAttribute.createDiffuse(shirtColor))
         val pantsMaterial = Material(ColorAttribute.createDiffuse(Color(0.25f, 0.25f, 0.35f, 1f)))
         val skinMaterial = Material(ColorAttribute.createDiffuse(Color(0.85f, 0.65f, 0.55f, 1f)))
         val hairMaterial = Material(ColorAttribute.createDiffuse(Color(0.3f, 0.2f, 0.15f, 1f)))
 
         return when (partName) {
-            "head" -> modelBuilder.createSphere(0.14f, 0.18f, 0.14f, 8, 8, skinMaterial, attributes)
+            "head" -> modelBuilder.createSphere(0.14f * scale, 0.18f * scale, 0.14f * scale, 8, 8, skinMaterial, attributes)
             "hair" -> {
                 modelBuilder.begin()
                 val part = modelBuilder.part("hair", GL20.GL_TRIANGLES, attributes, hairMaterial)
-                part.sphere(0.16f, 0.12f, 0.16f, 8, 8, 0f, 360f, 0f, 90f)
+                part.sphere(0.16f * scale, 0.12f * scale, 0.16f * scale, 8, 8, 0f, 360f, 0f, 90f)
                 modelBuilder.end()
             }
-            "torso" -> modelBuilder.createBox(0.30f, 0.5f, 0.20f, shirtMaterial, attributes)
-            "leftUpperArm", "rightUpperArm" -> modelBuilder.createBox(0.07f, 0.28f, 0.07f, shirtMaterial, attributes)
-            "leftLowerArm", "rightLowerArm" -> modelBuilder.createBox(0.06f, 0.25f, 0.06f, skinMaterial, attributes)
-            "leftUpperLeg", "rightUpperLeg" -> modelBuilder.createBox(0.10f, 0.40f, 0.10f, pantsMaterial, attributes)
-            "leftLowerLeg", "rightLowerLeg" -> modelBuilder.createBox(0.08f, 0.40f, 0.08f, pantsMaterial, attributes)
-            else -> modelBuilder.createBox(0.1f, 0.1f, 0.1f, skinMaterial, attributes)
+            "torso" -> modelBuilder.createBox(0.30f * scale, 0.5f * scale, 0.20f * scale, shirtMaterial, attributes)
+            "leftUpperArm", "rightUpperArm" -> modelBuilder.createBox(0.07f * scale, 0.28f * scale, 0.07f * scale, shirtMaterial, attributes)
+            "leftLowerArm", "rightLowerArm" -> modelBuilder.createBox(0.06f * scale, 0.25f * scale, 0.06f * scale, skinMaterial, attributes)
+            "leftUpperLeg", "rightUpperLeg" -> modelBuilder.createBox(0.10f * scale, 0.40f * scale * legScale, 0.10f * scale, pantsMaterial, attributes)
+            "leftLowerLeg", "rightLowerLeg" -> modelBuilder.createBox(0.08f * scale, 0.40f * scale * legScale, 0.08f * scale, pantsMaterial, attributes)
+            else -> modelBuilder.createBox(0.1f * scale, 0.1f * scale, 0.1f * scale, skinMaterial, attributes)
         }.also { models.add(it) }
     }
 

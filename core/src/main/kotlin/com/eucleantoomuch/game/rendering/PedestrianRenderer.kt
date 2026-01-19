@@ -52,17 +52,19 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
     private val partMatrix = Matrix4()
     private val tempVec = Vector3()
 
-    // Body dimensions (match ProceduralModels)
-    private val hipY = 0.9f
-    private val torsoHeight = 0.5f
-    private val upperArmLength = 0.28f
-    private val lowerArmLength = 0.25f
-    private val upperLegLength = 0.4f
-    private val lowerLegLength = 0.4f
-    private val shoulderOffset = 0.17f
-    private val hipOffset = 0.08f
-    private val shoulderY = hipY + torsoHeight - 0.05f
-    private val headY = hipY + torsoHeight + 0.072f
+    // Body dimensions (match ProceduralModels at 1.7x scale)
+    private val scale = 1.7f
+    private val legScale = 0.85f  // Shorter legs
+    private val hipY = 0.9f * scale * legScale  // Lower hip due to shorter legs
+    private val torsoHeight = 0.5f * scale
+    private val upperArmLength = 0.28f * scale
+    private val lowerArmLength = 0.25f * scale
+    private val upperLegLength = 0.4f * scale * legScale
+    private val lowerLegLength = 0.4f * scale * legScale
+    private val shoulderOffset = 0.17f * scale
+    private val hipOffset = 0.08f * scale
+    private val shoulderY = hipY + torsoHeight - 0.05f * scale
+    private val headY = hipY + torsoHeight + 0.072f * scale
 
     // Animation parameters
     private val armSwingAngle = 25f  // Degrees

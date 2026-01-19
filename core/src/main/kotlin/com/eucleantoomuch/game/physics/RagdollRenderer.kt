@@ -169,8 +169,9 @@ class RagdollRenderer : Disposable {
             )
         }
 
-        // Pedestrian scale (1.0 = normal human, no helmet)
-        val scale = 1.0f
+        // Pedestrian scale (1.7x for better visibility)
+        val scale = 1.7f
+        val legScale = 0.85f  // Shorter legs
 
         // Head (no helmet, just hair and face)
         modelBuilder.begin()
@@ -206,16 +207,16 @@ class RagdollRenderer : Disposable {
             attrs
         )
 
-        // Upper leg - box
+        // Upper leg - box (shorter legs)
         pedUpperLegModel = modelBuilder.createBox(
-            0.10f * scale, 0.40f * scale, 0.10f * scale,
+            0.10f * scale, 0.40f * scale * legScale, 0.10f * scale,
             opaqueMaterial(pedPantsColor),
             attrs
         )
 
-        // Lower leg - box
+        // Lower leg - box (shorter legs)
         pedLowerLegModel = modelBuilder.createBox(
-            0.08f * scale, 0.40f * scale, 0.08f * scale,
+            0.08f * scale, 0.40f * scale * legScale, 0.08f * scale,
             opaqueMaterial(pedPantsColor),
             attrs
         )
