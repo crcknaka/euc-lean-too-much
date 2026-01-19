@@ -1398,10 +1398,11 @@ class WorldGenerator(
 
         // Car in a lane, moving in same or opposite direction
         // 70% chance for same direction (right lane), 30% for oncoming (left lane)
+        // In this game: negative X = right side, positive X = left side (from camera view)
         val sameDirection = MathUtils.random() < 0.7f
-        val lane = if (sameDirection) 1 else -1
+        val lane = if (sameDirection) -1 else 1  // -1 = right lane (same dir), +1 = left lane (oncoming)
         val x = lane * 1.5f  // Lane position
-        val direction = if (lane == 1) 1 else -1  // Right lane = same direction, left = opposite
+        val direction = if (sameDirection) 1 else -1  // Same direction = forward, oncoming = backward
 
         // If same direction, start ahead of the obstacle position so player can catch up
         // If opposite direction, start further ahead so player can see them coming
@@ -1424,7 +1425,7 @@ class WorldGenerator(
         })
         entity.add(CarComponent().apply {
             speed = difficultyScaler.getCarSpeed(totalDistance)
-            this.lane = if (lane == 1) 1 else 0
+            this.lane = if (lane == -1) 0 else 1  // 0 = right lane, 1 = left lane
             this.direction = direction
         })
 
