@@ -200,7 +200,8 @@ class GameRenderer(
                         // Lean forward and side
                         // Rider leans dramatically (60°) at full gas/brake
                         val forwardLeanAngle = euc.visualForwardLean * 60f
-                        val sideLeanAngle = euc.visualSideLean * 15f
+                        // Rider leans into turns - more dramatic lean (25° at full turn)
+                        val sideLeanAngle = euc.visualSideLean * 25f
                         tempMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
                         tempMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
                     }
@@ -253,7 +254,8 @@ class GameRenderer(
 
         // Apply rider's lean (forward and side)
         val forwardLeanAngle = riderEuc.visualForwardLean * 60f
-        val sideLeanAngle = riderEuc.visualSideLean * 15f
+        // Rider leans into turns - more dramatic lean (25° at full turn)
+        val sideLeanAngle = riderEuc.visualSideLean * 25f
         headMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
         headMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
 
@@ -305,7 +307,8 @@ class GameRenderer(
         // Apply rider's lean (forward and side)
         // Rider leans dramatically (60°) at full gas/brake
         val forwardLeanAngle = riderEuc.visualForwardLean * 60f
-        val sideLeanAngle = riderEuc.visualSideLean * 15f
+        // Rider leans into turns - more dramatic lean (25° at full turn)
+        val sideLeanAngle = riderEuc.visualSideLean * 25f
         matrix.rotate(1f, 0f, 0f, forwardLeanAngle)
         matrix.rotate(0f, 0f, 1f, sideLeanAngle)
 

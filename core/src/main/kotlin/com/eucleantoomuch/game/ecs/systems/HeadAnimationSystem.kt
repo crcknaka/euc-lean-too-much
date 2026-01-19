@@ -24,6 +24,12 @@ class HeadAnimationSystem : IteratingSystem(Families.rider, 6) {
 
         val speedKmh = euc.speed * 3.6f
 
+        // Turn-based head lean - head tilts into the turn direction
+        // sideLean: negative = turning left, positive = turning right
+        // Head should tilt in the direction of the turn (lean into the turn)
+        val turnLeanRoll = -euc.visualSideLean * 12f  // Tilt head into turn
+        val turnLeanYaw = euc.visualSideLean * 8f     // Look slightly into turn
+
         // Head dance effect from 0 to 50 km/h (full intensity at 0, fades to 0 at 50)
         if (speedKmh < 50f) {
             // Full intensity at 0 km/h, linearly fades to 0 at 50 km/h
@@ -34,21 +40,22 @@ class HeadAnimationSystem : IteratingSystem(Families.rider, 6) {
 
             // Yaw: looking left/right occasionally - more noticeable
             val yawBase = MathUtils.sin(t * 1.3f) * 15f + MathUtils.sin(t * 2.1f) * 8f
-            head.yaw = yawBase * intensity
+            head.yaw = yawBase * intensity + turnLeanYaw
 
             // Pitch: nodding - more noticeable
             val pitchBase = MathUtils.sin(t * 1.7f) * 10f + MathUtils.sin(t * 0.8f) * 6f
             head.pitch = pitchBase * intensity
 
-            // Roll: head tilt - more noticeable
+            // Roll: head tilt - combines dance with turn lean
             val rollBase = MathUtils.sin(t * 1.1f) * 8f
-            head.roll = rollBase * intensity
+            head.roll = rollBase * intensity + turnLeanRoll
         } else {
-            // At higher speed, head stays neutral but follows turns slightly
-            val turnFollow = euc.visualSideLean * 5f
-            head.yaw = MathUtils.lerp(head.yaw, turnFollow, 5f * deltaTime)
+            // At higher speed, head leans into turns more noticeably
+            val targetYaw = turnLeanYaw
+            val targetRoll = turnLeanRoll
+            head.yaw = MathUtils.lerp(head.yaw, targetYaw, 5f * deltaTime)
             head.pitch = MathUtils.lerp(head.pitch, 0f, 5f * deltaTime)
-            head.roll = MathUtils.lerp(head.roll, -euc.visualSideLean * 3f, 5f * deltaTime)
+            head.roll = MathUtils.lerp(head.roll, targetRoll, 5f * deltaTime)
         }
     }
 }
