@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.eucleantoomuch.game.rendering
 
 import com.badlogic.gdx.Gdx
@@ -525,11 +527,20 @@ class ProceduralModels : Disposable {
     }
 
     fun createPuddleModel(): Model {
+        return createPuddleModel(Constants.PUDDLE_WIDTH, Constants.PUDDLE_LENGTH)
+    }
+
+    /**
+     * Create puddle model with custom size.
+     * @param width Width of the puddle (X axis)
+     * @param length Length of the puddle (Z axis)
+     */
+    fun createPuddleModel(width: Float, length: Float): Model {
         modelBuilder.begin()
         val material = Material(ColorAttribute.createDiffuse(puddleColor))
         val part = modelBuilder.part("puddle", GL20.GL_TRIANGLES, attributes, material)
         part.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.005f, 0f))
-        part.ellipse(Constants.PUDDLE_WIDTH, Constants.PUDDLE_LENGTH, 0f, 0f, 16,
+        part.ellipse(width, length, 0f, 0f, 16,
             0f, 0f, 0f, 0f, 1f, 0f)
         return modelBuilder.end().also { models.add(it) }
     }

@@ -81,8 +81,14 @@ class WorldGenerator(
     // Fog wall model for front boundary
     private var fogWallModel: ModelInstance
 
+    // Tower crane model
+    private var towerCraneModel: ModelInstance
+
     // Track which chunks have zebra crossings
     private var lastZebraCrossingChunk = -10  // Start with no recent crossing
+
+    // Track tower crane placement to avoid clustering
+    private var lastCraneChunk = -20  // Start with no recent crane
 
     init {
         // Create zebra crossing model
@@ -175,6 +181,9 @@ class WorldGenerator(
 
         // Create fog wall for front boundary
         fogWallModel = ModelInstance(models.createFogWallModel(300f, 120f))
+
+        // Create tower crane model
+        towerCraneModel = ModelInstance(models.createTowerCraneModel())
     }
 
     fun setRenderDistance(distance: Float) {
@@ -231,6 +240,9 @@ class WorldGenerator(
 
         // Buildings on both sides
         entities.addAll(generateBuildings(chunkIndex, chunkStartZ))
+
+        // Tower cranes (rare, decorative, behind buildings)
+        entities.addAll(generateTowerCranes(chunkIndex, chunkStartZ))
 
         // Scenery between buildings (trees, benches, etc.)
         entities.addAll(generateScenery(chunkIndex, chunkStartZ))
@@ -1005,6 +1017,65 @@ class WorldGenerator(
         return entity
     }
 
+    /**
+     * Generate tower cranes in this chunk.
+     * Cranes appear occasionally and not too close together.
+     * They are placed near buildings to suggest construction sites.
+     */
+    private fun generateTowerCranes(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Only generate cranes if enough distance from last crane (at least 4 chunks apart)
+        if (chunkIndex - lastCraneChunk < 4) return entities
+
+        // 25% chance to spawn a crane in this chunk
+        if (MathUtils.random() > 0.25f) return entities
+
+        // Place crane on one side of the road, near buildings
+        val isLeftSide = MathUtils.randomBoolean()
+        val sideMultiplier = if (isLeftSide) -1f else 1f
+
+        // Position crane at or slightly behind buildings (buildings are at BUILDING_OFFSET_X = 14f)
+        val craneX = sideMultiplier * (Constants.BUILDING_OFFSET_X + MathUtils.random(-2f, 5f))
+        val craneZ = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+
+        entities.add(createTowerCraneEntity(craneX, craneZ, chunkIndex, isLeftSide))
+        lastCraneChunk = chunkIndex
+
+        return entities
+    }
+
+    /**
+     * Create a tower crane entity
+     */
+    private fun createTowerCraneEntity(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
+        val entity = engine.createEntity()
+
+        // Random rotation so cranes face different directions
+        val baseYaw = if (isLeftSide) 90f else -90f  // Face towards road
+        val randomYawOffset = MathUtils.random(-45f, 45f)
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            yaw = baseYaw + randomYawOffset
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(towerCraneModel.model)
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        // No collider - cranes are far from the road and purely decorative
+
+        engine.addEntity(entity)
+        return entity
+    }
+
     private fun createSceneryItem(x: Float, z: Float, chunkIndex: Int, isLeftSide: Boolean): Entity {
         val roll = MathUtils.random()
 
@@ -1303,10 +1374,27 @@ class WorldGenerator(
     private fun createPuddleEntity(x: Float, z: Float): Entity {
         val entity = engine.createEntity()
 
-        entity.add(TransformComponent().apply { position.set(x, 0f, z) })
-        entity.add(ModelComponent().apply { modelInstance = ModelInstance(puddleModel) })
+        // Random puddle size - width 0.8 to 2.5m, length 1.0 to 3.5m
+        val widthScale = MathUtils.random(0.5f, 1.7f)
+        val lengthScale = MathUtils.random(0.5f, 1.8f)
+        val puddleWidth = Constants.PUDDLE_WIDTH * widthScale
+        val puddleLength = Constants.PUDDLE_LENGTH * lengthScale
+
+        // Random rotation for variety (0, 90, or slight angles)
+        val rotation = MathUtils.random(-25f, 25f)
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            yaw = rotation
+            updateRotationFromYaw()
+        })
+
+        // Create custom sized puddle model
+        val customPuddleModel = models.createPuddleModel(puddleWidth, puddleLength)
+        entity.add(ModelComponent().apply { modelInstance = ModelInstance(customPuddleModel) })
+
         entity.add(ColliderComponent().apply {
-            setSize(Constants.PUDDLE_WIDTH, 0.1f, Constants.PUDDLE_LENGTH)
+            setSize(puddleWidth, 0.1f, puddleLength)
             collisionGroup = CollisionGroups.OBSTACLE
         })
         entity.add(ObstacleComponent().apply {
@@ -1456,5 +1544,7 @@ class WorldGenerator(
         lastSkyscraperChunk = -100
         // Reset pigeon flock tracking
         nextFlockId = 0
+        // Reset tower crane tracking
+        lastCraneChunk = -20
     }
 }
