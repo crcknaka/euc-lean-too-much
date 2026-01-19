@@ -77,6 +77,7 @@ class RagdollPhysics : Disposable {
 
     // State
     private var isActive = false
+    private var isFrozen = false  // When frozen, ragdoll stays visible but doesn't simulate
 
     // Temp vectors for calculations
     private val tempVec = Vector3()
@@ -525,7 +526,7 @@ class RagdollPhysics : Disposable {
     fun getRightLowerLegTransform(): Matrix4? = getPartTransform(rightLowerLeg)
 
     private fun getPartTransform(part: BodyPart): Matrix4? {
-        if (!isActive || part.body == null) return null
+        if ((!isActive && !isFrozen) || part.body == null) return null
         part.motionState?.getWorldTransform(tempMatrix)
         return tempMatrix
     }
@@ -535,16 +536,26 @@ class RagdollPhysics : Disposable {
     fun getTorsoPosition(out: Vector3): Vector3 = getPartPosition(torso, out)
 
     private fun getPartPosition(part: BodyPart, out: Vector3): Vector3 {
-        if (!isActive || part.body == null) return out.setZero()
+        if ((!isActive && !isFrozen) || part.body == null) return out.setZero()
         part.motionState?.getWorldTransform(tempMatrix)
         tempMatrix.getTranslation(out)
         return out
     }
 
     /**
-     * Check if simulation is active.
+     * Check if simulation is active (or frozen but still visible).
      */
-    fun isActive(): Boolean = isActive
+    fun isActive(): Boolean = isActive || isFrozen
+
+    /**
+     * Freeze the ragdoll in place - stops physics but keeps it visible.
+     */
+    fun freeze() {
+        if (isActive) {
+            isActive = false
+            isFrozen = true
+        }
+    }
 
     /**
      * Add a box collider for world objects (cars, buildings, etc.)
@@ -614,6 +625,7 @@ class RagdollPhysics : Disposable {
     fun stop() {
         cleanup()
         isActive = false
+        isFrozen = false
     }
 
     private fun cleanup() {

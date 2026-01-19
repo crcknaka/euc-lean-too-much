@@ -734,6 +734,12 @@ class EucGame(
         // Continue music fade update
         musicManager.update(Gdx.graphics.deltaTime)
 
+        // Keep ragdoll visible if frozen
+        if (ragdollPhysics != null && ragdollPhysics!!.isActive()) {
+            renderer.activeRagdollRenderer = ragdollRenderer
+            renderer.activeRagdollPhysics = ragdollPhysics
+        }
+
         // Render frozen game state
         renderer.render()
 
@@ -817,6 +823,12 @@ class EucGame(
     }
 
     private fun resetGame() {
+        // Stop ragdoll physics completely
+        ragdollPhysics?.stop()
+        renderer.activeRagdollRenderer = null
+        renderer.activeRagdollPhysics = null
+        renderer.hideHead = false  // Restore head visibility
+
         // Remove arm entities
         leftArmEntity?.let { engine.removeEntity(it) }
         rightArmEntity?.let { engine.removeEntity(it) }
@@ -1024,15 +1036,8 @@ class EucGame(
             // Reset fall animation
             fallAnimationController.reset()
 
-            // Stop ragdoll physics
-            ragdollPhysics?.stop()
-
-            // Restore model visibility
-            playerEntity?.getComponent(ModelComponent::class.java)?.visible = true
-            riderEntity?.getComponent(ModelComponent::class.java)?.visible = true
-            leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
-            rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
-            renderer.hideHead = false
+            // Freeze ragdoll in place (keep visible, stop simulating)
+            ragdollPhysics?.freeze()
 
             // Reset game over animations
             gameOverRenderer.reset()
@@ -1333,17 +1338,21 @@ class EucGame(
         val physics = ragdollPhysics ?: return
 
         // Search radius for nearby objects
-        val searchRadius = 15f
+        val searchRadius = 20f
         val searchRadiusSq = searchRadius * searchRadius
 
-        // Add colliders for obstacles (cars, street lights, etc.)
+        var colliderCount = 0
+
+        // Add colliders for ALL collidable objects (includes obstacles, buildings, cars, etc.)
         // Use index-based loop to avoid nested iterator issue with GDX Array
-        val obstacles = engine.getEntitiesFor(Families.obstacles)
-        for (i in 0 until obstacles.size()) {
-            val entity = obstacles[i]
+        val collidables = engine.getEntitiesFor(Families.collidable)
+        for (i in 0 until collidables.size()) {
+            val entity = collidables[i]
             val transform = transformMapperForCollider.get(entity) ?: continue
             val collider = colliderMapper.get(entity) ?: continue
-            val obstacle = obstacleMapper.get(entity) ?: continue
+
+            // Skip very small colliders
+            if (collider.halfExtents.len() < 0.1f) continue
 
             // Check if within range
             val dx = transform.position.x - playerPos.x
@@ -1359,44 +1368,27 @@ class EucGame(
             )
             tempHalfExtents.set(collider.halfExtents)
 
-            // Add box collider based on obstacle type
-            when (obstacle.type) {
-                ObstacleType.CAR -> {
-                    // Cars are larger boxes
-                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
-                }
-                ObstacleType.STREET_LIGHT -> {
-                    // Street lights are thin cylinders
-                    physics.addCylinderCollider(
-                        tempColliderPos,
-                        0.15f,  // thin pole
-                        collider.halfExtents.y * 2f
-                    )
-                }
-                ObstacleType.RECYCLE_BIN -> {
-                    // Bins are boxes
-                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
-                }
-                ObstacleType.CURB -> {
-                    // Curbs are long thin boxes
-                    physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
-                }
-                else -> {
-                    // Default box collider for other types
-                    if (collider.halfExtents.len() > 0.1f) {
-                        physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
-                    }
-                }
+            // Check obstacle type for special handling
+            val obstacle = obstacleMapper.get(entity)
+            if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
+                // Street lights are thin cylinders
+                physics.addCylinderCollider(
+                    tempColliderPos,
+                    0.15f,  // thin pole
+                    collider.halfExtents.y * 2f
+                )
+            } else {
+                // Default: box collider
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
             }
+            colliderCount++
         }
 
-        // Also add colliders for cars (they have CarComponent, not ObstacleComponent)
-        // Use index-based loop to avoid nested iterator issue
+        // Also add colliders for moving cars (they may not have ColliderComponent in collidable family)
         val cars = engine.getEntitiesFor(Families.cars)
         for (i in 0 until cars.size()) {
             val entity = cars[i]
             val transform = transformMapperForCollider.get(entity) ?: continue
-            val collider = colliderMapper.get(entity)
 
             // Check if within range
             val dx = transform.position.x - playerPos.x
@@ -1404,7 +1396,8 @@ class EucGame(
             val distSq = dx * dx + dz * dz
             if (distSq > searchRadiusSq) continue
 
-            // Car dimensions (approximate)
+            // Car dimensions
+            val collider = colliderMapper.get(entity)
             if (collider != null) {
                 tempColliderPos.set(
                     transform.position.x,
@@ -1418,9 +1411,10 @@ class EucGame(
                 tempHalfExtents.set(1.0f, 0.7f, 2.2f)
                 physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw)
             }
+            colliderCount++
         }
 
-        Gdx.app.log("EucGame", "Added world colliders for ragdoll physics")
+        Gdx.app.log("EucGame", "Added $colliderCount world colliders for ragdoll physics")
     }
 
     // Helper functions to extract rotation angles from transformation matrix
