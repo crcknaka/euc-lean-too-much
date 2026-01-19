@@ -427,6 +427,20 @@ class GameRenderer(
         modelBatch.end()
     }
 
+    /**
+     * Render ragdoll from recorded transforms (for replay).
+     * Call this after render() when playing back recorded ragdoll frames.
+     */
+    fun renderRagdollFromTransforms(
+        ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer,
+        transforms: com.eucleantoomuch.game.replay.ReplayFrame.RagdollTransforms
+    ) {
+        modelBatch.begin(camera)
+        Gdx.gl.glDisable(GL20.GL_BLEND)
+        ragdollRenderer.renderFromTransforms(modelBatch, transforms, environment)
+        modelBatch.end()
+    }
+
     override fun dispose() {
         modelBatch.dispose()
         sceneManager.dispose()

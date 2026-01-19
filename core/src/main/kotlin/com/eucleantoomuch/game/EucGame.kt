@@ -3,6 +3,7 @@ package com.eucleantoomuch.game
 import com.badlogic.ashley.core.Engine
 import com.badlogic.ashley.core.Entity
 import com.badlogic.gdx.Application
+import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
@@ -838,8 +839,15 @@ class EucGame(
                 replayRenderer.reset()
                 replayCameraYaw = 0f
                 replayCameraPitch = 20f
+
+                // Prepare world chunks for replay - regenerate any missing chunks
+                val zRange = replaySystem.getZRange()
+                if (zRange != null) {
+                    worldGenerator.prepareForReplay(zRange.first, zRange.second, state.session.distanceTraveled)
+                }
+
                 replaySystem.startPlayback()
-                motorSoundManager.start()  // Start motor sound for replay
+                // No motor sound in replay - just visual playback
                 stateManager.transition(GameState.Replay(state.session))
             }
             GameOverRenderer.ButtonClicked.MENU -> {
@@ -1355,6 +1363,34 @@ class EucGame(
         pigeonSystem.replayMode = true
         worldGenerator.replayMode = true
 
+        // Normal camera far distance in replay (no fog)
+        renderer.camera.far = 400f
+        renderer.camera.update()
+
+        // Check if current frame has ragdoll data
+        val frame = replaySystem.getCurrentFrame()
+        val showRagdoll = frame?.isRagdollActive == true && frame.ragdollTransforms != null
+
+        if (showRagdoll) {
+            // Hide rider models during ragdoll - we'll render from recorded transforms
+            playerEntity?.getComponent(ModelComponent::class.java)?.visible = true  // EUC wheel visible
+            riderEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = false
+            renderer.hideHead = true
+        } else {
+            // Ensure all player/rider models are visible during non-ragdoll replay
+            playerEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            riderEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            leftArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            rightArmEntity?.getComponent(ModelComponent::class.java)?.visible = true
+            renderer.hideHead = false
+        }
+
+        // Disable live ragdoll physics renderers during replay (we use recorded data instead)
+        renderer.activeRagdollRenderer = null
+        renderer.activeRagdollPhysics = null
+
         // Update music (keep faded out)
         musicManager.update(delta)
 
@@ -1369,62 +1405,56 @@ class EucGame(
         // Update pigeon animations (flying pigeons continue)
         engine.update(delta)
 
-        // Get current interpolated frame
-        val frame = replaySystem.getCurrentFrame()
-        if (frame != null) {
+        // Get current interpolated frame (reuse from earlier check)
+        val currentFrame = replaySystem.getCurrentFrame()
+        if (currentFrame != null) {
             // Apply frame data to entities for rendering
             playerEntity?.getComponent(TransformComponent::class.java)?.let { transform ->
-                transform.position.set(frame.playerPosition)
-                transform.yaw = frame.playerYaw
+                transform.position.set(currentFrame.playerPosition)
+                transform.yaw = currentFrame.playerYaw
                 transform.updateRotationFromYaw()
             }
             playerEntity?.getComponent(EucComponent::class.java)?.let { euc ->
-                euc.visualForwardLean = frame.eucForwardLean
-                euc.visualSideLean = frame.eucSideLean
-                euc.speed = frame.eucSpeed
+                euc.visualForwardLean = currentFrame.eucForwardLean
+                euc.visualSideLean = currentFrame.eucSideLean
+                euc.speed = currentFrame.eucSpeed
                 // Apply eucRoll if we stored it (for fall animation)
             }
 
             // Update rider position and lean
             riderEntity?.getComponent(TransformComponent::class.java)?.let { transform ->
-                transform.position.set(frame.playerPosition)
+                transform.position.set(currentFrame.playerPosition)
                 transform.position.x -= 0.05f
                 transform.position.y += 0.7f
-                transform.yaw = frame.playerYaw
+                transform.yaw = currentFrame.playerYaw
                 transform.updateRotationFromYaw()
             }
             riderEntity?.getComponent(EucComponent::class.java)?.let { euc ->
-                euc.visualForwardLean = frame.riderVisualForwardLean
-                euc.visualSideLean = frame.riderVisualSideLean
-                euc.speed = frame.eucSpeed
+                euc.visualForwardLean = currentFrame.riderVisualForwardLean
+                euc.visualSideLean = currentFrame.riderVisualSideLean
+                euc.speed = currentFrame.eucSpeed
             }
 
             // Update head animation
             riderEntity?.getComponent(HeadComponent::class.java)?.let { head ->
-                head.yaw = frame.headYaw
-                head.pitch = frame.headPitch
-                head.roll = frame.headRoll
+                head.yaw = currentFrame.headYaw
+                head.pitch = currentFrame.headPitch
+                head.roll = currentFrame.headRoll
             }
 
             // Update arm positions
             riderEntity?.getComponent(ArmComponent::class.java)?.let { arm ->
-                arm.leftArmPitch = frame.leftArmPitch
-                arm.leftArmYaw = frame.leftArmYaw
-                arm.rightArmPitch = frame.rightArmPitch
-                arm.rightArmYaw = frame.rightArmYaw
+                arm.leftArmPitch = currentFrame.leftArmPitch
+                arm.leftArmYaw = currentFrame.leftArmYaw
+                arm.rightArmPitch = currentFrame.rightArmPitch
+                arm.rightArmYaw = currentFrame.rightArmYaw
             }
 
             // Free camera control - user drags to rotate around player
-            updateReplayCamera(delta, frame)
-
-            // Update motor sound based on replay speed (only when not paused)
-            if (!replaySystem.isPaused()) {
-                val replaySpeed = replaySystem.getPlaybackSpeed()
-                motorSoundManager.update(frame.eucSpeed * replaySpeed, frame.eucSpeed / 20f, delta)
-            }
+            updateReplayCamera(delta, currentFrame)
 
             // Update world generator to fill in chunks around player position (for 360 view)
-            worldGenerator.update(frame.playerPosition.z, state.session.distanceTraveled)
+            worldGenerator.update(currentFrame.playerPosition.z, state.session.distanceTraveled)
         }
 
         // Reset post-processing effects for clear replay view
@@ -1434,6 +1464,14 @@ class EucGame(
 
         // Render the scene
         renderer.render()
+
+        // Render ragdoll from recorded transforms if active
+        val ragdollTransforms = frame?.ragdollTransforms
+        if (showRagdoll && ragdollTransforms != null) {
+            ragdollRenderer?.let { rr ->
+                renderer.renderRagdollFromTransforms(rr, ragdollTransforms)
+            }
+        }
 
         // Render replay UI
         val result = replayRenderer.render(replaySystem)
@@ -1466,54 +1504,101 @@ class EucGame(
     private var replayCameraYaw = 0f
     private var replayCameraPitch = 20f
     private var replayCameraDistance = 5f
+    private val replayCameraMinDistance = 2f
+    private val replayCameraMaxDistance = 15f
     private var lastReplayTouchX = 0f
     private var lastReplayTouchY = 0f
     private var isReplayDragging = false
+    private var lastPinchDistance = 0f
+    private var isPinching = false
 
     private fun updateReplayCamera(delta: Float, frame: com.eucleantoomuch.game.replay.ReplayFrame) {
-        val sw = Gdx.graphics.width.toFloat()
         val sh = Gdx.graphics.height.toFloat()
-        val touchX = Gdx.input.x.toFloat()
-        val touchY = Gdx.input.y.toFloat()
 
         // Check if touch is in the middle area (not on UI controls at top/bottom)
         val topBarHeight = 70f * (sh / 720f)
         val bottomBarHeight = 140f * (sh / 720f)
-        val isInCameraZone = touchY > topBarHeight && touchY < (sh - bottomBarHeight)
 
-        if (Gdx.input.isTouched && isInCameraZone) {
-            if (!isReplayDragging) {
-                isReplayDragging = true
-                lastReplayTouchX = touchX
-                lastReplayTouchY = touchY
-            } else {
-                val deltaX = touchX - lastReplayTouchX
-                val deltaY = touchY - lastReplayTouchY
+        // Handle pinch-to-zoom (two fingers)
+        if (Gdx.input.isTouched(0) && Gdx.input.isTouched(1)) {
+            val x0 = Gdx.input.getX(0).toFloat()
+            val y0 = Gdx.input.getY(0).toFloat()
+            val x1 = Gdx.input.getX(1).toFloat()
+            val y1 = Gdx.input.getY(1).toFloat()
 
-                // Rotate camera around player (full 360 degrees)
-                replayCameraYaw -= deltaX * 0.3f
-                replayCameraPitch += deltaY * 0.2f
-                replayCameraPitch = replayCameraPitch.coerceIn(-10f, 60f)
+            val currentDistance = kotlin.math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
 
-                lastReplayTouchX = touchX
-                lastReplayTouchY = touchY
+            if (isPinching) {
+                // Calculate zoom change based on pinch delta
+                val pinchDelta = currentDistance - lastPinchDistance
+                replayCameraDistance -= pinchDelta * 0.015f
+                replayCameraDistance = replayCameraDistance.coerceIn(replayCameraMinDistance, replayCameraMaxDistance)
             }
+
+            lastPinchDistance = currentDistance
+            isPinching = true
+            isReplayDragging = false  // Don't rotate while pinching
         } else {
-            isReplayDragging = false
+            isPinching = false
+
+            // Single finger drag for rotation
+            val touchX = Gdx.input.x.toFloat()
+            val touchY = Gdx.input.y.toFloat()
+            val isInCameraZone = touchY > topBarHeight && touchY < (sh - bottomBarHeight)
+
+            if (Gdx.input.isTouched && isInCameraZone) {
+                if (!isReplayDragging) {
+                    isReplayDragging = true
+                    lastReplayTouchX = touchX
+                    lastReplayTouchY = touchY
+                } else {
+                    val deltaX = touchX - lastReplayTouchX
+                    val deltaY = touchY - lastReplayTouchY
+
+                    // Rotate camera around player (full 360 degrees)
+                    replayCameraYaw -= deltaX * 0.3f
+                    replayCameraPitch += deltaY * 0.2f
+                    replayCameraPitch = replayCameraPitch.coerceIn(-10f, 60f)
+
+                    lastReplayTouchX = touchX
+                    lastReplayTouchY = touchY
+                }
+            } else {
+                isReplayDragging = false
+            }
         }
 
-        // Calculate camera position orbiting around player
+        // Determine target position - follow rider/torso, not the wheel
+        val targetX: Float
+        val targetY: Float
+        val targetZ: Float
+
+        if (frame.isRagdollActive && frame.ragdollTransforms != null) {
+            // During ragdoll - follow the torso position from recorded transforms
+            val torsoPos = Vector3()
+            frame.ragdollTransforms.torso.getTranslation(torsoPos)
+            targetX = torsoPos.x
+            targetY = torsoPos.y
+            targetZ = torsoPos.z
+        } else {
+            // Normal riding - follow rider position (above the wheel)
+            targetX = frame.playerPosition.x
+            targetY = frame.playerPosition.y + 1.2f  // Rider height above wheel
+            targetZ = frame.playerPosition.z
+        }
+
+        // Calculate camera position orbiting around target
         val yawRad = Math.toRadians(replayCameraYaw.toDouble()).toFloat()
         val pitchRad = Math.toRadians(replayCameraPitch.toDouble()).toFloat()
 
-        val camX = frame.playerPosition.x + replayCameraDistance * kotlin.math.sin(yawRad) * kotlin.math.cos(pitchRad)
-        val camY = frame.playerPosition.y + 1.5f + replayCameraDistance * kotlin.math.sin(pitchRad)
-        val camZ = frame.playerPosition.z - replayCameraDistance * kotlin.math.cos(yawRad) * kotlin.math.cos(pitchRad)
+        val camX = targetX + replayCameraDistance * kotlin.math.sin(yawRad) * kotlin.math.cos(pitchRad)
+        val camY = targetY + 0.5f + replayCameraDistance * kotlin.math.sin(pitchRad)
+        val camZ = targetZ - replayCameraDistance * kotlin.math.cos(yawRad) * kotlin.math.cos(pitchRad)
 
-        // Update camera to look at player
+        // Update camera to look at target
         renderer.cameraController.setReplayCamera(
             camX, camY, camZ,
-            frame.playerPosition.x, frame.playerPosition.y + 1f, frame.playerPosition.z
+            targetX, targetY, targetZ
         )
     }
 
@@ -1549,9 +1634,24 @@ class EucGame(
         val headComponent = riderEntity?.getComponent(HeadComponent::class.java)
         val armComponent = riderEntity?.getComponent(ArmComponent::class.java)
 
+        // Capture ragdoll transforms if ragdoll is active
+        val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
+        val ragdollTransforms = if (ragdollActive) {
+            captureRagdollTransforms()
+        } else null
+
+        // Use torso position from ragdoll if active, otherwise use player transform
+        val recordPos = if (ragdollActive && ragdollTransforms != null) {
+            val torsoPos = Vector3()
+            ragdollTransforms.torso.getTranslation(torsoPos)
+            torsoPos
+        } else {
+            playerTransform.position
+        }
+
         replaySystem.recordFrame(
             delta = delta,
-            playerPos = playerTransform.position,
+            playerPos = recordPos,
             playerYaw = playerTransform.yaw,
             eucForwardLean = eucComponent.visualForwardLean,
             eucSideLean = eucComponent.visualSideLean,
@@ -1567,7 +1667,31 @@ class EucGame(
             rightArmPitch = armComponent?.rightArmPitch ?: 0f,
             rightArmYaw = armComponent?.rightArmYaw ?: 0f,
             cameraPos = renderer.cameraController.getCameraPosition(),
-            cameraYaw = renderer.cameraController.getCameraYaw()
+            cameraYaw = renderer.cameraController.getCameraYaw(),
+            isRagdollActive = ragdollActive,
+            ragdollTransforms = ragdollTransforms
+        )
+    }
+
+    /**
+     * Capture current ragdoll transforms for replay recording.
+     */
+    private fun captureRagdollTransforms(): com.eucleantoomuch.game.replay.ReplayFrame.RagdollTransforms? {
+        val physics = ragdollPhysics ?: return null
+        if (!physics.isActive()) return null
+
+        return com.eucleantoomuch.game.replay.ReplayFrame.RagdollTransforms(
+            eucWheel = com.badlogic.gdx.math.Matrix4(physics.getEucTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            head = com.badlogic.gdx.math.Matrix4(physics.getHeadTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            torso = com.badlogic.gdx.math.Matrix4(physics.getTorsoTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            leftUpperArm = com.badlogic.gdx.math.Matrix4(physics.getLeftUpperArmTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            leftLowerArm = com.badlogic.gdx.math.Matrix4(physics.getLeftLowerArmTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            rightUpperArm = com.badlogic.gdx.math.Matrix4(physics.getRightUpperArmTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            rightLowerArm = com.badlogic.gdx.math.Matrix4(physics.getRightLowerArmTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            leftUpperLeg = com.badlogic.gdx.math.Matrix4(physics.getLeftUpperLegTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            leftLowerLeg = com.badlogic.gdx.math.Matrix4(physics.getLeftLowerLegTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            rightUpperLeg = com.badlogic.gdx.math.Matrix4(physics.getRightUpperLegTransform() ?: com.badlogic.gdx.math.Matrix4()),
+            rightLowerLeg = com.badlogic.gdx.math.Matrix4(physics.getRightLowerLegTransform() ?: com.badlogic.gdx.math.Matrix4())
         )
     }
 

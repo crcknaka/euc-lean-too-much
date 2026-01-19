@@ -1,5 +1,6 @@
 package com.eucleantoomuch.game.replay
 
+import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 
 /**
@@ -34,8 +35,47 @@ data class ReplayFrame(
 
     // Camera state (for reference point)
     val cameraPosition: Vector3,
-    val cameraYaw: Float
+    val cameraYaw: Float,
+
+    // Ragdoll state (null if not in ragdoll mode)
+    val isRagdollActive: Boolean = false,
+    val ragdollTransforms: RagdollTransforms? = null
 ) {
+
+    /**
+     * Stores all ragdoll body part transforms for replay.
+     */
+    data class RagdollTransforms(
+        val eucWheel: Matrix4,
+        val head: Matrix4,
+        val torso: Matrix4,
+        val leftUpperArm: Matrix4,
+        val leftLowerArm: Matrix4,
+        val rightUpperArm: Matrix4,
+        val rightLowerArm: Matrix4,
+        val leftUpperLeg: Matrix4,
+        val leftLowerLeg: Matrix4,
+        val rightUpperLeg: Matrix4,
+        val rightLowerLeg: Matrix4
+    ) {
+        companion object {
+            fun copy(other: RagdollTransforms): RagdollTransforms {
+                return RagdollTransforms(
+                    eucWheel = Matrix4(other.eucWheel),
+                    head = Matrix4(other.head),
+                    torso = Matrix4(other.torso),
+                    leftUpperArm = Matrix4(other.leftUpperArm),
+                    leftLowerArm = Matrix4(other.leftLowerArm),
+                    rightUpperArm = Matrix4(other.rightUpperArm),
+                    rightLowerArm = Matrix4(other.rightLowerArm),
+                    leftUpperLeg = Matrix4(other.leftUpperLeg),
+                    leftLowerLeg = Matrix4(other.leftLowerLeg),
+                    rightUpperLeg = Matrix4(other.rightUpperLeg),
+                    rightLowerLeg = Matrix4(other.rightLowerLeg)
+                )
+            }
+        }
+    }
     companion object {
         fun create(
             timestamp: Float,
@@ -55,7 +95,9 @@ data class ReplayFrame(
             rightArmPitch: Float,
             rightArmYaw: Float,
             cameraPos: Vector3,
-            cameraYaw: Float
+            cameraYaw: Float,
+            isRagdollActive: Boolean = false,
+            ragdollTransforms: RagdollTransforms? = null
         ): ReplayFrame {
             return ReplayFrame(
                 timestamp = timestamp,
@@ -75,7 +117,9 @@ data class ReplayFrame(
                 rightArmPitch = rightArmPitch,
                 rightArmYaw = rightArmYaw,
                 cameraPosition = Vector3(cameraPos),
-                cameraYaw = cameraYaw
+                cameraYaw = cameraYaw,
+                isRagdollActive = isRagdollActive,
+                ragdollTransforms = ragdollTransforms
             )
         }
     }

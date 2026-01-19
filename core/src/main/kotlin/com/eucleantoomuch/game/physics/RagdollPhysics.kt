@@ -203,47 +203,46 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC dimensions as box: width ~0.12m (X), height ~0.44m (Y), depth ~0.44m (Z)
-        eucShape = btBoxShape(Vector3(0.06f, 0.22f, 0.22f))
+        // EUC as a simple box collider - stable and predictable
+        // Dimensions: width 0.15m (X), height 0.45m (Y), depth 0.45m (Z)
+        eucShape = btBoxShape(Vector3(0.075f, 0.225f, 0.225f))
 
-        val eucMass = 25f  // 25 kg EUC
+        val eucMass = 20f  // 20 kg EUC
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
-        // Initial transform with current lean applied
+        // Initial transform - start slightly above ground to avoid clipping
+        // Wheel radius is 0.22m, so center should be at Y = 0.22 + small margin
+        val startY = 0.25f.coerceAtLeast(eucPosition.y + 0.22f)
+
         tempMatrix.idt()
-        tempMatrix.translate(eucPosition.x, eucPosition.y + 0.22f, eucPosition.z)
+        tempMatrix.translate(eucPosition.x, startY, eucPosition.z)
         tempMatrix.rotate(Vector3.Y, eucYaw)
-        // Apply initial lean rotation so wheel starts tilted
-        tempMatrix.rotate(Vector3.Z, sideLean * 30f)   // Side lean
-        tempMatrix.rotate(Vector3.X, -forwardLean * 20f) // Forward lean
+        // Apply initial lean rotation (reduced to prevent wild spinning)
+        tempMatrix.rotate(Vector3.Z, sideLean * 15f)
+        tempMatrix.rotate(Vector3.X, -forwardLean * 10f)
 
         eucMotionState = btDefaultMotionState(tempMatrix)
         val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
         eucBody = btRigidBody(eucInfo)
-        eucBody!!.friction = 0.5f      // Moderate friction - can slide
-        eucBody!!.restitution = 0.3f   // Can bounce off ground/objects
-        eucBody!!.setDamping(0.05f, 0.1f)  // Low damping - realistic tumbling
+        eucBody!!.friction = 0.8f      // High friction - wheel grips ground
+        eucBody!!.restitution = 0.1f   // Low bounce
+        eucBody!!.setDamping(0.3f, 0.5f)  // Higher damping - settles quickly, no jittering
 
-        // Forward momentum continues
-        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.7f
-        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.7f
+        // Simple forward momentum (reduced)
+        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.4f
+        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.4f
 
-        // Side kick from lean (perpendicular to forward direction)
-        val sideX = kotlin.math.cos(yawRad) * sideLean * 3f
-        val sideZ = -kotlin.math.sin(yawRad) * sideLean * 3f
+        // Minimal upward velocity - just enough to not clip ground
+        val upKick = 0.2f
 
-        // Upward kick based on speed and lean magnitude
-        val leanMagnitude = kotlin.math.sqrt(sideLean * sideLean + forwardLean * forwardLean)
-        val upKick = 0.5f + leanMagnitude * 2f + playerVelocity * 0.1f
+        eucBody!!.linearVelocity = Vector3(forwardX, upKick, forwardZ)
 
-        eucBody!!.linearVelocity = Vector3(forwardX + sideX, upKick, forwardZ + sideZ)
-
-        // Angular velocity - wheel tumbles and spins realistically
+        // Minimal angular velocity - wheel tips over gently
         eucBody!!.angularVelocity = Vector3(
-            -forwardLean * 3f + playerVelocity * 0.5f,  // Pitch tumble + forward roll
-            sideLean * 2f,                               // Yaw spin from side impact
-            sideLean * 4f                                // Roll from side lean
+            playerVelocity * 0.3f,  // Roll forward
+            0f,
+            sideLean * 1.5f         // Tip to the side based on lean
         )
 
         dynamicsWorld.addRigidBody(eucBody)

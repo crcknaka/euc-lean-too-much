@@ -51,7 +51,9 @@ class ReplaySystem {
         rightArmPitch: Float,
         rightArmYaw: Float,
         cameraPos: Vector3,
-        cameraYaw: Float
+        cameraYaw: Float,
+        isRagdollActive: Boolean = false,
+        ragdollTransforms: ReplayFrame.RagdollTransforms? = null
     ) {
         totalRecordTime += delta
         recordTimer += delta
@@ -77,7 +79,9 @@ class ReplaySystem {
                 rightArmPitch = rightArmPitch,
                 rightArmYaw = rightArmYaw,
                 cameraPos = cameraPos,
-                cameraYaw = cameraYaw
+                cameraYaw = cameraYaw,
+                isRagdollActive = isRagdollActive,
+                ragdollTransforms = ragdollTransforms
             )
 
             frameBuffer.add(frame)
@@ -157,6 +161,20 @@ class ReplaySystem {
         // Calculate interpolation factor
         val t = (playbackTime - prevFrame.timestamp) / (nextFrame.timestamp - prevFrame.timestamp)
 
+        // Determine ragdoll state - use the closer frame's ragdoll data
+        val useRagdoll = if (t < 0.5f) prevFrame.isRagdollActive else nextFrame.isRagdollActive
+        val prevRagdoll = prevFrame.ragdollTransforms
+        val nextRagdoll = nextFrame.ragdollTransforms
+        val ragdollData = if (useRagdoll) {
+            // Interpolate ragdoll transforms if both frames have ragdoll data
+            if (prevRagdoll != null && nextRagdoll != null) {
+                lerpRagdollTransforms(prevRagdoll, nextRagdoll, t)
+            } else {
+                // Use whichever frame has data
+                prevRagdoll ?: nextRagdoll
+            }
+        } else null
+
         // Interpolate all values
         currentFrame = ReplayFrame(
             timestamp = playbackTime,
@@ -176,7 +194,9 @@ class ReplaySystem {
             rightArmPitch = MathUtils.lerp(prevFrame.rightArmPitch, nextFrame.rightArmPitch, t),
             rightArmYaw = MathUtils.lerp(prevFrame.rightArmYaw, nextFrame.rightArmYaw, t),
             cameraPosition = lerp(prevFrame.cameraPosition, nextFrame.cameraPosition, t),
-            cameraYaw = MathUtils.lerp(prevFrame.cameraYaw, nextFrame.cameraYaw, t)
+            cameraYaw = MathUtils.lerp(prevFrame.cameraYaw, nextFrame.cameraYaw, t),
+            isRagdollActive = useRagdoll,
+            ragdollTransforms = ragdollData
         )
     }
 
@@ -186,6 +206,41 @@ class ReplaySystem {
             MathUtils.lerp(a.y, b.y, t),
             MathUtils.lerp(a.z, b.z, t)
         )
+    }
+
+    /**
+     * Interpolate between two ragdoll transform sets.
+     * Uses simple linear interpolation of matrix values.
+     */
+    private fun lerpRagdollTransforms(
+        a: ReplayFrame.RagdollTransforms,
+        b: ReplayFrame.RagdollTransforms,
+        t: Float
+    ): ReplayFrame.RagdollTransforms {
+        return ReplayFrame.RagdollTransforms(
+            eucWheel = lerpMatrix(a.eucWheel, b.eucWheel, t),
+            head = lerpMatrix(a.head, b.head, t),
+            torso = lerpMatrix(a.torso, b.torso, t),
+            leftUpperArm = lerpMatrix(a.leftUpperArm, b.leftUpperArm, t),
+            leftLowerArm = lerpMatrix(a.leftLowerArm, b.leftLowerArm, t),
+            rightUpperArm = lerpMatrix(a.rightUpperArm, b.rightUpperArm, t),
+            rightLowerArm = lerpMatrix(a.rightLowerArm, b.rightLowerArm, t),
+            leftUpperLeg = lerpMatrix(a.leftUpperLeg, b.leftUpperLeg, t),
+            leftLowerLeg = lerpMatrix(a.leftLowerLeg, b.leftLowerLeg, t),
+            rightUpperLeg = lerpMatrix(a.rightUpperLeg, b.rightUpperLeg, t),
+            rightLowerLeg = lerpMatrix(a.rightLowerLeg, b.rightLowerLeg, t)
+        )
+    }
+
+    /**
+     * Simple linear interpolation of matrix values.
+     */
+    private fun lerpMatrix(a: com.badlogic.gdx.math.Matrix4, b: com.badlogic.gdx.math.Matrix4, t: Float): com.badlogic.gdx.math.Matrix4 {
+        val result = com.badlogic.gdx.math.Matrix4()
+        for (i in 0 until 16) {
+            result.`val`[i] = MathUtils.lerp(a.`val`[i], b.`val`[i], t)
+        }
+        return result
     }
 
     // Playback controls
@@ -247,5 +302,24 @@ class ReplaySystem {
     fun getDuration(): Float {
         if (frameBuffer.size < 2) return 0f
         return frameBuffer.last().timestamp - frameBuffer.first().timestamp
+    }
+
+    /**
+     * Get the Z position range covered by the replay buffer.
+     * Returns Pair(minZ, maxZ) or null if no frames.
+     */
+    fun getZRange(): Pair<Float, Float>? {
+        if (frameBuffer.isEmpty()) return null
+
+        var minZ = Float.MAX_VALUE
+        var maxZ = Float.MIN_VALUE
+
+        for (frame in frameBuffer) {
+            val z = frame.playerPosition.z
+            if (z < minZ) minZ = z
+            if (z > maxZ) maxZ = z
+        }
+
+        return Pair(minZ, maxZ)
     }
 }
