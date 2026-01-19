@@ -88,13 +88,24 @@ class RagdollPhysics : Disposable {
         val type: ColliderType = ColliderType.GENERIC
     )
 
-    // Collision callback - called when ragdoll hits something during flight
+    // Collision callback - called when player ragdoll hits something during flight
     var onRagdollCollision: ((ColliderType) -> Unit)? = null
+
+    // Secondary collision callback - when ragdoll (player or pedestrian) hits world objects
+    // Called with lower volume for "chain reaction" collisions
+    var onSecondaryRagdollCollision: ((ColliderType) -> Unit)? = null
+
+    // Callback when a ragdoll body hits a standing pedestrian (to knock them down)
+    // Returns the entity that was hit and the impact velocity/direction
+    var onRagdollHitPedestrian: ((pedestrianPosition: Vector3, impactVelocity: Vector3) -> Unit)? = null
 
     // Track which colliders have already triggered sound (to avoid spam)
     private val triggeredColliders = mutableSetOf<btRigidBody>()
+    private val triggeredSecondaryColliders = mutableSetOf<btRigidBody>()  // For secondary collisions
     private var lastCollisionTime = 0f
+    private var lastSecondaryCollisionTime = 0f
     private val minCollisionInterval = 0.15f  // Minimum time between collision sounds
+    private val minSecondaryCollisionInterval = 0.2f  // Slightly longer for secondary
 
     // Pedestrian ragdoll bodies - simplified 6-part ragdoll for performance
     data class PedestrianRagdoll(
@@ -192,38 +203,47 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC dimensions as box: width ~0.12m, height ~0.44m, depth ~0.44m
+        // EUC dimensions as box: width ~0.12m (X), height ~0.44m (Y), depth ~0.44m (Z)
         eucShape = btBoxShape(Vector3(0.06f, 0.22f, 0.22f))
 
-        val eucMass = 35f  // 35 kg EUC (heavy wheel like Begode, Veteran)
+        val eucMass = 25f  // 25 kg EUC
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
-        // Initial transform
+        // Initial transform with current lean applied
         tempMatrix.idt()
         tempMatrix.translate(eucPosition.x, eucPosition.y + 0.22f, eucPosition.z)
         tempMatrix.rotate(Vector3.Y, eucYaw)
+        // Apply initial lean rotation so wheel starts tilted
+        tempMatrix.rotate(Vector3.Z, sideLean * 30f)   // Side lean
+        tempMatrix.rotate(Vector3.X, -forwardLean * 20f) // Forward lean
 
         eucMotionState = btDefaultMotionState(tempMatrix)
         val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
         eucBody = btRigidBody(eucInfo)
-        eucBody!!.friction = 0.5f
-        eucBody!!.restitution = 0.3f
-        eucBody!!.setDamping(0.05f, 0.2f)
+        eucBody!!.friction = 0.5f      // Moderate friction - can slide
+        eucBody!!.restitution = 0.3f   // Can bounce off ground/objects
+        eucBody!!.setDamping(0.05f, 0.1f)  // Low damping - realistic tumbling
 
-        // Apply initial velocity - based on lean direction
+        // Forward momentum continues
         val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.7f
         val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.7f
-        val sideKick = sideLean * 3f
-        // Only add upward kick if there's significant lean (collision), otherwise just continue momentum
-        val leanMagnitude = kotlin.math.sqrt(sideLean * sideLean + forwardLean * forwardLean)
-        val upKick = if (leanMagnitude > 0.3f) 1f + leanMagnitude * 1.5f else 0.5f
 
-        eucBody!!.linearVelocity = Vector3(forwardX + sideKick, upKick, forwardZ)
+        // Side kick from lean (perpendicular to forward direction)
+        val sideX = kotlin.math.cos(yawRad) * sideLean * 3f
+        val sideZ = -kotlin.math.sin(yawRad) * sideLean * 3f
+
+        // Upward kick based on speed and lean magnitude
+        val leanMagnitude = kotlin.math.sqrt(sideLean * sideLean + forwardLean * forwardLean)
+        val upKick = 0.5f + leanMagnitude * 2f + playerVelocity * 0.1f
+
+        eucBody!!.linearVelocity = Vector3(forwardX + sideX, upKick, forwardZ + sideZ)
+
+        // Angular velocity - wheel tumbles and spins realistically
         eucBody!!.angularVelocity = Vector3(
-            playerVelocity * 3f,  // Wheel spin
-            sideLean * 4f,
-            forwardLean * 2f
+            -forwardLean * 3f + playerVelocity * 0.5f,  // Pitch tumble + forward roll
+            sideLean * 2f,                               // Yaw spin from side impact
+            sideLean * 4f                                // Roll from side lean
         )
 
         dynamicsWorld.addRigidBody(eucBody)
@@ -548,10 +568,18 @@ class RagdollPhysics : Disposable {
         // Step physics world (max 4 substeps for stability)
         dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
 
+        // Update collision timers
+        lastCollisionTime += delta
+        lastSecondaryCollisionTime += delta
+
         // Check for collisions and trigger sounds
         if (isActive) {
-            lastCollisionTime += delta
             checkRagdollCollisions()
+        }
+
+        // Check for secondary collisions (pedestrian ragdolls hitting world objects)
+        if (pedestrianRagdolls.isNotEmpty()) {
+            checkSecondaryRagdollCollisions()
         }
     }
 
@@ -624,6 +652,74 @@ class RagdollPhysics : Disposable {
             body0 in ragdollBodies -> body0
             body1 in ragdollBodies -> body1
             else -> null
+        }
+    }
+
+    /**
+     * Check if a body is part of any pedestrian ragdoll.
+     * @return The ragdoll body if found, null otherwise
+     */
+    private fun findPedestrianRagdollBody(body0: btRigidBody, body1: btRigidBody): btRigidBody? {
+        for (ragdoll in pedestrianRagdolls) {
+            val bodies = listOfNotNull(
+                ragdoll.head.body, ragdoll.torso.body,
+                ragdoll.leftArm.body, ragdoll.rightArm.body,
+                ragdoll.leftLeg.body, ragdoll.rightLeg.body
+            )
+            if (body0 in bodies) return body0
+            if (body1 in bodies) return body1
+        }
+        return null
+    }
+
+    /**
+     * Check for secondary collisions - pedestrian ragdolls hitting world objects.
+     * These play sounds at lower volume.
+     */
+    private fun checkSecondaryRagdollCollisions() {
+        if (onSecondaryRagdollCollision == null && onRagdollHitPedestrian == null) return
+
+        val numManifolds = dispatcher.numManifolds
+
+        for (i in 0 until numManifolds) {
+            val manifold = dispatcher.getManifoldByIndexInternal(i)
+            val numContacts = manifold.numContacts
+
+            if (numContacts == 0) continue
+
+            // Get the two bodies involved
+            val body0 = manifold.body0 as? btRigidBody ?: continue
+            val body1 = manifold.body1 as? btRigidBody ?: continue
+
+            // Check if one is a pedestrian ragdoll part
+            val pedRagdollBody = findPedestrianRagdollBody(body0, body1)
+            if (pedRagdollBody != null) {
+                val worldBody = if (pedRagdollBody == body0) body1 else body0
+
+                // Check if hitting a world collider (not ground, not another ragdoll body)
+                val collider = worldColliders.find { it.body == worldBody }
+
+                if (collider != null && collider.type != ColliderType.GROUND) {
+                    // Skip if already triggered
+                    if (worldBody in triggeredSecondaryColliders) continue
+                    if (lastSecondaryCollisionTime < minSecondaryCollisionInterval) continue
+
+                    // Check contact impulse
+                    var maxImpulse = 0f
+                    for (j in 0 until numContacts) {
+                        val pt = manifold.getContactPoint(j)
+                        val impulse = pt.appliedImpulse
+                        if (impulse > maxImpulse) maxImpulse = impulse
+                    }
+
+                    // Only trigger for significant impacts (higher threshold for secondary)
+                    if (maxImpulse > 8f) {
+                        triggeredSecondaryColliders.add(worldBody)
+                        lastSecondaryCollisionTime = 0f
+                        onSecondaryRagdollCollision?.invoke(collider.type)
+                    }
+                }
+            }
         }
     }
 
@@ -753,7 +849,9 @@ class RagdollPhysics : Disposable {
         }
         worldColliders.clear()
         triggeredColliders.clear()
+        triggeredSecondaryColliders.clear()
         lastCollisionTime = 0f
+        lastSecondaryCollisionTime = 0f
     }
 
     /**
@@ -1097,6 +1195,50 @@ class RagdollPhysics : Disposable {
      * Get number of active pedestrian ragdolls.
      */
     fun getPedestrianCount(): Int = pedestrianRagdolls.size
+
+    /**
+     * Data class for returning ragdoll body info for collision checking.
+     */
+    data class RagdollBodyInfo(
+        val position: Vector3,
+        val velocity: Vector3,
+        val isPlayerRagdoll: Boolean
+    )
+
+    /**
+     * Get positions and velocities of all active ragdoll torsos (main body parts).
+     * Used by EucGame to check collisions with standing pedestrians.
+     * Only returns bodies with significant velocity (moving fast enough to knock someone down).
+     */
+    fun getActiveRagdollBodies(minVelocity: Float = 2f): List<RagdollBodyInfo> {
+        val result = mutableListOf<RagdollBodyInfo>()
+        val pos = Vector3()
+        val vel = Vector3()
+
+        // Player ragdoll torso
+        if (isActive && torso.body != null) {
+            torso.motionState?.getWorldTransform(tempMatrix)
+            tempMatrix.getTranslation(pos)
+            vel.set(torso.body!!.linearVelocity)
+            if (vel.len() >= minVelocity) {
+                result.add(RagdollBodyInfo(Vector3(pos), Vector3(vel), true))
+            }
+        }
+
+        // Pedestrian ragdoll torsos
+        for (ragdoll in pedestrianRagdolls) {
+            if (ragdoll.torso.body != null) {
+                ragdoll.torso.motionState?.getWorldTransform(tempMatrix)
+                tempMatrix.getTranslation(pos)
+                vel.set(ragdoll.torso.body!!.linearVelocity)
+                if (vel.len() >= minVelocity) {
+                    result.add(RagdollBodyInfo(Vector3(pos), Vector3(vel), false))
+                }
+            }
+        }
+
+        return result
+    }
 
     /**
      * Clear all pedestrian ragdolls.

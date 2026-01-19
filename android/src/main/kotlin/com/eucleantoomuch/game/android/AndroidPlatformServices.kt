@@ -678,23 +678,24 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
         soundPool.play(waterSplashSound, 1f, 1f, 1, 0, 1f)
     }
 
-    override fun playStreetLightImpactSound() {
-        soundPool.play(streetLightImpactSound, 0.6f, 0.6f, 1, 0, 1f)  // Quieter
+    override fun playStreetLightImpactSound(volume: Float) {
+        val vol = 0.6f * volume  // Base volume is 0.6, then apply multiplier
+        soundPool.play(streetLightImpactSound, vol, vol, 1, 0, 1f)
     }
 
-    override fun playRecycleBinImpactSound() {
-        soundPool.play(recycleBinImpactSound, 1f, 1f, 1, 0, 1f)
+    override fun playRecycleBinImpactSound(volume: Float) {
+        soundPool.play(recycleBinImpactSound, volume, volume, 1, 0, 1f)
     }
 
-    override fun playPersonImpactSound() {
-        soundPool.play(personImpactSound, 1f, 1f, 1, 0, 1f)
+    override fun playPersonImpactSound(volume: Float) {
+        soundPool.play(personImpactSound, volume, volume, 1, 0, 1f)
     }
 
-    override fun playGenericHitSound() {
-        soundPool.play(genericHitSound, 1f, 1f, 1, 0, 1f)
+    override fun playGenericHitSound(volume: Float) {
+        soundPool.play(genericHitSound, volume, volume, 1, 0, 1f)
     }
 
-    override fun playCarCrashSound() {
-        soundPool.play(carCrashSound, 1f, 1f, 1, 0, 1f)
+    override fun playCarCrashSound(volume: Float) {
+        soundPool.play(carCrashSound, volume, volume, 1, 0, 1f)
     }
 }

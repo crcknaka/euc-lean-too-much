@@ -109,28 +109,33 @@ interface PlatformServices {
 
     /**
      * Play street light impact sound when crashing into a street light.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
-    fun playStreetLightImpactSound()
+    fun playStreetLightImpactSound(volume: Float = 1f)
 
     /**
      * Play recycle bin impact sound when crashing into a recycle bin.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
-    fun playRecycleBinImpactSound()
+    fun playRecycleBinImpactSound(volume: Float = 1f)
 
     /**
      * Play person impact sound when crashing into a pedestrian.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
-    fun playPersonImpactSound()
+    fun playPersonImpactSound(volume: Float = 1f)
 
     /**
      * Play generic hit sound for obstacles without specific sounds.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
-    fun playGenericHitSound()
+    fun playGenericHitSound(volume: Float = 1f)
 
     /**
      * Play car crash sound when colliding with a car.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
-    fun playCarCrashSound()
+    fun playCarCrashSound(volume: Float = 1f)
 }
 
 /**
@@ -193,23 +198,23 @@ class DefaultPlatformServices : PlatformServices {
         // No-op on desktop/unsupported platforms
     }
 
-    override fun playStreetLightImpactSound() {
+    override fun playStreetLightImpactSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 
-    override fun playRecycleBinImpactSound() {
+    override fun playRecycleBinImpactSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 
-    override fun playPersonImpactSound() {
+    override fun playPersonImpactSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 
-    override fun playGenericHitSound() {
+    override fun playGenericHitSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 
-    override fun playCarCrashSound() {
+    override fun playCarCrashSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 }

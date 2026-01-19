@@ -262,6 +262,11 @@ class EucGame(
                 playRagdollCollisionSound(colliderType)
             }
 
+            // Set up secondary collision callback for pedestrian ragdolls hitting objects (quieter)
+            ragdollPhysics?.onSecondaryRagdollCollision = { colliderType ->
+                playSecondaryRagdollCollisionSound(colliderType)
+            }
+
             // Set up pedestrian ragdoll rendering (always active during gameplay)
             renderer.pedestrianRagdollRenderer = ragdollRenderer
             renderer.pedestrianRagdollPhysics = ragdollPhysics
@@ -659,6 +664,9 @@ class EucGame(
         ragdollPhysics?.update(delta)
         updateFallingPedestrians()
 
+        // Check if ragdoll bodies knock down standing pedestrians
+        checkRagdollPedestrianCollisions()
+
         // Update session
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
@@ -1019,6 +1027,116 @@ class EucGame(
         return null
     }
 
+    // Temp vectors for ragdoll-to-pedestrian collision checking
+    private val ragdollCheckPos = com.badlogic.gdx.math.Vector3()
+    private val pedestrianCheckPos = com.badlogic.gdx.math.Vector3()
+    private val ragdollImpactDir = com.badlogic.gdx.math.Vector3()
+    private val ragdollCollisionRadius = 0.8f  // Collision radius for ragdoll body
+
+    /**
+     * Check if any ragdoll body (player or pedestrian) collides with standing pedestrians.
+     * If collision detected, knock down the standing pedestrian.
+     */
+    private fun checkRagdollPedestrianCollisions() {
+        if (!useRagdollPhysics || ragdollPhysics == null) return
+
+        // Get all active ragdoll bodies with significant velocity
+        val ragdollBodies = ragdollPhysics!!.getActiveRagdollBodies(minVelocity = 3f)
+        if (ragdollBodies.isEmpty()) return
+
+        // Get all pedestrians
+        val pedestrians = engine.getEntitiesFor(Families.pedestrians)
+        if (pedestrians.size() == 0) return
+
+        for (ragdollBody in ragdollBodies) {
+            ragdollCheckPos.set(ragdollBody.position)
+
+            for (i in 0 until pedestrians.size()) {
+                val pedestrianEntity = pedestrians[i]
+                val pedestrianComponent = pedestrianEntity.getComponent(
+                    com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
+                ) ?: continue
+
+                // Skip if already ragdolling
+                if (pedestrianComponent.isRagdolling) continue
+
+                val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: continue
+                pedestrianCheckPos.set(pedestrianTransform.position)
+                pedestrianCheckPos.y += 0.8f  // Check at torso height
+
+                // Simple distance check
+                val dx = ragdollCheckPos.x - pedestrianCheckPos.x
+                val dy = ragdollCheckPos.y - pedestrianCheckPos.y
+                val dz = ragdollCheckPos.z - pedestrianCheckPos.z
+                val distSq = dx * dx + dy * dy + dz * dz
+
+                if (distSq < ragdollCollisionRadius * ragdollCollisionRadius) {
+                    // Collision detected! Start ragdoll for this pedestrian
+                    startRagdollFromImpact(pedestrianEntity, ragdollBody.velocity)
+
+                    // Play quieter impact sound (chain reaction)
+                    platformServices.playPersonImpactSound(0.4f)
+                }
+            }
+        }
+    }
+
+    /**
+     * Start pedestrian ragdoll from being hit by another ragdoll body.
+     * Similar to startPedestrianRagdoll but uses the ragdoll's velocity as impact direction.
+     */
+    private fun startRagdollFromImpact(
+        pedestrianEntity: com.badlogic.ashley.core.Entity,
+        impactVelocity: com.badlogic.gdx.math.Vector3
+    ) {
+        if (!useRagdollPhysics || ragdollPhysics == null) return
+
+        val pedestrianComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
+        ) ?: return
+
+        if (pedestrianComponent.isRagdolling) return
+
+        val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
+
+        // Hide models
+        val modelComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
+        )
+        modelComponent?.visible = false
+
+        val shadowComponent = pedestrianEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
+        )
+        shadowComponent?.visible = false
+
+        // Calculate impact direction from velocity (normalized)
+        ragdollImpactDir.set(impactVelocity).nor()
+        ragdollImpactDir.y = 0f  // Keep horizontal
+
+        // Impact speed is reduced (secondary impact)
+        val impactSpeed = impactVelocity.len() * 0.6f
+
+        // Extract shirt color
+        val shirtColor = extractPedestrianShirtColor(modelComponent?.modelInstance)
+            ?: com.badlogic.gdx.graphics.Color.GREEN
+
+        // Add pedestrian ragdoll
+        val bodyIndex = ragdollPhysics!!.addPedestrianRagdoll(
+            position = pedestrianTransform.position,
+            yaw = pedestrianTransform.yaw,
+            playerVelocity = impactSpeed,
+            playerDirection = ragdollImpactDir,
+            entityIndex = pedestrianEntity.hashCode(),
+            shirtColor = shirtColor
+        )
+
+        // Mark pedestrian as ragdolling
+        pedestrianComponent.isRagdolling = true
+        pedestrianComponent.ragdollBodyIndex = bodyIndex
+        pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+    }
+
     private fun handlePlayerFall() {
         // God mode - prevent death
         if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.godMode) {
@@ -1083,6 +1201,9 @@ class EucGame(
 
         // Always update ragdoll physics (for pedestrians even if player ragdoll is inactive)
         ragdollPhysics?.update(delta)
+
+        // Check if ragdoll bodies knock down standing pedestrians
+        checkRagdollPedestrianCollisions()
 
         // Update ragdoll physics if active
         val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
@@ -1769,7 +1890,22 @@ class EucGame(
             RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound()
             RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts handled by fall animation */ }
         }
-        Gdx.app.log("EucGame", "Ragdoll collision sound: $colliderType")
+    }
+
+    /**
+     * Play quieter sound when pedestrian ragdoll (secondary) collides with an object.
+     * These are "chain reaction" sounds - quieter than direct player collisions.
+     */
+    private fun playSecondaryRagdollCollisionSound(colliderType: RagdollPhysics.ColliderType) {
+        // Play same sounds but at lower volume (0.4x)
+        when (colliderType) {
+            RagdollPhysics.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound(0.4f)
+            RagdollPhysics.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound(0.4f)
+            RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound(0.4f)
+            RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound(0.4f)
+            RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound(0.4f)
+            RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts not needed for secondary */ }
+        }
     }
 
     /**
