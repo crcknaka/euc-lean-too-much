@@ -49,10 +49,8 @@ class DebugMenu(private val engine: Engine) : Disposable {
     private var selectedOption = 0
     private var touchCooldown = 0f
 
-    // Triple-tap detection for more reliable activation
-    private var tripleFingerTouchActive = false
-    private var tripleFingerHoldTime = 0f
-    private val tripleFingerHoldThreshold = 0.15f  // Hold 3 fingers for 150ms to toggle
+    // Triple-finger touch detection
+    private var wasThreeFingerTouch = false
 
     // Debug options state
     var showColliders = false
@@ -134,24 +132,17 @@ class DebugMenu(private val engine: Engine) : Disposable {
             isOpen = !isOpen
         }
 
-        // Toggle with 3-finger hold (mobile) - more reliable than tap
-        // Detect exactly 3 fingers touching (indices 0, 1, 2 active, but NOT 3)
-        val hasThreeFingers = Gdx.input.isTouched(0) && Gdx.input.isTouched(1) &&
-                              Gdx.input.isTouched(2) && !Gdx.input.isTouched(3)
+        // Toggle with 4+ finger touch (mobile) - touch with 4 fingers, release to toggle
+        val hasFourOrMoreFingers = Gdx.input.isTouched(3)  // If finger index 3 exists, we have at least 4 fingers
 
-        if (hasThreeFingers && touchCooldown <= 0f) {
-            tripleFingerHoldTime += delta
-            if (tripleFingerHoldTime >= tripleFingerHoldThreshold && !tripleFingerTouchActive) {
-                // Toggle menu after holding 3 fingers for threshold time
-                isOpen = !isOpen
-                tripleFingerTouchActive = true
-                touchCooldown = 0.5f  // Prevent rapid toggling
-                Gdx.app.log("DebugMenu", "Toggled by 3-finger hold, isOpen=$isOpen")
-            }
-        } else {
-            // Reset when fingers released
-            tripleFingerHoldTime = 0f
-            tripleFingerTouchActive = false
+        if (hasFourOrMoreFingers) {
+            wasThreeFingerTouch = true
+        } else if (wasThreeFingerTouch && touchCooldown <= 0f) {
+            // Fingers released after 4-finger touch - toggle menu
+            isOpen = !isOpen
+            touchCooldown = 0.8f  // Prevent rapid toggling
+            wasThreeFingerTouch = false
+            Gdx.app.log("DebugMenu", "Toggled by 4-finger touch, isOpen=$isOpen")
         }
 
         // Update entity counts
@@ -303,7 +294,7 @@ class DebugMenu(private val engine: Engine) : Disposable {
         UIFonts.caption.color = UITheme.textMuted
         UIFonts.caption.draw(ui.batch, "F3: Toggle menu | Enter: Select | Esc: Close",
             panelX + 20f * scale, panelY + 30f * scale)
-        UIFonts.caption.draw(ui.batch, "Hold 3 fingers to toggle on mobile",
+        UIFonts.caption.draw(ui.batch, "Touch with 4 fingers to toggle on mobile",
             panelX + 20f * scale, panelY + 50f * scale)
 
         ui.endBatch()
