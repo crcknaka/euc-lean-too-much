@@ -94,6 +94,33 @@ interface PlatformServices {
      * Stop wobble sound when wobbling ends.
      */
     fun stopWobbleSound()
+
+    // === Obstacle Impact Sounds ===
+
+    /**
+     * Play manhole impact sound when riding over a manhole cover.
+     */
+    fun playManholeSound()
+
+    /**
+     * Play water splash sound when riding through a puddle.
+     */
+    fun playWaterSplashSound()
+
+    /**
+     * Play street light impact sound when crashing into a street light.
+     */
+    fun playStreetLightImpactSound()
+
+    /**
+     * Play recycle bin impact sound when crashing into a recycle bin.
+     */
+    fun playRecycleBinImpactSound()
+
+    /**
+     * Play person impact sound when crashing into a pedestrian.
+     */
+    fun playPersonImpactSound()
 }
 
 /**
@@ -145,6 +172,26 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun stopWobbleSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playManholeSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playWaterSplashSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playStreetLightImpactSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playRecycleBinImpactSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playPersonImpactSound() {
         // No-op on desktop/unsupported platforms
     }
 }

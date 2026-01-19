@@ -62,6 +62,9 @@ class FallAnimationController(
     // Random roll direction for this fall (set on start)
     private var rollDirection = 1f
 
+    // Skip crash sound (when obstacle has its own sound)
+    private var skipCrashSound = false
+
     // Animation progress (0 to 1)
     val progress: Float
         get() = (timer / FALL_DURATION).coerceIn(0f, 1f)
@@ -75,8 +78,10 @@ class FallAnimationController(
      * @param forwardLean Forward lean at moment of fall (-1 to 1)
      * @param sideLean Side lean at moment of fall (-1 to 1)
      * @param yaw Current yaw rotation
+     * @param skipSound Skip crash sound (obstacle has its own impact sound)
      */
-    fun start(speed: Float, forwardLean: Float, sideLean: Float, yaw: Float) {
+    fun start(speed: Float, forwardLean: Float, sideLean: Float, yaw: Float, skipSound: Boolean = false) {
+        skipCrashSound = skipSound
         timer = 0f
         isActive = true
         impactTriggered = false
@@ -268,8 +273,10 @@ class FallAnimationController(
         val vibrationAmplitude = (150 + (speedFactor * 100).toInt()).coerceIn(100, 255)
         platformServices.vibrate(vibrationDuration, vibrationAmplitude)
 
-        // Crash sound: short "crack" with pitch down
-        platformServices.playCrashSound(speedFactor)
+        // Crash sound: short "crack" with pitch down (skip if obstacle has its own sound)
+        if (!skipCrashSound) {
+            platformServices.playCrashSound(speedFactor)
+        }
     }
 
     fun reset() {

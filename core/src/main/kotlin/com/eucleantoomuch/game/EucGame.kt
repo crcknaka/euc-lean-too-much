@@ -10,6 +10,7 @@ import com.eucleantoomuch.game.ecs.EntityFactory
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.ArmComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
+import com.eucleantoomuch.game.ecs.components.ObstacleType
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
@@ -72,6 +73,7 @@ class EucGame(
     private var countdownTimer = 2f
     private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
+    private var currentCollisionType: ObstacleType? = null  // Track collision type for sound
 
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
@@ -147,8 +149,18 @@ class EucGame(
         eucPhysicsSystem.onPlayerFall = { handlePlayerFall() }
 
         collisionSystem = CollisionSystem()
-        collisionSystem.onCollision = { _, causesGameOver ->
+        collisionSystem.onCollision = { obstacleType, causesGameOver ->
+            // Play obstacle-specific impact sounds
+            when (obstacleType) {
+                ObstacleType.MANHOLE -> platformServices.playManholeSound()
+                ObstacleType.PUDDLE -> platformServices.playWaterSplashSound()
+                ObstacleType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
+                ObstacleType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
+                ObstacleType.PEDESTRIAN -> platformServices.playPersonImpactSound()
+                else -> {} // Other obstacles use crash sound via handlePlayerFall
+            }
             if (causesGameOver) {
+                currentCollisionType = obstacleType
                 handlePlayerFall()
             }
         }
@@ -755,12 +767,20 @@ class EucGame(
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
         if (eucComponent != null && playerTransform != null) {
+            // Skip crash sound for obstacles that have their own impact sound
+            val skipCrashSound = currentCollisionType in listOf(
+                ObstacleType.STREET_LIGHT,
+                ObstacleType.RECYCLE_BIN,
+                ObstacleType.PEDESTRIAN
+            )
             fallAnimationController.start(
                 speed = eucComponent.speed,
                 forwardLean = eucComponent.forwardLean,
                 sideLean = eucComponent.sideLean,
-                yaw = playerTransform.yaw
+                yaw = playerTransform.yaw,
+                skipSound = skipCrashSound
             )
+            currentCollisionType = null  // Reset for next collision
         }
 
         // Transition to falling state (will show animation before game over)

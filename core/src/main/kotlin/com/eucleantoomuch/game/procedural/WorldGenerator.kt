@@ -1209,7 +1209,7 @@ class WorldGenerator(
         })
 
         entity.add(ObstacleComponent().apply {
-            type = ObstacleType.CURB
+            type = ObstacleType.RECYCLE_BIN
             causesGameOver = true
         })
 
@@ -1277,7 +1277,7 @@ class WorldGenerator(
         })
 
         entity.add(ObstacleComponent().apply {
-            type = ObstacleType.CURB
+            type = ObstacleType.STREET_LIGHT
             causesGameOver = true
         })
 

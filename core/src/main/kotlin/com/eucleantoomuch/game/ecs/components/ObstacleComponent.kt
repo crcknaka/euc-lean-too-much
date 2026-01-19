@@ -9,7 +9,9 @@ enum class ObstacleType {
     PEDESTRIAN,
     CAR,
     CURB,
-    POTHOLE
+    POTHOLE,
+    STREET_LIGHT,
+    RECYCLE_BIN
 }
 
 class ObstacleComponent : Component, Pool.Poolable {

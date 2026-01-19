@@ -60,6 +60,11 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     // Sound IDs
     private val pigeonWingsSound: Int = soundPool.load(context, R.raw.pigeon_wings, 1)
     private val swooshSound: Int = soundPool.load(context, R.raw.swoosh, 1)
+    private val manholeSound: Int = soundPool.load(context, R.raw.manhole, 1)
+    private val waterSplashSound: Int = soundPool.load(context, R.raw.water_splash, 1)
+    private val streetLightImpactSound: Int = soundPool.load(context, R.raw.impact_street_light, 1)
+    private val recycleBinImpactSound: Int = soundPool.load(context, R.raw.impact_recycle, 1)
+    private val personImpactSound: Int = soundPool.load(context, R.raw.personimpact, 1)
 
     override fun vibrate(durationMs: Long, amplitude: Int) {
         if (!hasVibrator()) return
@@ -659,5 +664,27 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
         } catch (e: Exception) {
             isWobblePlaying.set(false)
         }
+    }
+
+    // === Obstacle Impact Sounds ===
+
+    override fun playManholeSound() {
+        soundPool.play(manholeSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playWaterSplashSound() {
+        soundPool.play(waterSplashSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playStreetLightImpactSound() {
+        soundPool.play(streetLightImpactSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playRecycleBinImpactSound() {
+        soundPool.play(recycleBinImpactSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    override fun playPersonImpactSound() {
+        soundPool.play(personImpactSound, 1f, 1f, 1, 0, 1f)
     }
 }
