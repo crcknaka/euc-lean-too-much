@@ -24,6 +24,7 @@ class CollisionSystem : EntitySystem(5) {
     var onCollision: ((ObstacleType, Boolean) -> Unit)? = null  // Type, causesGameOver
     var onNearMiss: (() -> Unit)? = null  // Called when player passes close to pedestrian
     var onPedestrianHit: ((Entity) -> Unit)? = null  // Called when player hits a pedestrian
+    var onKnockableHit: ((Entity) -> Unit)? = null  // Called when player hits a knockable object (trash can)
 
     // Near miss tracking - distance threshold for "close call"
     private val nearMissThresholdPedestrian = 1.2f  // Distance in meters for pedestrian near miss
@@ -148,8 +149,14 @@ class CollisionSystem : EntitySystem(5) {
                 onCollision?.invoke(obstacle.type, true)
             }
             else -> {
-                // All other obstacles cause game over
-                if (obstacle.causesGameOver) {
+                // Check if knockable (e.g., trash can)
+                if (obstacle.isKnockable && !obstacle.isKnockedOver) {
+                    obstacle.isKnockedOver = true
+                    obstacle.hasBeenPassed = true
+                    onKnockableHit?.invoke(obstacleEntity)
+                    onCollision?.invoke(obstacle.type, false)
+                } else if (obstacle.causesGameOver) {
+                    // Non-knockable obstacles cause game over
                     player.isAlive = false
                     onCollision?.invoke(obstacle.type, true)
                 }

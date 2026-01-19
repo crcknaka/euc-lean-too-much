@@ -130,6 +130,15 @@ class RagdollPhysics : Disposable {
     )
     private val pedestrianBodies = mutableListOf<PedestrianBody>()
 
+    // Dynamic object ragdolls (trash cans, etc.)
+    data class DynamicObjectRagdoll(
+        var shape: btCollisionShape? = null,
+        var body: btRigidBody? = null,
+        var motionState: btDefaultMotionState? = null,
+        var entityIndex: Int = -1
+    )
+    private val dynamicObjects = mutableListOf<DynamicObjectRagdoll>()
+
     // State
     private var isActive = false
     private var isFrozen = false  // When frozen, ragdoll stays visible but doesn't simulate
@@ -579,8 +588,8 @@ class RagdollPhysics : Disposable {
      * Runs if main ragdoll is active OR if there are falling pedestrians.
      */
     fun update(delta: Float) {
-        // Run simulation if main ragdoll is active or there are pedestrian ragdolls
-        if (!isActive && pedestrianRagdolls.isEmpty()) return
+        // Run simulation if main ragdoll is active, or there are pedestrian ragdolls, or dynamic objects
+        if (!isActive && pedestrianRagdolls.isEmpty() && dynamicObjects.isEmpty()) return
 
         // Step physics world (max 4 substeps for stability)
         dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
@@ -970,6 +979,95 @@ class RagdollPhysics : Disposable {
         return pedestrianRagdolls.size - 1
     }
 
+    /**
+     * Add a dynamic trash can that can be knocked over.
+     * @param position Position of the trash can
+     * @param playerVelocity Player's speed at collision
+     * @param playerDirection Direction player was moving (normalized)
+     * @param entityIndex Index to track which entity this belongs to
+     * @return Index of the created dynamic object
+     */
+    fun addTrashCanRagdoll(
+        position: Vector3,
+        playerVelocity: Float,
+        playerDirection: Vector3,
+        entityIndex: Int
+    ): Int {
+        val obj = DynamicObjectRagdoll(entityIndex = entityIndex)
+
+        // Trash can dimensions (scaled 1.6x as per WorldGenerator)
+        val scale = 1.6f
+        val radius = 0.25f * scale
+        val height = 1f * scale
+        val halfHeight = height / 2
+
+        // Use cylinder shape for trash can
+        obj.shape = btCylinderShape(Vector3(radius, halfHeight, radius))
+
+        val mass = 12f  // Light enough to tip over easily
+        val inertia = Vector3()
+        obj.shape!!.calculateLocalInertia(mass, inertia)
+
+        // Start upright at ground level
+        tempMatrix.idt()
+        tempMatrix.translate(position.x, halfHeight, position.z)
+
+        obj.motionState = btDefaultMotionState(tempMatrix)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, obj.motionState, obj.shape, inertia)
+        obj.body = btRigidBody(info)
+        obj.body!!.friction = 0.5f
+        obj.body!!.restitution = 0.2f
+        obj.body!!.setDamping(0.05f, 0.1f)  // Less damping for more tumbling
+
+        // Disable deactivation so it keeps moving
+        obj.body!!.activationState = 4  // DISABLE_DEACTIVATION
+
+        // Enable CCD to prevent tunneling
+        obj.body!!.setCcdMotionThreshold(0.1f)
+        obj.body!!.setCcdSweptSphereRadius(radius * 0.8f)
+
+        dynamicsWorld.addRigidBody(obj.body)
+        info.dispose()
+
+        // Apply impulse at the TOP of the trash can to create tipping torque
+        // This is the key to making it tip over instead of just sliding
+        val impactSpeed = playerVelocity.coerceIn(5f, 15f)
+        val impulseStrength = impactSpeed * mass * 0.3f
+
+        // Point of impact - at the top of the trash can, offset in player direction
+        val impactPoint = Vector3(
+            position.x + playerDirection.x * radius * 0.5f,
+            halfHeight + halfHeight * 0.7f,  // Hit near top
+            position.z + playerDirection.z * radius * 0.5f
+        )
+
+        // Impulse direction - mostly forward, slight upward
+        val impulse = Vector3(
+            playerDirection.x * impulseStrength,
+            impulseStrength * 0.2f,
+            playerDirection.z * impulseStrength
+        )
+
+        // Apply impulse at offset point - this creates both linear and angular motion
+        obj.body!!.applyImpulse(impulse, impactPoint.sub(position.x, halfHeight, position.z))
+
+        dynamicObjects.add(obj)
+        return dynamicObjects.size - 1
+    }
+
+    /**
+     * Get transform for a dynamic object (trash can, etc.).
+     * @param index Index returned by addTrashCanRagdoll
+     * @return Transform matrix or null if invalid
+     */
+    fun getDynamicObjectTransform(index: Int): Matrix4? {
+        if (index < 0 || index >= dynamicObjects.size) return null
+        val obj = dynamicObjects[index]
+        if (obj.body == null) return null
+        obj.motionState?.getWorldTransform(tempMatrix2)
+        return tempMatrix2
+    }
+
     private fun createPedestrianBodyPart(
         part: BodyPart,
         shape: btCollisionShape,
@@ -1268,6 +1366,24 @@ class RagdollPhysics : Disposable {
             pedestrian.shape?.dispose()
         }
         pedestrianBodies.clear()
+
+        // Clear dynamic objects (trash cans, etc.)
+        clearDynamicObjects()
+    }
+
+    /**
+     * Clear all dynamic objects (trash cans, etc.).
+     */
+    private fun clearDynamicObjects() {
+        for (obj in dynamicObjects) {
+            obj.body?.let {
+                dynamicsWorld.removeRigidBody(it)
+                it.dispose()
+            }
+            obj.motionState?.dispose()
+            obj.shape?.dispose()
+        }
+        dynamicObjects.clear()
     }
 
     /**

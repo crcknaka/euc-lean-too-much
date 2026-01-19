@@ -1300,7 +1300,8 @@ class WorldGenerator(
 
         entity.add(ObstacleComponent().apply {
             type = ObstacleType.RECYCLE_BIN
-            causesGameOver = true
+            causesGameOver = false  // Trash cans can be knocked over
+            isKnockable = true
         })
 
         // Add shadow for trash can

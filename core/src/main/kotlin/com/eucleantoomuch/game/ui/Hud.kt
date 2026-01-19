@@ -121,7 +121,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val topPanelHeight = 120f * scale
         val topPanelY = sh - topPanelHeight - 28f * scale
         ui.roundedRect(sw / 2 - topPanelWidth / 2, topPanelY, topPanelWidth, topPanelHeight,
-            20f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
+            20f * scale, UITheme.withAlpha(UITheme.surface, 0.65f))
 
         // === Speed Panel (bottom left) ===
         drawSpeedPanel(euc)
@@ -208,7 +208,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val panelY = 30f * scale
 
         // Panel background
-        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.65f))
 
         // Speed bar background
         val barX = panelX + 16f * scale
@@ -257,7 +257,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val panelY = 170f * scale  // Above speed panel
 
         // Panel background
-        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.92f))
+        ui.roundedRect(panelX, panelY, panelWidth, panelHeight, 18f * scale, UITheme.withAlpha(UITheme.surface, 0.65f))
 
         // PWM bar background
         val barX = panelX + 16f * scale
@@ -321,23 +321,23 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val centerY = indicatorY + indicatorSize / 2
 
         // Shadow
-        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.35f)
+        ui.shapes.color = UITheme.withAlpha(Color.BLACK, 0.25f)
         ui.shapes.circle(centerX + 3f, centerY - 3f, indicatorSize / 2 + 3f)
 
         // Background with zones
-        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.95f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.surface, 0.55f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2)
 
         // Danger zone (outer red)
-        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.22f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.danger, 0.15f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2 - 4f)
 
         // Warning zone (yellow)
-        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.18f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.12f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.72f)
 
         // Safe zone (accent center)
-        ui.shapes.color = UITheme.withAlpha(UITheme.accent, 0.22f)
+        ui.shapes.color = UITheme.withAlpha(UITheme.accent, 0.15f)
         ui.shapes.circle(centerX, centerY, indicatorSize / 2 * 0.45f)
 
         // Grid lines

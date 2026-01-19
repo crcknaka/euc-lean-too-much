@@ -205,6 +205,10 @@ class EucGame(
             // Start ragdoll physics for the hit pedestrian
             startPedestrianRagdoll(pedestrianEntity)
         }
+        collisionSystem.onKnockableHit = { obstacleEntity ->
+            // Start ragdoll physics for knockable objects (trash cans)
+            startTrashCanRagdoll(obstacleEntity)
+        }
 
         pigeonSystem = PigeonSystem(models, platformServices)
         cullingSystem = CullingSystem()
@@ -664,6 +668,7 @@ class EucGame(
         // Update pedestrian ragdoll physics (if any pedestrians are falling)
         ragdollPhysics?.update(delta)
         updateFallingPedestrians()
+        updateKnockedOverTrashCans()
 
         // Check if ragdoll bodies knock down standing pedestrians
         checkRagdollPedestrianCollisions()
@@ -1002,6 +1007,51 @@ class EucGame(
     }
 
     /**
+     * Start ragdoll physics for a trash can (knockable object).
+     */
+    private fun startTrashCanRagdoll(obstacleEntity: com.badlogic.ashley.core.Entity) {
+        if (ragdollPhysics == null) return
+
+        val obstacleComponent = obstacleEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
+        ) ?: return
+
+        val obstacleTransform = obstacleEntity.getComponent(TransformComponent::class.java) ?: return
+        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
+        val eucComponent = playerEntity?.getComponent(EucComponent::class.java) ?: return
+
+        // Calculate impact direction (from player to obstacle)
+        val yawRad = Math.toRadians(playerTransform.yaw.toDouble()).toFloat()
+        val impactDir = com.badlogic.gdx.math.Vector3(
+            kotlin.math.sin(yawRad),
+            0f,
+            kotlin.math.cos(yawRad)
+        )
+
+        // Hide original model
+        val modelComponent = obstacleEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
+        )
+        modelComponent?.visible = false
+
+        // Hide shadow
+        val shadowComponent = obstacleEntity.getComponent(
+            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
+        )
+        shadowComponent?.visible = false
+
+        // Add trash can ragdoll
+        val bodyIndex = ragdollPhysics!!.addTrashCanRagdoll(
+            position = obstacleTransform.position,
+            playerVelocity = eucComponent.speed,
+            playerDirection = impactDir,
+            entityIndex = obstacleEntity.hashCode()
+        )
+
+        obstacleComponent.ragdollBodyIndex = bodyIndex
+    }
+
+    /**
      * Extract shirt color from pedestrian model instance for ragdoll rendering.
      */
     private fun extractPedestrianShirtColor(modelInstance: com.badlogic.gdx.graphics.g3d.ModelInstance?): com.badlogic.gdx.graphics.Color? {
@@ -1336,6 +1386,7 @@ class EucGame(
 
         // Update falling pedestrians (always, not just when player ragdoll is active)
         updateFallingPedestrians()
+        updateKnockedOverTrashCans()
 
         // Render the scene (ragdoll is rendered inside main render pass via activeRagdollRenderer)
         renderer.render()
@@ -2007,6 +2058,44 @@ class EucGame(
                 transform.position.set(pedestrianTempPos)
                 // Offset Y down by half torso height since physics center is at torso
                 transform.position.y = pedestrianTempPos.y - 0.25f
+            }
+        }
+    }
+
+    // Temp matrix for dynamic object (trash can) transform updates
+    private val trashCanTempMatrix = com.badlogic.gdx.math.Matrix4()
+    private val trashCanTempPos = com.badlogic.gdx.math.Vector3()
+
+    /**
+     * Update positions and render knocked over trash cans using ragdoll physics transforms.
+     */
+    private fun updateKnockedOverTrashCans() {
+        if (ragdollPhysics == null) return
+
+        val obstacles = engine.getEntitiesFor(Families.obstacles)
+        for (i in 0 until obstacles.size()) {
+            val entity = obstacles[i]
+            val obstacleComponent = entity.getComponent(
+                com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
+            ) ?: continue
+
+            if (!obstacleComponent.isKnockedOver || obstacleComponent.ragdollBodyIndex < 0) continue
+
+            val transform = entity.getComponent(TransformComponent::class.java) ?: continue
+            val modelComponent = entity.getComponent(ModelComponent::class.java) ?: continue
+
+            // Get physics transform
+            val physicsTransform = ragdollPhysics!!.getDynamicObjectTransform(obstacleComponent.ragdollBodyIndex)
+            if (physicsTransform != null) {
+                // Update model instance transform directly from physics
+                modelComponent.modelInstance?.transform?.set(physicsTransform)
+
+                // Also update entity position for culling
+                physicsTransform.getTranslation(trashCanTempPos)
+                transform.position.set(trashCanTempPos)
+
+                // Make model visible again (it's now controlled by physics)
+                modelComponent.visible = true
             }
         }
     }
