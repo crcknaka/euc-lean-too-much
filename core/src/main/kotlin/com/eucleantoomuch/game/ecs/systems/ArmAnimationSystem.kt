@@ -83,28 +83,42 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
     }
 
     private fun calculateRelaxedPose(arm: ArmComponent, euc: EucComponent) {
-        // Relaxed pose: arms hanging down naturally, swaying with turns
-        // armYaw = how far out to the side (0=down, 90=horizontal)
+        // Relaxed pose: arms extend forward based on acceleration (forward lean)
+        // When accelerating hard, arms stretch forward for balance
+        // When cruising (no acceleration), arms hang down naturally
 
-        val baseYaw = 15f  // Slightly outward from body
+        // Forward lean goes from -1 (braking) to +1 (accelerating)
+        // Only extend arms forward when accelerating (positive lean)
+        val accelFactor = euc.visualForwardLean.coerceIn(0f, 1f)
+
+        // Yaw: how far out to side (0 = down at sides, 90 = horizontal out)
+        // Keep arms close to body
+        val targetYaw = MathUtils.lerp(15f, 5f, accelFactor)  // Arms stay close to body
+
+        // Pitch: forward/backward (negative = forward, positive = backward)
+        // When accelerating hard, arms stretch fully forward
+        val targetPitch = MathUtils.lerp(0f, -180f, accelFactor)  // Arms reach forward (negative pitch)
 
         // Minimal idle sway - very subtle
         val swingTime = arm.balanceTime * 1.2f
-        val idleSway = MathUtils.sin(swingTime) * 3f  // Very small idle movement
+        val idleSway = MathUtils.sin(swingTime) * 3f * (1f - accelFactor)  // Less sway when accelerating
 
         // Turn response - BOTH arms swing in SAME direction (inertia effect)
-        val turnSwing = -euc.visualSideLean * 40f
+        val turnSwing = -euc.visualSideLean * 40f * (1f - accelFactor * 0.7f)  // Less turn response when arms forward
 
-        // Both arms move together in same direction
-        arm.leftArmYaw = baseYaw + idleSway + turnSwing
-        arm.leftArmPitch = 0f
+        // Forearm bend: straight when reaching forward, slightly bent when relaxed
+        val forearmBend = MathUtils.lerp(10f, 0f, accelFactor)
+
+        // Both arms move together
+        arm.leftArmYaw = targetYaw + idleSway + turnSwing
+        arm.leftArmPitch = targetPitch
         arm.leftArmRoll = 0f
-        arm.leftForearmBend = 10f
+        arm.leftForearmBend = forearmBend
 
-        arm.rightArmYaw = baseYaw + idleSway + turnSwing  // Same direction as left
-        arm.rightArmPitch = 0f
+        arm.rightArmYaw = targetYaw + idleSway + turnSwing
+        arm.rightArmPitch = targetPitch
         arm.rightArmRoll = 0f
-        arm.rightForearmBend = 10f
+        arm.rightForearmBend = forearmBend
     }
 
     private fun calculateBehindBackPose(arm: ArmComponent, euc: EucComponent) {
