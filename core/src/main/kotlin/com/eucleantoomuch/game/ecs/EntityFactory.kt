@@ -5,6 +5,7 @@ import com.badlogic.ashley.core.Entity
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.eucleantoomuch.game.ecs.components.ArmComponent
 import com.eucleantoomuch.game.ecs.components.ArmTagComponent
+import com.eucleantoomuch.game.ecs.components.HeadComponent
 import com.eucleantoomuch.game.ecs.components.ColliderComponent
 import com.eucleantoomuch.game.ecs.components.CollisionGroups
 import com.eucleantoomuch.game.ecs.components.EucComponent
@@ -99,6 +100,9 @@ class EntityFactory(
 
         // Add ArmComponent for arm animation state
         entity.add(ArmComponent())
+
+        // Add HeadComponent for head animation state
+        entity.add(HeadComponent())
 
         engine.addEntity(entity)
         return entity

@@ -130,7 +130,7 @@ class EucPhysicsSystem(
         }
     }
 
-    private fun lerp(start: Float, end: Float, alpha: Float): Float {
+    private fun  lerp(start: Float, end: Float, alpha: Float): Float {
         return start + (end - start) * alpha
     }
 

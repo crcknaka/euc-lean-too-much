@@ -54,9 +54,10 @@ object Families {
         ModelComponent::class.java
     ).get()
 
-    // Rider entities (have both EucComponent and ArmComponent for arm animation)
+    // Rider entities (have EucComponent, ArmComponent and HeadComponent for animation)
     val rider: Family = Family.all(
         EucComponent::class.java,
-        ArmComponent::class.java
+        ArmComponent::class.java,
+        HeadComponent::class.java
     ).get()
 }

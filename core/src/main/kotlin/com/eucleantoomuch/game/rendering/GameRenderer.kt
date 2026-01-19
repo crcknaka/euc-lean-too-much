@@ -14,9 +14,11 @@ import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.ecs.Families
+import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.eucleantoomuch.game.ecs.components.ArmComponent
 import com.eucleantoomuch.game.ecs.components.ArmTagComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
+import com.eucleantoomuch.game.ecs.components.HeadComponent
 import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.ShadowComponent
@@ -47,13 +49,18 @@ class GameRenderer(
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
     private val armTagMapper = ComponentMapper.getFor(ArmTagComponent::class.java)
     private val armMapper = ComponentMapper.getFor(ArmComponent::class.java)
+    private val headMapper = ComponentMapper.getFor(HeadComponent::class.java)
     private val shadowMapper = ComponentMapper.getFor(ShadowComponent::class.java)
 
     private val tempMatrix = Matrix4()
     private val shadowMatrix = Matrix4()
+    private val headMatrix = Matrix4()
 
     // Reference to rider entity for arm rendering (set externally)
     var riderEntity: com.badlogic.ashley.core.Entity? = null
+
+    // Head model instance (rendered separately for animation)
+    private var headInstance: ModelInstance? = null
 
     // Sky color
     private val skyR = 0.5f
@@ -72,6 +79,9 @@ class GameRenderer(
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
         camera.far = 300f
         camera.update()
+
+        // Create head model instance for animated rendering
+        headInstance = ModelInstance(models.createHeadModel())
     }
 
     fun setCameraFar(distance: Float) {
@@ -210,10 +220,56 @@ class GameRenderer(
             }
         }
 
+        // Render head separately with animation
+        renderHead()
+
         modelBatch.end()
 
         // End post-processing (apply effects and render to screen)
         postProcessing.end()
+    }
+
+    /**
+     * Render the rider's head with animation.
+     * Head is attached to the rider's neck and can rotate independently.
+     */
+    private fun renderHead() {
+        val rider = riderEntity ?: return
+        val head = headInstance ?: return
+        val riderTransform = transformMapper.get(rider) ?: return
+        val riderEuc = eucMapper.get(rider) ?: return
+        val headComponent = headMapper.get(rider) ?: return
+
+        // Neck position (top of torso)
+        val neckY = headComponent.offsetY
+
+        headMatrix.idt()
+
+        // Start with rider's base position
+        headMatrix.translate(riderTransform.position)
+
+        // Apply rider's yaw (body facing direction)
+        headMatrix.rotate(0f, 1f, 0f, -riderTransform.yaw)
+
+        // Apply rider's lean (forward and side)
+        val forwardLeanAngle = riderEuc.visualForwardLean * 60f
+        val sideLeanAngle = riderEuc.visualSideLean * 15f
+        headMatrix.rotate(1f, 0f, 0f, forwardLeanAngle)
+        headMatrix.rotate(0f, 0f, 1f, sideLeanAngle)
+
+        // Translate to neck position (in leaned body space)
+        headMatrix.translate(0f, neckY, 0f)
+
+        // Apply head rotation (independent movement)
+        // Yaw: turn head left/right
+        headMatrix.rotate(0f, 1f, 0f, headComponent.yaw)
+        // Pitch: nod up/down
+        headMatrix.rotate(1f, 0f, 0f, headComponent.pitch)
+        // Roll: tilt head side to side
+        headMatrix.rotate(0f, 0f, 1f, headComponent.roll)
+
+        head.transform.set(headMatrix)
+        modelBatch.render(head, environment)
     }
 
     /**
