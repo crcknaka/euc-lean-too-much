@@ -29,8 +29,10 @@ class WorldGenerator(
     private var grassModel = models.createGrassAreaModel(Constants.CHUNK_LENGTH)
     private var manholeModel = models.createManholeModel()
     private var puddleModel = models.createPuddleModel()
-    private var curbModel = models.createCurbModel()
     private var potholeModel = models.createPotholeModel()
+
+    // Curb models of varying lengths (3-8 segments, each segment is ~2 meters)
+    private val curbModels = mutableMapOf<Int, Model>()
 
     // Pedestrian models with different shirt colors
     private val pedestrianModels = mutableListOf<Model>()
@@ -102,6 +104,12 @@ class WorldGenerator(
     init {
         // Create zebra crossing model
         zebraCrossingModel = ModelInstance(models.createZebraCrossingModel())
+
+        // Create curb models of varying lengths (3-8 segments, each ~2m)
+        for (segments in 3..8) {
+            val length = segments * 2f
+            curbModels[segments] = models.createCurbModel(length)
+        }
 
         // Create pedestrians with different shirt colors
         for (i in 0..9) {
@@ -1373,10 +1381,10 @@ class WorldGenerator(
                 val staticRoll = MathUtils.random()
                 val x = getRandomLaneX()
                 when {
-                    staticRoll < 0.25f -> createManholeEntity(x, z)
-                    staticRoll < 0.45f -> createPuddleEntity(x, z)
-                    staticRoll < 0.65f -> createPotholeEntity(x, z)
-                    staticRoll < 0.85f -> createCurbEntity(z)
+                    staticRoll < 0.20f -> createManholeEntity(x, z)
+                    staticRoll < 0.35f -> createPuddleEntity(x, z)
+                    staticRoll < 0.50f -> createPotholeEntity(x, z)
+                    staticRoll < 0.90f -> createCurbEntity(z)  // Curbs are more common (40% chance)
                     else -> createManholeEntity(x, z)  // Default to manhole
                 }
             }
@@ -1462,14 +1470,20 @@ class WorldGenerator(
     private fun createCurbEntity(z: Float): Entity {
         val entity = engine.createEntity()
 
+        // Random length 3-8 segments (each segment ~2m)
+        val segments = MathUtils.random(3, 8)
+        val length = segments * 2f
+        val curbModel = curbModels[segments]!!
+
         // Place curb at edge of road
         val side = if (MathUtils.randomBoolean()) -1 else 1
         val x = side * (Constants.ROAD_WIDTH / 2 - 0.3f)
 
-        entity.add(TransformComponent().apply { position.set(x, 0f, z) })
+        // Center the curb at z position (so it extends forward and backward)
+        entity.add(TransformComponent().apply { position.set(x, 0f, z + length / 2f) })
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(curbModel) })
         entity.add(ColliderComponent().apply {
-            setSize(0.3f, Constants.CURB_HEIGHT, 1f)
+            setSize(0.3f, Constants.CURB_HEIGHT, length)
             collisionGroup = CollisionGroups.OBSTACLE
         })
         entity.add(ObstacleComponent().apply {
@@ -1542,15 +1556,14 @@ class WorldGenerator(
             yaw = if (direction == -1) 180f else 0f
             updateRotationFromYaw()
             if (useGlbCars && chosenAsset != null) {
-                val testScale = chosenScale * 100f
-                scale.set(testScale, testScale, testScale)
+                scale.set(chosenScale, chosenScale, chosenScale)
             }
         })
 
-        // Create model component - use Scene for GLB models to preserve PBR materials
+        // Create model component - use Scene for GLB models (PBR rendering)
         entity.add(ModelComponent().apply {
             if (useGlbCars && chosenAsset != null) {
-                // Create a new Scene instance for this car (preserves PBR materials)
+                // Create Scene for PBR rendering with proper materials
                 scene = Scene(chosenAsset.scene)
                 modelInstance = scene!!.modelInstance
                 isPbr = true

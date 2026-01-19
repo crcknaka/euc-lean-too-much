@@ -161,16 +161,16 @@ class MenuRenderer : Disposable {
         // === Draw Text ===
         ui.beginBatch()
 
-        // Title "EUC" with subtle animation
+        // Title "EUC RIDER" with subtle animation
         val titleY = sh - 80f * scale + (1 - enterAnimProgress) * 60
         val titleScale = titlePulse
         UIFonts.display.data.setScale(UIFonts.display.data.scaleX * titleScale)
-        ui.textCentered("EUC", centerX, titleY, UIFonts.display, UITheme.textPrimary)
+        ui.textCentered("EUC RIDER", centerX, titleY, UIFonts.display, UITheme.textPrimary)
         UIFonts.display.data.setScale(UIFonts.display.data.scaleX / titleScale)
 
         // Subtitle with glow effect
         val subtitleY = titleY - 90f * scale
-        ui.textCentered("LEAN TOO MUCH", centerX, subtitleY, UIFonts.heading, UITheme.accent)
+        ui.textCentered("Lean too much", centerX, subtitleY, UIFonts.heading, UITheme.accent)
 
         // Button labels with larger text
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)

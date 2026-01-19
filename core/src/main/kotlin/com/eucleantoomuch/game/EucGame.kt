@@ -72,7 +72,7 @@ class EucGame(
     private var riderEntity: Entity? = null
     private var leftArmEntity: Entity? = null
     private var rightArmEntity: Entity? = null
-    private var countdownTimer = 2f
+    private var countdownTimer = 3f
     private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
 
@@ -748,8 +748,8 @@ class EucGame(
         // Generate initial world
         worldGenerator.update(0f, 0f)
 
-        // Start countdown (faster: 2 seconds total)
-        countdownTimer = 2f
+        // Start countdown (3 seconds for proper 3-2-1 beep spacing)
+        countdownTimer = 3f
         lastCountdownSecond = -1  // Reset for beep tracking
         session.reset()
         hud.reset()

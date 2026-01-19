@@ -545,12 +545,12 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createCurbModel(): Model {
+    fun createCurbModel(length: Float = 1f): Model {
         modelBuilder.begin()
         val material = Material(ColorAttribute.createDiffuse(curbColor))
         val part = modelBuilder.part("curb", GL20.GL_TRIANGLES, attributes, material)
         part.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, Constants.CURB_HEIGHT / 2, 0f))
-        part.box(0.3f, Constants.CURB_HEIGHT, 1f)
+        part.box(0.3f, Constants.CURB_HEIGHT, length)
         return modelBuilder.end().also { models.add(it) }
     }
 

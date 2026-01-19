@@ -6,7 +6,7 @@ import com.eucleantoomuch.game.EucGame
 
 fun main() {
     val config = Lwjgl3ApplicationConfiguration().apply {
-        setTitle("EUC - Lean Too Much")
+        setTitle("EUC Rider - Lean too much")
         setWindowedMode(1280, 720)
         setForegroundFPS(60)
         useVsync(true)

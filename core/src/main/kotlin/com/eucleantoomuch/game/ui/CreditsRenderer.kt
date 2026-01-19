@@ -80,7 +80,7 @@ class CreditsRenderer : Disposable {
             textY -= 80f * scale
 
             // Game title
-            ui.textCentered("EUC: Lean Too Much", centerX, textY, UIFonts.heading, UITheme.accent)
+            ui.textCentered("EUC Rider - Lean too much", centerX, textY, UIFonts.heading, UITheme.accent)
             textY -= 60f * scale
 
             // Developer
