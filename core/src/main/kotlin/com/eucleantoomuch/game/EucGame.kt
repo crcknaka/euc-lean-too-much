@@ -215,6 +215,14 @@ class EucGame(
                 platformServices.playWhooshSound()
             }
         }
+        UIFeedback.wobbleProvider = object : UIFeedback.WobbleProvider {
+            override fun playWobble(intensity: Float) {
+                platformServices.playWobbleSound(intensity)
+            }
+            override fun stopWobble() {
+                platformServices.stopWobbleSound()
+            }
+        }
 
         // Start at menu
         stateManager.transition(GameState.Menu)

@@ -25,7 +25,7 @@ class CollisionSystem : EntitySystem(5) {
 
     // Near miss tracking - distance threshold for "close call"
     private val nearMissThresholdPedestrian = 1.2f  // Distance in meters for pedestrian near miss
-    private val nearMissThresholdCar = 1.8f  // Distance in meters for car near miss (wider)
+    private val nearMissThresholdCar = 2.8f  // Distance in meters for car near miss (wider, cars are big)
 
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)

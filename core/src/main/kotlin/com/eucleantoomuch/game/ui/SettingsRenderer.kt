@@ -125,9 +125,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // Main settings panel - wider for two columns
         val panelWidth = 900f * scale * enterAnimProgress
-        val panelHeight = 580f * scale * enterAnimProgress
+        val panelHeight = 700f * scale * enterAnimProgress
         val panelX = centerX - panelWidth / 2
-        val panelY = sh / 2 - panelHeight / 2 + 40f * scale
+        val panelY = sh / 2 - panelHeight / 2 + 80f * scale
 
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             radius = UITheme.Dimensions.panelRadius,
@@ -145,8 +145,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // === LEFT COLUMN ===
         val leftColCenterX = leftColumnX + columnWidth / 2
 
-        // Render Distance Setting
-        val renderDistanceY = panelY + panelHeight - 160f * scale
+        // Render Distance Setting (more space from SETTINGS title)
+        val renderDistanceY = panelY + panelHeight - 220f * scale
         renderSelectorSetting(
             leftColCenterX, renderDistanceY, valueBoxWidth, arrowButtonSize,
             renderDistanceLeftButton, renderDistanceRightButton,
@@ -172,8 +172,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // === RIGHT COLUMN ===
         val rightColCenterX = rightColumnX + columnWidth / 2
 
-        // AVAS Setting
-        val avasY = panelY + panelHeight - 160f * scale
+        // AVAS Setting (more space from SETTINGS title)
+        val avasY = panelY + panelHeight - 220f * scale
         renderSelectorSetting(
             rightColCenterX, avasY, valueBoxWidth, arrowButtonSize,
             avasLeftButton, avasRightButton,
@@ -200,22 +200,17 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         fpsCheckbox.set(checkboxStartX, fpsY - checkboxSize / 2, checkboxSize, checkboxSize)
         renderCheckbox(fpsCheckbox, fpsCheckboxHover, settingsManager.showFps)
 
-        // Back button
-        val buttonWidth = 340f * scale
-        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 36f * scale, buttonWidth, buttonHeight)
-        ui.button(backButton, UITheme.accent, glowIntensity = backButtonHover * 0.8f)
-
-        // Privacy Policy and Terms buttons
-        val linkButtonWidth = 160f * scale
+        // Privacy Policy and Terms buttons (inside panel, above back button)
+        val privacyButtonWidth = 190f * scale  // Wider for "Privacy Policy" text
+        val termsButtonWidth = 120f * scale
         val linkButtonHeight = 40f * scale
-        val linkButtonY = panelY + 15f * scale
+        val linkButtonY = panelY + 50f * scale  // Inside panel near bottom
         val linkButtonSpacing = 20f * scale
 
         privacyPolicyButton.set(
-            centerX - linkButtonWidth - linkButtonSpacing / 2,
+            centerX - privacyButtonWidth - linkButtonSpacing / 2,
             linkButtonY,
-            linkButtonWidth,
+            privacyButtonWidth,
             linkButtonHeight
         )
         ui.panel(
@@ -229,7 +224,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         termsButton.set(
             centerX + linkButtonSpacing / 2,
             linkButtonY,
-            linkButtonWidth,
+            termsButtonWidth,
             linkButtonHeight
         )
         ui.panel(
@@ -240,13 +235,19 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             shadowOffset = 0f
         )
 
+        // Back button (below panel)
+        val buttonWidth = 340f * scale
+        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
+        backButton.set(centerX - buttonWidth / 2, panelY - buttonHeight - 30f * scale, buttonWidth, buttonHeight)
+        ui.button(backButton, UITheme.accent, glowIntensity = backButtonHover * 0.8f)
+
         ui.endShapes()
 
         // === Draw Text ===
         ui.beginBatch()
 
-        // Title
-        val titleY = panelY + panelHeight - 55f * scale
+        // Title (more space above)
+        val titleY = panelY + panelHeight - 80f * scale
         ui.textCentered("SETTINGS", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
         // === LEFT COLUMN TEXT ===
@@ -254,9 +255,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // Render Distance
         ui.textCentered("Render Distance", leftColCenterX, renderDistanceY + 55f * scale, UIFonts.body, UITheme.textSecondary)
         renderArrowText(renderDistanceLeftButton, renderDistanceRightButton)
-        val rdName = settingsManager.getRenderDistanceName()
-        val rdDist = settingsManager.renderDistance.toInt()
-        ui.textCentered("$rdName (${rdDist}m)", leftColCenterX, renderDistanceY, UIFonts.body, UITheme.accent)
+        ui.textCentered(settingsManager.getRenderDistanceName(), leftColCenterX, renderDistanceY, UIFonts.body, UITheme.accent)
 
         // Max FPS
         ui.textCentered("Max FPS", leftColCenterX, maxFpsY + 55f * scale, UIFonts.body, UITheme.textSecondary)

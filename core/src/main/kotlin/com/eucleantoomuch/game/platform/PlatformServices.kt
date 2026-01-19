@@ -80,6 +80,20 @@ interface PlatformServices {
      * Short fluttering/cooing sound.
      */
     fun playPigeonFlyOffSound()
+
+    // === Wobble Sound Effect ===
+
+    /**
+     * Play wobble sound effect when wheel starts wobbling.
+     * Low-frequency rumbling/rattling sound.
+     * @param intensity Wobble intensity 0-1, affects volume and frequency
+     */
+    fun playWobbleSound(intensity: Float)
+
+    /**
+     * Stop wobble sound when wobbling ends.
+     */
+    fun stopWobbleSound()
 }
 
 /**
@@ -123,6 +137,14 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun playPigeonFlyOffSound() {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playWobbleSound(intensity: Float) {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun stopWobbleSound() {
         // No-op on desktop/unsupported platforms
     }
 }

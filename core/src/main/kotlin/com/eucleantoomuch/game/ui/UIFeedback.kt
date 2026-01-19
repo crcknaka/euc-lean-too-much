@@ -32,8 +32,16 @@ object UIFeedback : Disposable {
         fun playWhoosh()
     }
 
+    interface WobbleProvider {
+        fun playWobble(intensity: Float)
+        fun stopWobble()
+    }
+
     // Whoosh provider for near miss sound
     var whooshProvider: WhooshProvider? = null
+
+    // Wobble sound provider
+    var wobbleProvider: WobbleProvider? = null
 
     /**
      * Initialize sound assets. Safe to call multiple times.
@@ -181,14 +189,15 @@ object UIFeedback : Disposable {
     }
 
     /**
-     * Wobble haptic feedback - continuous vibration while wobbling.
+     * Wobble haptic feedback only (no sound).
      * Intensity based on wobble strength (0-1).
      * Should be called every frame while wobbling.
      */
-    fun wobble(intensity: Float) {
+    fun wobbleHapticOnly(intensity: Float) {
         if (!enabled) return
         if (intensity < 0.05f) return
 
+        // Haptic feedback only
         hapticProvider?.let {
             if (it.hasVibrator()) {
                 // Short pulse proportional to intensity

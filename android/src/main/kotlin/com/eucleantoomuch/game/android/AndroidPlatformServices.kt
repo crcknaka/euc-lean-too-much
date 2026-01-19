@@ -298,8 +298,6 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                 // === HARMONICS ===
                 val harmonic2Freq = motorBaseFreq * 2.0
                 val harmonic3Freq = motorBaseFreq * 3.0
-                val harmonic4Freq = motorBaseFreq * 4.0  // Extra for V8
-                val harmonic5Freq = motorBaseFreq * 5.0  // Extra for V8
 
                 val harmonic2Vol = when {
                     isElectric -> motorVolume * 0.05f  // Reduced harmonics for softer sound
@@ -543,5 +541,123 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     override fun playPigeonFlyOffSound() {
         // Play pre-loaded sound from SoundPool
         soundPool.play(pigeonWingsSound, 1f, 1f, 1, 0, 1f)
+    }
+
+    // === Wobble Sound Implementation ===
+    private var wobbleSoundThread: Thread? = null
+    private var wobbleAudioTrack: AudioTrack? = null
+    private val isWobblePlaying = AtomicBoolean(false)
+    @Volatile private var wobbleIntensity: Float = 0f
+
+    override fun playWobbleSound(intensity: Float) {
+        wobbleIntensity = intensity.coerceIn(0f, 1f)
+
+        if (isWobblePlaying.get()) return  // Already playing, just update intensity
+
+        isWobblePlaying.set(true)
+        wobbleSoundThread = Thread {
+            runWobbleSoundLoop()
+        }.apply {
+            priority = Thread.NORM_PRIORITY
+            start()
+        }
+    }
+
+    override fun stopWobbleSound() {
+        isWobblePlaying.set(false)
+        wobbleSoundThread?.join(200)
+        wobbleSoundThread = null
+    }
+
+    /**
+     * Wobble sound synthesis loop.
+     * Generates low-frequency rattling/rumbling sound that varies with intensity.
+     */
+    private fun runWobbleSoundLoop() {
+        try {
+            val bufferSize = AudioTrack.getMinBufferSize(
+                sampleRate,
+                AudioFormat.CHANNEL_OUT_MONO,
+                AudioFormat.ENCODING_PCM_16BIT
+            )
+            val actualBufferSize = maxOf(bufferSize, sampleRate / 20) // 50ms buffer
+
+            val track = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                AudioTrack.Builder()
+                    .setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_GAME)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    )
+                    .setAudioFormat(
+                        AudioFormat.Builder()
+                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                            .setSampleRate(sampleRate)
+                            .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                            .build()
+                    )
+                    .setBufferSizeInBytes(actualBufferSize * 2)
+                    .setTransferMode(AudioTrack.MODE_STREAM)
+                    .build()
+            } else {
+                @Suppress("DEPRECATION")
+                AudioTrack(
+                    AudioManager.STREAM_MUSIC,
+                    sampleRate,
+                    AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    actualBufferSize * 2,
+                    AudioTrack.MODE_STREAM
+                )
+            }
+
+            wobbleAudioTrack = track
+            track.play()
+
+            // Sound state
+            var phase1 = 0.0
+
+            val chunkSize = sampleRate / 60
+            val samples = ShortArray(chunkSize)
+
+            while (isWobblePlaying.get()) {
+                val intensity = wobbleIntensity
+
+                if (intensity < 0.01f) {
+                    // Very quiet - generate silence
+                    for (i in 0 until chunkSize) samples[i] = 0
+                    track.write(samples, 0, chunkSize)
+                    continue
+                }
+
+                // Simple low frequency tone
+                val rumbleFreq = 50.0 + intensity * 30.0  // 50-80 Hz
+
+                // Volume scales with intensity
+                val masterVol = (0.4f + intensity * 0.4f).coerceIn(0.3f, 0.8f)
+
+                for (i in 0 until chunkSize) {
+                    // Single clean sine wave
+                    val sample = sin(phase1).toFloat() * masterVol
+
+                    samples[i] = (sample * Short.MAX_VALUE * 0.7f).toInt().coerceIn(-32768, 32767).toShort()
+
+                    // Advance phase
+                    val phaseStep = 2.0 * Math.PI / sampleRate
+                    phase1 += rumbleFreq * phaseStep
+                    if (phase1 > 2.0 * Math.PI) phase1 -= 2.0 * Math.PI
+                }
+
+                track.write(samples, 0, chunkSize)
+            }
+
+            track.stop()
+            track.release()
+            wobbleAudioTrack = null
+
+        } catch (e: Exception) {
+            isWobblePlaying.set(false)
+        }
     }
 }

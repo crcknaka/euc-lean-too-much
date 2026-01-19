@@ -228,8 +228,8 @@ class EucPhysicsSystem(
             val wobbleOffset = sin(euc.wobblePhase) * euc.wobbleIntensity * wobbleMaxAmplitude
             euc.visualSideLean += wobbleOffset
 
-            // Haptic feedback while wobbling
-            UIFeedback.wobble(euc.wobbleIntensity)
+            // Haptic feedback while wobbling (no sound)
+            UIFeedback.wobbleHapticOnly(euc.wobbleIntensity)
         } else {
             euc.wobblePhase = 0f
         }
