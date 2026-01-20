@@ -9,6 +9,7 @@ import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.components.VelocityComponent
+import com.eucleantoomuch.game.util.Constants
 
 class MovementSystem : IteratingSystem(Families.movable, 2) {
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
@@ -56,6 +57,15 @@ class MovementSystem : IteratingSystem(Families.movable, 2) {
             transform.position.x += rotatedX
             transform.position.y += tempMovement.y
             transform.position.z += rotatedZ
+
+            // Clamp player X position to stay within bounds (can't go past buildings)
+            val player = playerMapper.get(entity)
+            if (player != null) {
+                transform.position.x = transform.position.x.coerceIn(
+                    -Constants.PLAYER_BOUNDS_X,
+                    Constants.PLAYER_BOUNDS_X
+                )
+            }
         }
     }
 }

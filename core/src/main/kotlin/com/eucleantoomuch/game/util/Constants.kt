@@ -59,6 +59,9 @@ object Constants {
     const val BUILDING_DEPTH = 8f
     const val BUILDING_OFFSET_X = 14f       // Distance from road center (leaves room for grass)
 
+    // Player movement bounds (can't go past buildings)
+    const val PLAYER_BOUNDS_X = 13f         // Max distance from center (before buildings)
+
     // Obstacle dimensions
     const val MANHOLE_RADIUS = 0.7f
     const val PUDDLE_WIDTH = 1.5f
