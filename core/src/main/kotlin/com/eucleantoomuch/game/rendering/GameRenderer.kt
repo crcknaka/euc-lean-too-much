@@ -27,8 +27,13 @@ import com.eucleantoomuch.game.ecs.components.GroundComponent
 import com.eucleantoomuch.game.ecs.components.GroundType
 import com.eucleantoomuch.game.ecs.components.ObstacleComponent
 import com.eucleantoomuch.game.ecs.components.ObstacleType
+import com.badlogic.gdx.graphics.Cubemap
+import com.badlogic.gdx.graphics.Texture
+import net.mgsx.gltf.scene3d.attributes.PBRCubemapAttribute
+import net.mgsx.gltf.scene3d.attributes.PBRTextureAttribute
 import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
 import net.mgsx.gltf.scene3d.scene.SceneManager
+import net.mgsx.gltf.scene3d.utils.IBLBuilder
 
 class GameRenderer(
     private val engine: Engine,
@@ -109,6 +114,11 @@ class GameRenderer(
     val sceneManager: SceneManager
     private val pbrLight: DirectionalLightEx
 
+    // IBL textures for PBR rendering
+    private var diffuseCubemap: Cubemap? = null
+    private var specularCubemap: Cubemap? = null
+    private var brdfLUT: Texture? = null
+
     init {
         postProcessing.initialize()
         camera.near = 0.5f  // Increased from 0.1f to reduce z-fighting
@@ -125,14 +135,28 @@ class GameRenderer(
         sceneManager = SceneManager()
         sceneManager.setCamera(camera)
 
-        // Setup flat lighting for GLB models (like Blender viewport without extra lights)
+        // Setup directional light for PBR
         pbrLight = DirectionalLightEx()
         pbrLight.direction.set(-0.5f, -1f, -0.3f).nor()
-        pbrLight.intensity = 5.5f  // Soft directional light
+        pbrLight.color.set(1.0f, 1.0f, 1.0f, 1f)
+        pbrLight.intensity = 3.0f
         sceneManager.environment.add(pbrLight)
 
-        // Moderate ambient for flat but not overexposed look
-        sceneManager.setAmbientLight(0.020f)
+        // Setup IBL (Image Based Lighting) for proper PBR rendering
+        // Lower resolution for better performance (64 diffuse, 6 mip levels for specular)
+        val iblBuilder = IBLBuilder.createOutdoor(pbrLight)
+        diffuseCubemap = iblBuilder.buildIrradianceMap(64)
+        specularCubemap = iblBuilder.buildRadianceMap(6)
+        iblBuilder.dispose()
+
+        // BRDF lookup texture (provided by gdx-gltf library)
+        brdfLUT = Texture(Gdx.files.classpath("net/mgsx/gltf/shaders/brdfLUT.png"))
+
+        // Apply IBL to environment
+        sceneManager.setAmbientLight(1f)
+        sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
+        sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
+        sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
     }
 
     fun setCameraFar(distance: Float) {
@@ -499,5 +523,8 @@ class GameRenderer(
         sceneManager.dispose()
         postProcessing.dispose()
         pedestrianRenderer.dispose()
+        diffuseCubemap?.dispose()
+        specularCubemap?.dispose()
+        brdfLUT?.dispose()
     }
 }

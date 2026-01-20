@@ -11,11 +11,16 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.state.SettingsManager
+import com.badlogic.gdx.graphics.Cubemap
+import com.badlogic.gdx.graphics.Texture
 import net.mgsx.gltf.loaders.glb.GLBLoader
+import net.mgsx.gltf.scene3d.attributes.PBRCubemapAttribute
+import net.mgsx.gltf.scene3d.attributes.PBRTextureAttribute
 import net.mgsx.gltf.scene3d.scene.SceneAsset
 import net.mgsx.gltf.scene3d.scene.SceneManager
 import net.mgsx.gltf.scene3d.scene.Scene
 import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
+import net.mgsx.gltf.scene3d.utils.IBLBuilder
 
 /**
  * Wheel selection screen - allows player to choose between 3 EUC types.
@@ -50,6 +55,11 @@ class WheelSelectionRenderer(
     private val wheelSceneAssets = mutableMapOf<String, SceneAsset>()
     private val wheelScenes = mutableMapOf<String, Scene>()
 
+    // IBL textures for PBR rendering
+    private var diffuseCubemap: Cubemap? = null
+    private var specularCubemap: Cubemap? = null
+    private var brdfLUT: Texture? = null
+
     enum class Action {
         NONE, START, BACK
     }
@@ -73,14 +83,29 @@ class WheelSelectionRenderer(
         // Setup SceneManager for PBR rendering
         sceneManager = SceneManager()
         sceneManager.setCamera(previewCamera)
-        sceneManager.setAmbientLight(0.02f)  // Low ambient like in game
 
-        // Add directional light - similar to GameRenderer settings
+        // Setup directional light for PBR
         val light = DirectionalLightEx()
         light.direction.set(-0.5f, -1f, 0.5f).nor()
-        light.color.set(1f, 1f, 1f, 1f)
-        light.intensity = 5.5f  // Match game lighting
+        light.color.set(1.0f, 1.0f, 1.0f, 1f)
+        light.intensity = 3.0f
         sceneManager.environment.add(light)
+
+        // Setup IBL (Image Based Lighting) for proper PBR rendering
+        // Lower resolution for better performance
+        val iblBuilder = IBLBuilder.createOutdoor(light)
+        diffuseCubemap = iblBuilder.buildIrradianceMap(64)
+        specularCubemap = iblBuilder.buildRadianceMap(6)
+        iblBuilder.dispose()
+
+        // BRDF lookup texture (provided by gdx-gltf library)
+        brdfLUT = Texture(Gdx.files.classpath("net/mgsx/gltf/shaders/brdfLUT.png"))
+
+        // Apply IBL to environment
+        sceneManager.setAmbientLight(1f)
+        sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
+        sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
+        sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
 
         // Load GLB models for each wheel type
         loadWheelModels()
@@ -431,15 +456,34 @@ class WheelSelectionRenderer(
 
     fun recreate() {
         ui.recreate()
+        // Dispose old IBL textures
+        diffuseCubemap?.dispose()
+        specularCubemap?.dispose()
+        brdfLUT?.dispose()
         sceneManager.dispose()
+
+        // Recreate SceneManager with IBL
         sceneManager = SceneManager()
         sceneManager.setCamera(previewCamera)
-        sceneManager.setAmbientLight(0.02f)
+
         val light = DirectionalLightEx()
         light.direction.set(-0.5f, -1f, 0.5f).nor()
         light.color.set(1f, 1f, 1f, 1f)
-        light.intensity = 5.5f
+        light.intensity = 3.0f
         sceneManager.environment.add(light)
+
+        // Rebuild IBL
+        val iblBuilder = IBLBuilder.createOutdoor(light)
+        diffuseCubemap = iblBuilder.buildIrradianceMap(64)
+        specularCubemap = iblBuilder.buildRadianceMap(6)
+        iblBuilder.dispose()
+
+        brdfLUT = Texture(Gdx.files.classpath("net/mgsx/gltf/shaders/brdfLUT.png"))
+
+        sceneManager.setAmbientLight(1f)
+        sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
+        sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
+        sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
     }
 
     override fun dispose() {
@@ -448,5 +492,8 @@ class WheelSelectionRenderer(
         wheelSceneAssets.values.forEach { it.dispose() }
         wheelSceneAssets.clear()
         wheelScenes.clear()
+        diffuseCubemap?.dispose()
+        specularCubemap?.dispose()
+        brdfLUT?.dispose()
     }
 }

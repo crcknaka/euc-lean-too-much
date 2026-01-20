@@ -15,6 +15,7 @@ object Constants {
     const val MAX_TURN_RATE = 90f           // degrees/second
     const val TURN_RESPONSIVENESS = 3f
     const val WHEEL_RADIUS = 0.2f           // 20cm wheel
+    const val EUC_GROUND_OFFSET = 0.15f     // Height offset to prevent wheel clipping into ground
 
     // Puddle effect
     const val PUDDLE_DURATION = 3f          // seconds of control loss

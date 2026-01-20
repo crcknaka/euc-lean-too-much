@@ -40,9 +40,9 @@ class EntityFactory(
         // Now read the scale (after lazy init has set it)
         val modelScale = models.eucModelScale
 
-        // Transform - start at origin with model scale
+        // Transform - start slightly above ground to prevent wheel clipping
         entity.add(TransformComponent().apply {
-            position.set(0f, 0f, 0f)
+            position.set(0f, Constants.EUC_GROUND_OFFSET, 0f)
             scale.set(modelScale, modelScale, modelScale)
         })
 
