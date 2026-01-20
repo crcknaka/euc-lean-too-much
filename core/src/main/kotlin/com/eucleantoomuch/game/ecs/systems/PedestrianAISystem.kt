@@ -122,6 +122,7 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun processSidewalkPedestrian(
         entity: Entity,
         transform: TransformComponent,

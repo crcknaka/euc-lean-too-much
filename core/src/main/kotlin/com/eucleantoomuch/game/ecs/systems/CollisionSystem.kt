@@ -55,24 +55,28 @@ class CollisionSystem : EntitySystem(5) {
 
         for (obstacleEntity in obstacleEntities) {
             val obstacleTransform = transformMapper.get(obstacleEntity)
-            val obstacleComponent = obstacleMapper.get(obstacleEntity)
 
+            // Quick Z distance check FIRST (before getting other components)
+            val zDist = obstacleTransform.position.z - playerZ
+            if (zDist > collisionCheckRange || zDist < -5f) {
+                // Mark as passed if player is well ahead (only if needed)
+                if (zDist < -2f) {
+                    val obstacleComponent = obstacleMapper.get(obstacleEntity)
+                    if (!obstacleComponent.hasBeenPassed) {
+                        obstacleComponent.hasBeenPassed = true
+                    }
+                }
+                continue
+            }
+
+            val obstacleComponent = obstacleMapper.get(obstacleEntity)
             if (obstacleComponent.hasBeenPassed) continue
 
             // Skip pedestrians that are already falling (ragdolling)
+            // Only call pedestrianMapper if type is PEDESTRIAN (avoid unnecessary lookup)
             if (obstacleComponent.type == ObstacleType.PEDESTRIAN) {
                 val pedestrianComponent = pedestrianMapper.get(obstacleEntity)
-                if (pedestrianComponent != null && pedestrianComponent.isRagdolling) continue
-            }
-
-            // Skip obstacles too far away (quick Z distance check)
-            val zDist = obstacleTransform.position.z - playerZ
-            if (zDist > collisionCheckRange || zDist < -5f) {
-                // Mark as passed if player is well ahead
-                if (zDist < -2f) {
-                    obstacleComponent.hasBeenPassed = true
-                }
-                continue
+                if (pedestrianComponent?.isRagdolling == true) continue
             }
 
             val obstacleCollider = colliderMapper.get(obstacleEntity)

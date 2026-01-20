@@ -18,6 +18,7 @@ import com.badlogic.gdx.utils.Disposable
  * Renders ragdoll physics bodies as visible 3D shapes.
  * Uses boxes for limbs, sphere for head. EUC wheel uses original model.
  */
+@Suppress("DEPRECATION")  // MeshPartBuilder.sphere() is deprecated but has no replacement
 class RagdollRenderer : Disposable {
 
     private val modelBuilder = ModelBuilder()

@@ -68,6 +68,8 @@ class RagdollPhysics : Disposable {
 
     // Static world colliders (obstacles, cars, etc.)
     private val worldColliders = mutableListOf<StaticCollider>()
+    // HashMap for O(1) lookup of collider by rigid body (optimization)
+    private val worldColliderMap = mutableMapOf<btRigidBody, StaticCollider>()
 
     /**
      * Types of objects that can collide with ragdoll during flight.
@@ -636,8 +638,8 @@ class RagdollPhysics : Disposable {
 
             if (ragdollBody == null || worldBody == null) continue
 
-            // Find the collider type
-            val collider = worldColliders.find { it.body == worldBody }
+            // Find the collider type (O(1) HashMap lookup instead of O(n) list search)
+            val collider = worldColliderMap[worldBody]
 
             // Skip if already triggered for this collider or if ground
             if (collider != null) {
@@ -726,7 +728,8 @@ class RagdollPhysics : Disposable {
                 val worldBody = if (pedRagdollBody == body0) body1 else body0
 
                 // Check if hitting a world collider (not ground, not another ragdoll body)
-                val collider = worldColliders.find { it.body == worldBody }
+                // O(1) HashMap lookup instead of O(n) list search
+                val collider = worldColliderMap[worldBody]
 
                 if (collider != null && collider.type != ColliderType.GROUND) {
                     // Skip if already triggered
@@ -837,7 +840,9 @@ class RagdollPhysics : Disposable {
         body.restitution = 0.3f
 
         dynamicsWorld.addRigidBody(body)
-        worldColliders.add(StaticCollider(shape, body, motionState, type))
+        val collider = StaticCollider(shape, body, motionState, type)
+        worldColliders.add(collider)
+        worldColliderMap[body] = collider  // O(1) lookup support
         info.dispose()
     }
 
@@ -861,7 +866,9 @@ class RagdollPhysics : Disposable {
         body.restitution = 0.2f
 
         dynamicsWorld.addRigidBody(body)
-        worldColliders.add(StaticCollider(shape, body, motionState, type))
+        val collider = StaticCollider(shape, body, motionState, type)
+        worldColliders.add(collider)
+        worldColliderMap[body] = collider  // O(1) lookup support
         info.dispose()
     }
 
@@ -876,6 +883,7 @@ class RagdollPhysics : Disposable {
             collider.shape.dispose()
         }
         worldColliders.clear()
+        worldColliderMap.clear()  // Clear HashMap for O(1) lookup
         triggeredColliders.clear()
         triggeredSecondaryColliders.clear()
         lastCollisionTime = 0f

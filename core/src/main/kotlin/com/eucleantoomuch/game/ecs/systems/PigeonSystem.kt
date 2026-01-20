@@ -249,6 +249,7 @@ class PigeonSystem(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updateWalking(
         entity: Entity,
         transform: TransformComponent,
@@ -284,6 +285,7 @@ class PigeonSystem(
         transform.updateRotationFromYaw()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updatePecking(
         entity: Entity,
         transform: TransformComponent,
@@ -309,6 +311,7 @@ class PigeonSystem(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updateStartled(
         entity: Entity,
         transform: TransformComponent,
@@ -336,6 +339,7 @@ class PigeonSystem(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updateFlying(
         entity: Entity,
         transform: TransformComponent,

@@ -487,6 +487,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val angle1 = (i.toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
             val angle2 = ((i + 1).toFloat() / segments) * com.badlogic.gdx.math.MathUtils.PI2
             val innerR = ringRadius - ringThickness / 2
+            @Suppress("UNUSED_VARIABLE")
             val outerR = ringRadius + ringThickness / 2
             ui.shapes.rectLine(
                 centerX + innerR * com.badlogic.gdx.math.MathUtils.cos(angle1),
@@ -534,6 +535,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.endBatch()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun updateSpeedLines(sw: Float, sh: Float, scale: Float) {
         val delta = Gdx.graphics.deltaTime
 

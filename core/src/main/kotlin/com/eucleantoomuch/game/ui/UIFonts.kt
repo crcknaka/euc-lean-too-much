@@ -84,6 +84,7 @@ object UIFonts : Disposable {
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun createFont(baseSize: Int, density: Float, screenScale: Float): BitmapFont {
         return if (generator != null) {
             // FreeType: scale based on screen size only (density is handled by screen resolution)

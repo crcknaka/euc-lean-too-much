@@ -69,16 +69,16 @@ class WorldGenerator(
     private var pigeonWalkingModel: ModelInstance
     private var pigeonFlyingModel: ModelInstance
 
-    // Shadow models for different entity sizes
-    private val pedestrianShadowModel by lazy { models.createBlobShadowModel(0.5f, 0.4f) }
-    private val carShadowModel by lazy { models.createBlobShadowModel(1.2f, 2.5f) }
-    private val pigeonShadowModel by lazy { models.createBlobShadowModel(0.18f, 0.15f) }
-    private val treeShadowModel by lazy { models.createBlobShadowModel(1.5f, 1.5f) }
-    private val lampPostShadowModel by lazy { models.createBlobShadowModel(0.6f, 0.6f) }
-    private val benchShadowModel by lazy { models.createBlobShadowModel(0.4f, 0.9f) }
-    private val trashCanShadowModel by lazy { models.createBlobShadowModel(0.4f, 0.4f) }
+    // Shadow models for different entity sizes (eager initialization to avoid first-frame hitches)
+    private val pedestrianShadowModel: Model
+    private val carShadowModel: Model
+    private val pigeonShadowModel: Model
+    private val treeShadowModel: Model
+    private val lampPostShadowModel: Model
+    private val benchShadowModel: Model
+    private val trashCanShadowModel: Model
     // Building shadow - slightly larger than building (width=6, depth=8)
-    private val buildingShadowModel by lazy { models.createBuildingShadowModel(Constants.BUILDING_WIDTH + 2f, Constants.BUILDING_DEPTH + 2f) }
+    private val buildingShadowModel: Model
 
     // Track pigeon flock ID for group behavior
     private var nextFlockId = 0
@@ -104,6 +104,16 @@ class WorldGenerator(
     private var lastCraneChunk = -20  // Start with no recent crane
 
     init {
+        // Initialize shadow models eagerly to avoid first-frame hitches
+        pedestrianShadowModel = models.createBlobShadowModel(0.5f, 0.4f)
+        carShadowModel = models.createBlobShadowModel(1.2f, 2.5f)
+        pigeonShadowModel = models.createBlobShadowModel(0.18f, 0.15f)
+        treeShadowModel = models.createBlobShadowModel(1.5f, 1.5f)
+        lampPostShadowModel = models.createBlobShadowModel(0.6f, 0.6f)
+        benchShadowModel = models.createBlobShadowModel(0.4f, 0.9f)
+        trashCanShadowModel = models.createBlobShadowModel(0.4f, 0.4f)
+        buildingShadowModel = models.createBuildingShadowModel(Constants.BUILDING_WIDTH + 2f, Constants.BUILDING_DEPTH + 2f)
+
         // Create zebra crossing model
         zebraCrossingModel = ModelInstance(models.createZebraCrossingModel())
 
