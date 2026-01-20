@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Black background -->
+    <item android:drawable="@android:color/black" />
+
+    <!-- Centered large icon -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash_icon" />
+    </item>
+</layer-list>

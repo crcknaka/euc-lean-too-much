@@ -1488,7 +1488,8 @@ class WorldGenerator(
         entity.add(TransformComponent().apply { position.set(x, 0f, z) })
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(manholeModel) })
         entity.add(ColliderComponent().apply {
-            setSize(Constants.MANHOLE_RADIUS * 2, 0.1f, Constants.MANHOLE_RADIUS * 2)
+            setSize(Constants.MANHOLE_RADIUS * 2, 0.5f, Constants.MANHOLE_RADIUS * 2)
+            offset.y = 0f  // Ground-level collider that extends upward
             collisionGroup = CollisionGroups.OBSTACLE
         })
         entity.add(ObstacleComponent().apply {
@@ -1523,7 +1524,8 @@ class WorldGenerator(
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(customPuddleModel) })
 
         entity.add(ColliderComponent().apply {
-            setSize(puddleWidth, 0.1f, puddleLength)
+            setSize(puddleWidth, 0.5f, puddleLength)
+            offset.y = 0f  // Ground-level collider that extends upward
             collisionGroup = CollisionGroups.OBSTACLE
         })
         entity.add(ObstacleComponent().apply {
@@ -1541,7 +1543,8 @@ class WorldGenerator(
         entity.add(TransformComponent().apply { position.set(x, 0f, z) })
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(potholeModel) })
         entity.add(ColliderComponent().apply {
-            setSize(Constants.POTHOLE_RADIUS * 2, 0.1f, Constants.POTHOLE_RADIUS * 2)
+            setSize(Constants.POTHOLE_RADIUS * 2, 0.5f, Constants.POTHOLE_RADIUS * 2)
+            offset.y = 0f  // Ground-level collider that extends upward
             collisionGroup = CollisionGroups.OBSTACLE
         })
         entity.add(ObstacleComponent().apply {
