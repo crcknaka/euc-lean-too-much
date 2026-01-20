@@ -25,9 +25,6 @@ class WorldGenerator(
     // Configurable render distance
     private var renderDistance = Constants.RENDER_DISTANCE
 
-    // Replay mode - don't remove old chunks, keep more chunks behind
-    var replayMode = false
-
     private var groundModel = models.createGroundChunkModel(Constants.CHUNK_LENGTH)
     private var grassModel = models.createGrassAreaModel(Constants.CHUNK_LENGTH)
     private var manholeModel = models.createManholeModel()
@@ -259,52 +256,22 @@ class WorldGenerator(
     }
 
     fun update(playerZ: Float, totalDistance: Float) {
-        // In replay mode, don't generate new chunks behind - fog hides the edges
-        // Just keep existing chunks and don't remove them
-        val behindDistance = 50f  // Same for both modes
+        val behindDistance = 50f
         val startChunk = ((playerZ - behindDistance) / Constants.CHUNK_LENGTH).toInt()
         val endChunk = ((playerZ + renderDistance) / Constants.CHUNK_LENGTH).toInt()
 
-        // Generate new chunks (only forward, not behind in replay)
-        if (!replayMode) {
-            for (chunkIndex in startChunk..endChunk) {
-                if (!activeChunks.containsKey(chunkIndex)) {
-                    generateChunk(chunkIndex, totalDistance)
-                }
-            }
-        }
-
-        // Don't remove chunks in replay mode - keep what we have
-        if (!replayMode) {
-            // Remove old chunks (behind the camera)
-            val despawnChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
-            val chunksToRemove = activeChunks.keys.filter { it < despawnChunk - 1 }
-            for (chunkIndex in chunksToRemove) {
-                removeChunk(chunkIndex)
-            }
-        }
-    }
-
-    /**
-     * Prepare chunks for replay mode.
-     * Regenerates any missing chunks in the given Z range.
-     * Call this when starting replay to fill in chunks that were removed during gameplay.
-     */
-    fun prepareForReplay(minZ: Float, maxZ: Float, totalDistance: Float) {
-        replayMode = true
-
-        // Calculate chunk range needed for replay
-        // Large behind margin so user can rotate camera 360 degrees
-        val behindMargin = 150f
-        val aheadMargin = 150f
-        val startChunk = ((minZ - behindMargin) / Constants.CHUNK_LENGTH).toInt()
-        val endChunk = ((maxZ + aheadMargin) / Constants.CHUNK_LENGTH).toInt()
-
-        // Generate any missing chunks in this range
+        // Generate new chunks
         for (chunkIndex in startChunk..endChunk) {
-            if (!activeChunks.containsKey(chunkIndex) && chunkIndex >= 0) {
+            if (!activeChunks.containsKey(chunkIndex)) {
                 generateChunk(chunkIndex, totalDistance)
             }
+        }
+
+        // Remove old chunks (behind the camera)
+        val despawnChunk = ((playerZ + Constants.DESPAWN_DISTANCE) / Constants.CHUNK_LENGTH).toInt()
+        val chunksToRemove = activeChunks.keys.filter { it < despawnChunk - 1 }
+        for (chunkIndex in chunksToRemove) {
+            removeChunk(chunkIndex)
         }
     }
 
@@ -1323,7 +1290,7 @@ class WorldGenerator(
         })
 
         entity.add(ObstacleComponent().apply {
-            type = ObstacleType.CURB
+            type = ObstacleType.BENCH
             causesGameOver = true
         })
 

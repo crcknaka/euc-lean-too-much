@@ -28,9 +28,6 @@ class PigeonSystem(
     private val pigeonMapper = ComponentMapper.getFor(PigeonComponent::class.java)
     private val modelMapper = ComponentMapper.getFor(ModelComponent::class.java)
 
-    // Replay mode - only update flying pigeons, don't startle or remove
-    var replayMode = false
-
     // Pre-created models for walking and flying states
     private var walkingModel: ModelInstance? = null
     private var flyingModel: ModelInstance? = null
@@ -68,24 +65,17 @@ class PigeonSystem(
         // which they check at the start of their own checkForStartle call
         val pigeons = engine.getEntitiesFor(Families.pigeons)
         for (entity in pigeons) {
-            if (replayMode) {
-                // In replay mode, only continue flying animations
-                updatePigeonReplay(entity, deltaTime)
-            } else {
-                checkForStartle(entity)
-                checkForExternalStartle(entity)
-                updatePigeon(entity, deltaTime)
-            }
+            checkForStartle(entity)
+            checkForExternalStartle(entity)
+            updatePigeon(entity, deltaTime)
         }
 
         // Clear startle sources after processing
         startleSources.clear()
 
-        // Remove marked entities (not in replay mode)
-        if (!replayMode) {
-            for (entity in entitiesToRemove) {
-                engine.removeEntity(entity)
-            }
+        // Remove marked entities
+        for (entity in entitiesToRemove) {
+            engine.removeEntity(entity)
         }
     }
 
@@ -372,28 +362,5 @@ class PigeonSystem(
         if (pigeon.flightAltitude > pigeon.maxFlightAltitude || horizontalDist > 30f) {
             pigeon.state = PigeonComponent.State.LANDED
         }
-    }
-
-    /**
-     * Simplified update for replay mode - only continue flying pigeons.
-     */
-    private fun updatePigeonReplay(entity: Entity, deltaTime: Float) {
-        val transform = transformMapper.get(entity)
-        val pigeon = pigeonMapper.get(entity)
-
-        // Only update flying pigeons - they continue their flight path
-        if (pigeon.state == PigeonComponent.State.FLYING) {
-            // Move horizontally
-            transform.position.x += pigeon.flightDirection.x * pigeon.flightSpeed * deltaTime
-            transform.position.z += pigeon.flightDirection.z * pigeon.flightSpeed * deltaTime
-
-            // Move vertically
-            pigeon.verticalSpeed -= 2f * deltaTime
-            pigeon.verticalSpeed = pigeon.verticalSpeed.coerceAtLeast(1f)
-
-            pigeon.flightAltitude += pigeon.verticalSpeed * deltaTime
-            transform.position.y = pigeon.spawnPosition.y + pigeon.flightAltitude
-        }
-        // Walking/pecking pigeons stay still in replay
     }
 }

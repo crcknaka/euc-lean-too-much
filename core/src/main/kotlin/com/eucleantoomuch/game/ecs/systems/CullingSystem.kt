@@ -15,7 +15,7 @@ class CullingSystem : EntitySystem(7) {
 
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
 
-    // Flag to disable culling (e.g. during replay)
+    // Flag to disable culling
     var enabled = true
 
     override fun addedToEngine(engine: Engine) {

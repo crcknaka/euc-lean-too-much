@@ -284,48 +284,6 @@ class RagdollRenderer : Disposable {
     }
 
     /**
-     * Render ragdoll from pre-recorded transforms (for replay).
-     * Note: EUC wheel is NOT rendered here - original model handles it.
-     */
-    fun renderFromTransforms(
-        modelBatch: ModelBatch,
-        transforms: com.eucleantoomuch.game.replay.ReplayFrame.RagdollTransforms,
-        environment: Environment
-    ) {
-        // Head
-        headInstance.transform.set(transforms.head)
-        modelBatch.render(headInstance, environment)
-
-        // Torso
-        torsoInstance.transform.set(transforms.torso)
-        modelBatch.render(torsoInstance, environment)
-
-        // Left arm
-        leftUpperArmInstance.transform.set(transforms.leftUpperArm)
-        modelBatch.render(leftUpperArmInstance, environment)
-        leftLowerArmInstance.transform.set(transforms.leftLowerArm)
-        modelBatch.render(leftLowerArmInstance, environment)
-
-        // Right arm
-        rightUpperArmInstance.transform.set(transforms.rightUpperArm)
-        modelBatch.render(rightUpperArmInstance, environment)
-        rightLowerArmInstance.transform.set(transforms.rightLowerArm)
-        modelBatch.render(rightLowerArmInstance, environment)
-
-        // Left leg
-        leftUpperLegInstance.transform.set(transforms.leftUpperLeg)
-        modelBatch.render(leftUpperLegInstance, environment)
-        leftLowerLegInstance.transform.set(transforms.leftLowerLeg)
-        modelBatch.render(leftLowerLegInstance, environment)
-
-        // Right leg
-        rightUpperLegInstance.transform.set(transforms.rightUpperLeg)
-        modelBatch.render(rightUpperLegInstance, environment)
-        rightLowerLegInstance.transform.set(transforms.rightLowerLeg)
-        modelBatch.render(rightLowerLegInstance, environment)
-    }
-
-    /**
      * Render all pedestrian ragdolls (simplified 6-part).
      */
     fun renderPedestrians(modelBatch: ModelBatch, ragdollPhysics: RagdollPhysics, environment: Environment) {

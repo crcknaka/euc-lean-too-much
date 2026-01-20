@@ -16,7 +16,6 @@ class GameOverRenderer : Disposable {
 
     private val retryButton = Rectangle()
     private val menuButton = Rectangle()
-    private val replayButton = Rectangle()
 
     // Animation states
     private var overlayAlpha = 0f
@@ -25,10 +24,6 @@ class GameOverRenderer : Disposable {
     private var newHighScoreAnim = 0f
     private var retryHover = 0f
     private var menuHover = 0f
-    private var replayHover = 0f
-
-    // Replay availability
-    private var hasReplayFrames = false
     private var safetyTipAnim = 0f  // Animation timer for safety tip
 
     // Current safety tip (randomized on reset)
@@ -60,11 +55,7 @@ class GameOverRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, RETRY, MENU, REPLAY
-    }
-
-    fun setHasReplayFrames(hasFrames: Boolean) {
-        hasReplayFrames = hasFrames
+        NONE, RETRY, MENU
     }
 
     fun render(session: GameSession, isNewHighScore: Boolean): ButtonClicked {
@@ -91,7 +82,6 @@ class GameOverRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         retryHover = UITheme.Anim.ease(retryHover, if (retryButton.contains(touchX, touchY)) 1f else 0f, 10f)
         menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 10f)
-        replayHover = UITheme.Anim.ease(replayHover, if (hasReplayFrames && replayButton.contains(touchX, touchY)) 1f else 0f, 10f)
 
         ui.beginShapes()
 
@@ -160,20 +150,10 @@ class GameOverRenderer : Disposable {
         retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
         ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.4f + retryHover * 0.6f)
 
-        // Replay button (if available) - same size
-        if (hasReplayFrames) {
-            val replayY = retryY - buttonHeight - buttonGap
-            replayButton.set(rightCenterX - buttonWidth / 2, replayY, buttonWidth, buttonHeight)
-            ui.neonButton(replayButton, UITheme.warning, UITheme.warning, replayHover * 0.5f)
-
-            val menuY = replayY - buttonHeight - buttonGap
-            menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
-            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
-        } else {
-            val menuY = retryY - buttonHeight - buttonGap
-            menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
-            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
-        }
+        // Menu button
+        val menuY = retryY - buttonHeight - buttonGap
+        menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
+        ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
 
         ui.endShapes()
 
@@ -242,10 +222,6 @@ class GameOverRenderer : Disposable {
             // Button labels
             ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
-            if (hasReplayFrames) {
-                ui.textCentered("REPLAY", replayButton.x + replayButton.width / 2, replayButton.y + replayButton.height / 2,
-                    UIFonts.body, UITheme.textPrimary)
-            }
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
                 UIFonts.body, UITheme.textPrimary)
         }
@@ -258,10 +234,6 @@ class GameOverRenderer : Disposable {
                 UIFeedback.clickHeavy()
                 return ButtonClicked.RETRY
             }
-            if (hasReplayFrames && replayButton.contains(touchX, touchY)) {
-                UIFeedback.click()
-                return ButtonClicked.REPLAY
-            }
             if (menuButton.contains(touchX, touchY)) {
                 UIFeedback.click()
                 return ButtonClicked.MENU
@@ -271,10 +243,6 @@ class GameOverRenderer : Disposable {
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.R)) {
             UIFeedback.clickHeavy()
             return ButtonClicked.RETRY
-        }
-        if (hasReplayFrames && Gdx.input.isKeyJustPressed(Input.Keys.P)) {
-            UIFeedback.click()
-            return ButtonClicked.REPLAY
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.M)) {
             UIFeedback.click()

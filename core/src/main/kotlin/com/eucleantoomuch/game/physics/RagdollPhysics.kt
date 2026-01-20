@@ -78,6 +78,7 @@ class RagdollPhysics : Disposable {
         RECYCLE_BIN,
         CAR,
         PEDESTRIAN,
+        BENCH,
         GENERIC
     }
 

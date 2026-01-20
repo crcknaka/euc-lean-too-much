@@ -136,6 +136,12 @@ interface PlatformServices {
      * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
     fun playCarCrashSound(volume: Float = 1f)
+
+    /**
+     * Play bench impact sound when colliding with a bench.
+     * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
+     */
+    fun playBenchImpactSound(volume: Float = 1f)
 }
 
 /**
@@ -215,6 +221,10 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun playCarCrashSound(volume: Float) {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playBenchImpactSound(volume: Float) {
         // No-op on desktop/unsupported platforms
     }
 }

@@ -317,23 +317,12 @@ class CameraController(private val camera: PerspectiveCamera) {
     }
 
     /**
-     * Set camera position and look-at for replay mode (free camera).
-     */
-    fun setReplayCamera(camX: Float, camY: Float, camZ: Float, lookX: Float, lookY: Float, lookZ: Float) {
-        camera.position.set(camX, camY, camZ)
-        camera.lookAt(lookX, lookY, lookZ)
-        camera.up.set(Vector3.Y)
-        camera.fieldOfView = baseFov
-        camera.update()
-    }
-
-    /**
      * Get current camera position.
      */
     fun getCameraPosition(): Vector3 = camera.position.cpy()
 
     /**
-     * Get current camera yaw angle (for replay recording).
+     * Get current camera yaw angle (for debug).
      */
     fun getCameraYaw(): Float {
         // Calculate yaw from camera direction
