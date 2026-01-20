@@ -1294,8 +1294,9 @@ class WorldGenerator(
         })
 
         // Add collider - bench (scaled 1.6x)
+        // Bench is rotated 90° to face road, so swap X and Z for collider
         entity.add(ColliderComponent().apply {
-            setSize(1.2f * 1.6f, 1f * 1.6f, 0.5f * 1.6f)
+            setSize(0.5f * 1.6f, 1f * 1.6f, 1.2f * 1.6f)
             collisionGroup = CollisionGroups.OBSTACLE
         })
 
