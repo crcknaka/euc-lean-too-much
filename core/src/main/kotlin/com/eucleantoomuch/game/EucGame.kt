@@ -47,6 +47,7 @@ import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 import com.eucleantoomuch.game.ui.DebugMenu
 import com.eucleantoomuch.game.ui.DebugConfig
 import com.eucleantoomuch.game.physics.RagdollPhysics
+import com.eucleantoomuch.game.physics.RagdollRenderer
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -1220,6 +1221,10 @@ class EucGame(
 
             // Start ragdoll physics simulation
             if (useRagdollPhysics && ragdollPhysics != null) {
+                // Reset smoothed rotation values for new fall
+                smoothedEucRoll = eucComponent.sideLean * 25f
+                smoothedEucPitch = eucComponent.forwardLean * 20f
+
                 ragdollPhysics!!.startFall(
                     eucPosition = playerTransform.position,
                     eucYaw = playerTransform.yaw,
@@ -1244,6 +1249,10 @@ class EucGame(
     // Temp vectors for ragdoll position extraction
     private val ragdollEucPos = com.badlogic.gdx.math.Vector3()
     private val ragdollTorsoPos = com.badlogic.gdx.math.Vector3()
+
+    // Smoothing for EUC visual rotation during ragdoll (prevents jitter)
+    private var smoothedEucRoll = 0f
+    private var smoothedEucPitch = 0f
 
     private fun renderFalling(delta: Float) {
         val state = stateManager.current() as GameState.Falling
@@ -1315,9 +1324,15 @@ class EucGame(
                 // Get rotation from physics transform matrix
                 val eucTransform = ragdollPhysics!!.getEucTransform()
                 if (eucTransform != null) {
-                    // Extract rotation and apply to visual lean for EUC wheel
-                    eucComponent.visualSideLean = extractRollFromMatrix(eucTransform) / 45f
-                    eucComponent.visualForwardLean = extractPitchFromMatrix(eucTransform) / 45f
+                    // Extract rotation angles directly from physics (in degrees)
+                    val rollDegrees = extractRollFromMatrix(eucTransform)
+                    val pitchDegrees = extractPitchFromMatrix(eucTransform)
+
+                    // Convert to visualLean: renderer uses sideLean * 25 for normal,
+                    // but for falling we need full 90° range, so divide by 25 to get proper angle
+                    // Roll of 90° (lying on side) should give visualSideLean = 3.6
+                    eucComponent.visualSideLean = rollDegrees / 25f
+                    eucComponent.visualForwardLean = pitchDegrees / 20f
                 }
 
                 // Get torso/rider position from physics

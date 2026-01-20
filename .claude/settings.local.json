@@ -23,7 +23,8 @@
       "Bash(python -m pip install:*)",
       "Bash(python:*)",
       "Bash(gradlew.bat android:assembleDebug:*)",
-      "Bash(C:/Projects/euc-lean-too-much/gradlew.bat -p C:/Projects/euc-lean-too-much android:assembleDebug)"
+      "Bash(C:/Projects/euc-lean-too-much/gradlew.bat -p C:/Projects/euc-lean-too-much android:assembleDebug)",
+      "Bash(git checkout:*)"
     ]
   }
 }

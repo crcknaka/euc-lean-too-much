@@ -164,15 +164,17 @@ class RagdollPhysics : Disposable {
 
         // Create dynamics world
         dynamicsWorld = btDiscreteDynamicsWorld(dispatcher, broadphase, constraintSolver, collisionConfig)
-        dynamicsWorld.gravity = Vector3(0f, -12f, 0f)  // Gravity
+        dynamicsWorld.gravity = Vector3(0f, -15f, 0f)  // Stronger gravity for more realistic falls
 
         // Create ground plane at Y = 0 (road surface level)
+        // Use a thick box instead of infinite plane for more reliable collision
         groundShape = btStaticPlaneShape(Vector3(0f, 1f, 0f), 0f)
         groundMotionState = btDefaultMotionState()
         val groundInfo = btRigidBody.btRigidBodyConstructionInfo(0f, groundMotionState, groundShape, Vector3.Zero)
         groundBody = btRigidBody(groundInfo)
-        groundBody.friction = 1.0f  // High friction to stop sliding
-        groundBody.restitution = 0.05f  // Almost no bounce
+        groundBody.friction = 0.9f  // High friction for asphalt
+        groundBody.restitution = 0.1f  // Slight bounce
+        groundBody.collisionFlags = groundBody.collisionFlags or btCollisionObject.CollisionFlags.CF_STATIC_OBJECT
         dynamicsWorld.addRigidBody(groundBody)
         groundInfo.dispose()
     }
@@ -211,70 +213,52 @@ class RagdollPhysics : Disposable {
         eucYaw: Float,
         playerVelocity: Float,
         sideLean: Float,
-        forwardLean: Float,
+        @Suppress("UNUSED_PARAMETER") forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC as a cylinder collider oriented along X axis (wheel shape)
-        val wheelRadius = 0.35f  // Match visual model size
-        val wheelWidth = 0.15f   // Thickness of the wheel
-        eucShape = btCylinderShapeX(Vector3(wheelWidth / 2f, wheelRadius, wheelRadius))
-        val halfHeight = wheelRadius
+        // Simple box shape for EUC - stable and predictable physics
+        val wheelWidth = 0.15f
+        val wheelHeight = 0.5f
+        val wheelDepth = 0.35f
+        eucShape = btBoxShape(Vector3(wheelWidth / 2f, wheelHeight / 2f, wheelDepth / 2f))
 
-        val eucMass = 30f  // Realistic EUC weight (~25-30 kg)
+        val eucMass = 20f
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
-        // Start at reasonable height
-        val startY = (halfHeight + 0.05f).coerceAtLeast(eucPosition.y)
-
-        // Determine which way to fall - use sideLean, or default to right if neutral
+        // Determine fall direction
         val fallDirection = if (kotlin.math.abs(sideLean) > 0.1f) {
             if (sideLean > 0) 1f else -1f
         } else {
-            if (com.badlogic.gdx.math.MathUtils.random() > 0.5f) 1f else -1f  // Random if neutral
+            if (com.badlogic.gdx.math.MathUtils.random() > 0.5f) 1f else -1f
         }
 
+        // Start position - slightly above ground
         tempMatrix.idt()
-        tempMatrix.translate(eucPosition.x, startY, eucPosition.z)
+        tempMatrix.translate(eucPosition.x, wheelHeight / 2f + 0.05f, eucPosition.z)
         tempMatrix.rotate(Vector3.Y, eucYaw)
-        // Start slightly tilted
-        tempMatrix.rotate(Vector3.Z, fallDirection * 15f)
-        tempMatrix.rotate(Vector3.X, -forwardLean * 10f)
 
         eucMotionState = btDefaultMotionState(tempMatrix)
         val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
         eucBody = btRigidBody(eucInfo)
-        eucBody!!.friction = 0.7f  // Good friction for rolling
-        eucBody!!.restitution = 0.25f  // Moderate bounce
-        eucBody!!.setDamping(0.2f, 0.4f)  // Higher damping for smoother, less jittery motion
-
-        // Disable deactivation so wheel keeps moving (like ragdoll parts)
+        eucBody!!.friction = 0.8f
+        eucBody!!.restitution = 0.1f
+        eucBody!!.setDamping(0.3f, 0.4f)
         eucBody!!.activationState = 4  // DISABLE_DEACTIVATION
 
-        // Enable CCD for fast-moving objects
-        eucBody!!.setCcdMotionThreshold(0.05f)
-        eucBody!!.setCcdSweptSphereRadius(wheelRadius * 0.8f)
+        // Simple velocity - just forward momentum and slight side push
+        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.5f
+        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.5f
+        val sideX = kotlin.math.cos(yawRad) * fallDirection * 1.5f
+        val sideZ = -kotlin.math.sin(yawRad) * fallDirection * 1.5f
 
-        // Forward momentum - wheel keeps forward velocity
-        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.8f
-        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.8f
+        eucBody!!.linearVelocity = Vector3(forwardX + sideX, 0.5f, forwardZ + sideZ)
 
-        // Side kick based on lean - moderate side push
-        val sideKick = (1.5f + playerVelocity * 0.15f) * fallDirection
-        val sideX = kotlin.math.cos(yawRad) * sideKick
-        val sideZ = -kotlin.math.sin(yawRad) * sideKick
-
-        // Upward kick - small bounce
-        val upKick = 0.5f + playerVelocity * 0.08f
-
-        eucBody!!.linearVelocity = Vector3(forwardX + sideX, upKick, forwardZ + sideZ)
-
-        // Angular velocity - gentle tumble, not crazy spinning
-        val gentleTumble = 1.5f + playerVelocity * 0.1f
+        // Simple angular velocity - just tip over to the side
         eucBody!!.angularVelocity = Vector3(
-            fallDirection * gentleTumble,        // Slight roll to the side
-            sideLean * gentleTumble * 0.2f,      // Minor yaw
-            -forwardLean * gentleTumble * 0.3f   // Minor pitch
+            fallDirection * 3f,  // Tip over sideways
+            0f,
+            0f
         )
 
         dynamicsWorld.addRigidBody(eucBody)
@@ -596,8 +580,11 @@ class RagdollPhysics : Disposable {
         // Run simulation if main ragdoll is active, or there are pedestrian ragdolls, or dynamic objects
         if (!isActive && pedestrianRagdolls.isEmpty() && dynamicObjects.isEmpty()) return
 
-        // Step physics world (max 4 substeps for stability)
-        dynamicsWorld.stepSimulation(delta, 4, 1f / 60f)
+        // Clamp delta to prevent physics explosions on lag spikes
+        val clampedDelta = delta.coerceIn(0.001f, 0.033f)  // Max ~30 FPS equivalent
+
+        // Step physics world with more substeps for smoother simulation
+        dynamicsWorld.stepSimulation(clampedDelta, 8, 1f / 120f)
 
         // Update collision timers
         lastCollisionTime += delta
