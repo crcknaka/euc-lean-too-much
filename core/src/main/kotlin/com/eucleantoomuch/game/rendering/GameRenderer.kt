@@ -23,6 +23,10 @@ import com.eucleantoomuch.game.ecs.components.PlayerComponent
 import com.eucleantoomuch.game.ecs.components.ShadowComponent
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.components.PedestrianComponent
+import com.eucleantoomuch.game.ecs.components.GroundComponent
+import com.eucleantoomuch.game.ecs.components.GroundType
+import com.eucleantoomuch.game.ecs.components.ObstacleComponent
+import com.eucleantoomuch.game.ecs.components.ObstacleType
 import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
 import net.mgsx.gltf.scene3d.scene.SceneManager
 
@@ -53,6 +57,8 @@ class GameRenderer(
     private val headMapper = ComponentMapper.getFor(HeadComponent::class.java)
     private val shadowMapper = ComponentMapper.getFor(ShadowComponent::class.java)
     private val pedestrianMapper = ComponentMapper.getFor(PedestrianComponent::class.java)
+    private val groundMapper = ComponentMapper.getFor(GroundComponent::class.java)
+    private val obstacleMapper = ComponentMapper.getFor(ObstacleComponent::class.java)
 
     private val tempMatrix = Matrix4()
     private val shadowMatrix = Matrix4()
@@ -89,6 +95,12 @@ class GameRenderer(
     // LOD distance threshold - buildings further than this use simple model
     private val lodDistance = 80f
     private val lodDistanceSq = lodDistance * lodDistance
+
+    // Frustum culling - radius for bounding sphere checks (generous to avoid popping)
+    private val defaultCullRadius = 8f  // Most objects fit in 8m sphere
+    private val buildingCullRadius = 60f  // Tall buildings need larger radius
+    private val shadowMaxDistance = 50f  // Don't render shadows beyond this distance
+    private val shadowMaxDistanceSq = shadowMaxDistance * shadowMaxDistance
 
     // Post-processing effects
     val postProcessing = PostProcessing()
@@ -153,6 +165,17 @@ class GameRenderer(
                 val transform = transformMapper.get(entity) ?: continue
 
                 if (shadow.visible && shadow.shadowInstance != null) {
+                    // Distance culling for shadows - don't render far away shadows
+                    val dx = transform.position.x - camera.position.x
+                    val dz = transform.position.z - camera.position.z
+                    val distSq = dx * dx + dz * dz
+                    if (distSq > shadowMaxDistanceSq) continue
+
+                    // Frustum culling for shadows
+                    if (!camera.frustum.sphereInFrustum(transform.position.x, 0f, transform.position.z, shadow.scale * 5f)) {
+                        continue
+                    }
+
                     val shadowX = transform.position.x + shadow.xOffset
 
                     // All shadows render at sidewalk height (0.11f) so they're visible on all surfaces
@@ -188,6 +211,31 @@ class GameRenderer(
             }
 
             if (model.visible && model.modelInstance != null) {
+                // Frustum culling - skip objects outside camera view
+                // Skip culling for: ground surfaces, arms (attached to rider), player-related entities
+                val ground = groundMapper.get(entity)
+                val isGroundSurface = ground != null && (ground.type == GroundType.ROAD || ground.type == GroundType.SIDEWALK)
+                val isArm = armTagMapper.get(entity) != null
+                val isPlayerRelated = eucMapper.get(entity) != null  // EUC, rider, arms
+
+                // Check if this is a curb (long horizontal object)
+                val obstacle = obstacleMapper.get(entity)
+                val isCurb = obstacle != null && obstacle.type == ObstacleType.CURB
+
+                if (!isGroundSurface && !isArm && !isPlayerRelated) {
+                    // Use larger radius for buildings (tall) and curbs (long horizontal)
+                    val cullRadius = when {
+                        model.modelInstanceLod != null -> buildingCullRadius
+                        isCurb -> 25f  // Curbs are long, need larger radius
+                        else -> defaultCullRadius
+                    }
+                    // Check if bounding sphere is in frustum (Y offset for tall objects)
+                    val centerY = if (model.modelInstanceLod != null) 30f else transform.position.y + 2f
+                    if (!camera.frustum.sphereInFrustum(transform.position.x, centerY, transform.position.z, cullRadius)) {
+                        continue  // Object is outside camera frustum, skip rendering
+                    }
+                }
+
                 // Update LOD state based on distance to camera
                 if (model.modelInstanceLod != null) {
                     val dx = transform.position.x - camera.position.x
@@ -279,8 +327,8 @@ class GameRenderer(
         // Render head separately with animation
         renderHead()
 
-        // Render articulated pedestrians with walking animation
-        pedestrianRenderer.render(modelBatch, environment)
+        // Render articulated pedestrians with walking animation (with frustum culling)
+        pedestrianRenderer.render(modelBatch, environment, camera)
 
         // Render ragdoll if active (inside main render pass for correct lighting/post-processing)
         if (activeRagdollPhysics != null && activeRagdollRenderer != null && activeRagdollPhysics!!.isActive()) {

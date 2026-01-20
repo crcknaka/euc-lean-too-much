@@ -2,6 +2,7 @@ package com.eucleantoomuch.game.rendering
 
 import com.badlogic.ashley.core.ComponentMapper
 import com.badlogic.ashley.core.Engine
+import com.badlogic.gdx.graphics.Camera
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g3d.Environment
 import com.badlogic.gdx.graphics.g3d.Model
@@ -89,11 +90,14 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
         }
     }
 
+    // Frustum culling radius for pedestrians (~2m tall)
+    private val pedestrianCullRadius = 3f
+
     /**
      * Render all pedestrians with articulated animation.
      * Call this instead of the normal ModelComponent rendering for pedestrians.
      */
-    fun render(modelBatch: ModelBatch, environment: Environment) {
+    fun render(modelBatch: ModelBatch, environment: Environment, camera: Camera) {
         val pedestrians = engine.getEntitiesFor(Families.pedestrians)
 
         for (i in 0 until pedestrians.size()) {
@@ -107,6 +111,11 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
 
             // Skip if model is hidden
             if (!modelComp.visible) continue
+
+            // Frustum culling - skip pedestrians outside camera view
+            if (!camera.frustum.sphereInFrustum(transform.position.x, transform.position.y + 1f, transform.position.z, pedestrianCullRadius)) {
+                continue
+            }
 
             // Get shirt color from the original model instance material
             val shirtColor = extractShirtColor(modelComp.modelInstance) ?: Color.GREEN

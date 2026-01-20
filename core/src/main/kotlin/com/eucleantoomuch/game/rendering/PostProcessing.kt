@@ -39,6 +39,9 @@ class PostProcessing : Disposable {
     private var enabled = true
     private var initialized = false
 
+    // Track if effects are active to skip unnecessary framebuffer rendering
+    private var effectsActive = false
+
     private val vertexShader = """
         attribute vec4 a_position;
         attribute vec2 a_texCoord0;
@@ -190,8 +193,25 @@ class PostProcessing : Disposable {
         initialized = true
     }
 
+    /**
+     * Check if any post-processing effects are currently active.
+     * If all effects are at zero, we can skip the framebuffer overhead.
+     */
+    private fun hasActiveEffects(): Boolean {
+        // Check if any effect is above threshold
+        val hasBlur = blurStrength > 0.001f
+        val hasVignette = vignetteStrength > 0.01f || vignetteDanger > 0.01f
+        val hasDanger = dangerTint > 0.001f
+        val hasChromatic = chromaticAberration > 0.001f
+        return hasBlur || hasVignette || hasDanger || hasChromatic
+    }
+
     fun begin() {
         if (!enabled || !initialized) return
+
+        // Check if effects are active - if not, skip framebuffer entirely
+        effectsActive = hasActiveEffects()
+        if (!effectsActive) return
 
         val width = Gdx.graphics.width
         val height = Gdx.graphics.height
@@ -205,7 +225,7 @@ class PostProcessing : Disposable {
     }
 
     fun end() {
-        if (!enabled || !initialized || frameBuffer == null) return
+        if (!enabled || !initialized || !effectsActive || frameBuffer == null) return
 
         frameBuffer?.end()
 

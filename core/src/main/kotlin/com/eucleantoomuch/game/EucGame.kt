@@ -967,6 +967,9 @@ class EucGame(
         leftArmEntity = null
         rightArmEntity = null
         renderer.riderEntity = null
+
+        // Reset collider tracking to prevent memory leak
+        resetColliderTracking()
     }
 
     // Temp vector for pedestrian ragdoll
@@ -1024,6 +1027,9 @@ class EucGame(
         pedestrianComponent.isRagdolling = true
         pedestrianComponent.ragdollBodyIndex = bodyIndex
         pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+
+        // Startle nearby pigeons when pedestrian is hit
+        pigeonSystem.addStartleSource(pedestrianTransform.position)
     }
 
     /**
@@ -1213,6 +1219,9 @@ class EucGame(
         pedestrianComponent.isRagdolling = true
         pedestrianComponent.ragdollBodyIndex = bodyIndex
         pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
+
+        // Startle nearby pigeons when pedestrian is knocked down (secondary impact)
+        pigeonSystem.addStartleSource(pedestrianTransform.position)
     }
 
     private fun handlePlayerFall() {
@@ -1257,6 +1266,9 @@ class EucGame(
                 resetColliderTracking()
                 addWorldCollidersForRagdoll(playerTransform.position)
             }
+
+            // Startle nearby pigeons when player crashes
+            pigeonSystem.addStartleSource(playerTransform.position)
         }
 
         // Transition to falling state (will show animation before game over)
@@ -2081,6 +2093,9 @@ class EucGame(
                 transform.position.set(pedestrianTempPos)
                 // Offset Y down by half torso height since physics center is at torso
                 transform.position.y = pedestrianTempPos.y - 0.25f
+
+                // Continuously startle pigeons near falling pedestrians
+                pigeonSystem.addStartleSource(pedestrianTempPos.x, pedestrianTempPos.z)
             }
         }
     }

@@ -42,6 +42,10 @@ class PigeonSystem(
     private var playerX: Float = 0f
     private var playerZ: Float = 0f
 
+    // External startle sources (ragdoll impacts, falling pedestrians)
+    private val startleSources = mutableListOf<Vector3>()
+    private val startleRadius = 4f  // Radius for startle from external sources
+
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
         walkingModel = ModelInstance(models.createPigeonModel(isFlying = false))
@@ -69,14 +73,98 @@ class PigeonSystem(
                 updatePigeonReplay(entity, deltaTime)
             } else {
                 checkForStartle(entity)
+                checkForExternalStartle(entity)
                 updatePigeon(entity, deltaTime)
             }
         }
+
+        // Clear startle sources after processing
+        startleSources.clear()
 
         // Remove marked entities (not in replay mode)
         if (!replayMode) {
             for (entity in entitiesToRemove) {
                 engine.removeEntity(entity)
+            }
+        }
+    }
+
+    /**
+     * Add an external startle source (e.g., player ragdoll impact, falling pedestrian).
+     * Pigeons near this position will fly away.
+     */
+    fun addStartleSource(position: Vector3) {
+        startleSources.add(Vector3(position))
+    }
+
+    /**
+     * Add startle source from x, z coordinates (y is ignored for ground-level events).
+     */
+    fun addStartleSource(x: Float, z: Float) {
+        startleSources.add(Vector3(x, 0f, z))
+    }
+
+    /**
+     * Check if pigeon should be startled by external sources (ragdolls, falling pedestrians).
+     */
+    private fun checkForExternalStartle(entity: Entity) {
+        val transform = transformMapper.get(entity)
+        val pigeon = pigeonMapper.get(entity)
+
+        // Skip if already flying or startled
+        if (pigeon.state == PigeonComponent.State.FLYING ||
+            pigeon.state == PigeonComponent.State.LANDED ||
+            pigeon.state == PigeonComponent.State.STARTLED ||
+            pigeon.isStartled) {
+            return
+        }
+
+        // Check distance to each startle source
+        for (source in startleSources) {
+            val dx = transform.position.x - source.x
+            val dz = transform.position.z - source.z
+            val distSq = dx * dx + dz * dz
+
+            if (distSq < startleRadius * startleRadius) {
+                // Startle this pigeon, fleeing from the source
+                startlePigeonFromSource(entity, pigeon, transform, source)
+                return
+            }
+        }
+    }
+
+    /**
+     * Startle a pigeon from a specific source position.
+     */
+    private fun startlePigeonFromSource(
+        entity: Entity,
+        pigeon: PigeonComponent,
+        transform: TransformComponent,
+        source: Vector3
+    ) {
+        pigeon.isStartled = true
+        pigeon.state = PigeonComponent.State.STARTLED
+        pigeon.stateTimer = 0f
+
+        // Calculate flight direction - away from source with some randomness
+        val dx = transform.position.x - source.x
+        val dz = transform.position.z - source.z
+        val dist = sqrt(dx * dx + dz * dz).coerceAtLeast(0.1f)
+
+        pigeon.flightDirection.set(
+            dx / dist + MathUtils.random(-0.3f, 0.3f),
+            0f,
+            dz / dist + MathUtils.random(-0.3f, 0.3f)
+        ).nor()
+
+        // Mark flock members as startled
+        val pigeons = engine.getEntitiesFor(Families.pigeons)
+        for (i in 0 until pigeons.size()) {
+            val other = pigeons[i]
+            if (other == entity) continue
+            val otherPigeon = pigeonMapper.get(other)
+            if (otherPigeon.flockId == pigeon.flockId && !otherPigeon.isStartled) {
+                otherPigeon.isStartled = true
             }
         }
     }
