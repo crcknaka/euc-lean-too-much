@@ -151,65 +151,47 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // === Draw Background ===
         ui.beginShapes()
 
-        // Gradient background
-        val bgTop = UITheme.backgroundLight
-        val bgBottom = UITheme.background
-        for (i in 0 until 20) {
-            val t = i / 20f
-            val stripY = sh * t
-            val stripHeight = sh / 20f + 1
-            ui.shapes.color = UITheme.lerp(bgBottom, bgTop, t)
-            ui.shapes.rect(0f, stripY, sw, stripHeight)
-        }
+        // Full gradient background
+        ui.gradientBackground()
 
         // === CENTERED COMPACT LAYOUT with breathing room ===
         // Panel is narrower, centered, with lots of space on sides
-        val panelMarginY = 50f * scale
-        val maxPanelWidth = 900f * scale  // Max width for comfortable reading
-        val panelWidth = (sw * 0.75f).coerceAtMost(maxPanelWidth) * enterAnimProgress
+        val panelMarginY = 45f * scale
+        val maxPanelWidth = 850f * scale  // Max width for comfortable reading
+        val panelWidth = (sw * 0.72f).coerceAtMost(maxPanelWidth) * enterAnimProgress
         val panelHeight = (sh - panelMarginY * 2) * enterAnimProgress
         val panelX = centerX - panelWidth / 2
         val panelY = panelMarginY
 
-        ui.panel(panelX, panelY, panelWidth, panelHeight,
+        // Main glass panel with accent glow
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
             radius = UITheme.Dimensions.panelRadius,
-            backgroundColor = UITheme.surface)
+            tintColor = UITheme.surfaceSolid,
+            borderGlow = UITheme.accent)
 
         // Title at top center with good padding
         val titleY = panelY + panelHeight - 55f * scale
 
         // === TABS - horizontal at top, below title ===
-        val tabWidth = 180f * scale
-        val tabHeight = 60f * scale
-        val tabGap = 20f * scale
-        val tabsY = titleY - 90f * scale
+        val tabWidth = 170f * scale
+        val tabHeight = 55f * scale
+        val tabGap = 15f * scale
+        val tabsY = titleY - 115f * scale  // Moved down
 
-        // Graphics tab (left)
+        // Graphics tab (left) - using neonButton
         graphicsTabButton.set(centerX - tabWidth - tabGap / 2, tabsY, tabWidth, tabHeight)
         val graphicsTabColor = if (currentTab == 0) UITheme.accent else UITheme.surfaceLight
-        val graphicsTabGlow = if (currentTab == 0) 0.3f else graphicsTabHover * 0.2f
-        ui.roundedRect(graphicsTabButton.x, graphicsTabButton.y, graphicsTabButton.width, graphicsTabButton.height,
-            12f * scale, graphicsTabColor)
-        if (graphicsTabGlow > 0.01f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.accent, graphicsTabGlow)
-            ui.roundedRect(graphicsTabButton.x - 2f, graphicsTabButton.y - 2f,
-                graphicsTabButton.width + 4f, graphicsTabButton.height + 4f, 14f * scale, ui.shapes.color)
-        }
+        val graphicsTabGlow = if (currentTab == 0) 0.6f else graphicsTabHover * 0.4f
+        ui.neonButton(graphicsTabButton, graphicsTabColor, UITheme.accent, graphicsTabGlow)
 
-        // Gameplay tab (right)
+        // Gameplay tab (right) - using neonButton
         gameplayTabButton.set(centerX + tabGap / 2, tabsY, tabWidth, tabHeight)
         val gameplayTabColor = if (currentTab == 1) UITheme.accent else UITheme.surfaceLight
-        val gameplayTabGlow = if (currentTab == 1) 0.3f else gameplayTabHover * 0.2f
-        ui.roundedRect(gameplayTabButton.x, gameplayTabButton.y, gameplayTabButton.width, gameplayTabButton.height,
-            12f * scale, gameplayTabColor)
-        if (gameplayTabGlow > 0.01f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.accent, gameplayTabGlow)
-            ui.roundedRect(gameplayTabButton.x - 2f, gameplayTabButton.y - 2f,
-                gameplayTabButton.width + 4f, gameplayTabButton.height + 4f, 14f * scale, ui.shapes.color)
-        }
+        val gameplayTabGlow = if (currentTab == 1) 0.6f else gameplayTabHover * 0.4f
+        ui.neonButton(gameplayTabButton, gameplayTabColor, UITheme.accent, gameplayTabGlow)
 
         // === CONTENT AREA - Two columns ===
-        val contentStartY = tabsY - 50f * scale
+        val contentStartY = tabsY - 80f * scale
         val contentWidth = panelWidth - 100f * scale
         val contentX = panelX + 50f * scale
         val leftColCenterX = contentX + contentWidth * 0.32f
@@ -278,28 +260,26 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         }
 
         // === BOTTOM: Back button and links ===
-        val buttonWidth = 180f * scale
-        val buttonHeight = UITheme.Dimensions.buttonHeight
-        backButton.set(centerX - buttonWidth / 2, panelY + 30f * scale, buttonWidth, buttonHeight)
-        ui.button(backButton, UITheme.surfaceLight, glowIntensity = backButtonHover * 0.5f)
+        val buttonWidth = 220f * scale
+        val buttonHeight = 70f * scale
+        val bottomY = panelY + 25f * scale
+        backButton.set(centerX - buttonWidth / 2, bottomY, buttonWidth, buttonHeight)
+        ui.neonButton(backButton, UITheme.surfaceLight, UITheme.cyan, backButtonHover * 0.6f)
 
-        // Footer links - centered above back button
-        val linkButtonHeight = 36f * scale
-        val linkButtonY = backButton.y + backButton.height + 15f * scale
-        val privacyButtonWidth = 95f * scale
-        val termsButtonWidth = 75f * scale
-        val linkSpacing = 10f * scale
-        val totalLinksWidth = privacyButtonWidth + termsButtonWidth + linkSpacing
+        // Footer links - on sides of back button
+        val linkButtonHeight = 40f * scale
+        val linkButtonWidth = 120f * scale
+        val linkGap = 15f * scale
 
-        privacyPolicyButton.set(centerX - totalLinksWidth / 2, linkButtonY, privacyButtonWidth, linkButtonHeight)
-        val privacyBgColor = if (privacyButtonHover > 0.5f) UITheme.surfaceBorder else UITheme.surfaceLight
-        ui.roundedRect(privacyPolicyButton.x, privacyPolicyButton.y,
-            privacyPolicyButton.width, privacyPolicyButton.height, 8f * scale, privacyBgColor)
+        // Privacy on the left of Back
+        privacyPolicyButton.set(backButton.x - linkButtonWidth - linkGap, bottomY + (buttonHeight - linkButtonHeight) / 2, linkButtonWidth, linkButtonHeight)
+        val privacyGlow = privacyButtonHover * 0.4f
+        ui.neonButton(privacyPolicyButton, UITheme.surfaceLight, UITheme.cyan, privacyGlow)
 
-        termsButton.set(centerX - totalLinksWidth / 2 + privacyButtonWidth + linkSpacing, linkButtonY, termsButtonWidth, linkButtonHeight)
-        val termsBgColor = if (termsButtonHover > 0.5f) UITheme.surfaceBorder else UITheme.surfaceLight
-        ui.roundedRect(termsButton.x, termsButton.y,
-            termsButton.width, termsButton.height, 8f * scale, termsBgColor)
+        // Terms on the right of Back
+        termsButton.set(backButton.x + buttonWidth + linkGap, bottomY + (buttonHeight - linkButtonHeight) / 2, linkButtonWidth, linkButtonHeight)
+        val termsGlow = termsButtonHover * 0.4f
+        ui.neonButton(termsButton, UITheme.surfaceLight, UITheme.cyan, termsGlow)
 
         ui.endShapes()
 
@@ -523,7 +503,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(leftButton, UITheme.secondary, glowIntensity = leftHover * 0.6f)
+        ui.neonButton(leftButton, UITheme.secondary, UITheme.secondary, 0.2f + leftHover * 0.6f)
 
         rightButton.set(
             centerX + valueBoxWidth / 2 + 12f * scale,
@@ -531,17 +511,18 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(rightButton, UITheme.secondary, glowIntensity = rightHover * 0.6f)
+        ui.neonButton(rightButton, UITheme.secondary, UITheme.secondary, 0.2f + rightHover * 0.6f)
 
-        // Value box
-        ui.panel(
+        // Value box with gradient card style
+        ui.card(
             centerX - valueBoxWidth / 2,
             y - 32f * scale,
             valueBoxWidth,
             64f * scale,
             radius = 12f * scale,
             backgroundColor = UITheme.surfaceLight,
-            shadowOffset = 0f
+            glowColor = UITheme.accent,
+            glowIntensity = 0.15f
         )
     }
 
@@ -553,31 +534,32 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val scale = UITheme.Dimensions.scale()
 
         leftButton.set(
-            centerX - valueBoxWidth / 2 - arrowButtonSize - 16f * scale,
+            centerX - valueBoxWidth / 2 - arrowButtonSize - 14f * scale,
             y - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(leftButton, UITheme.secondary, glowIntensity = leftHover * 0.6f)
+        ui.neonButton(leftButton, UITheme.secondary, UITheme.secondary, 0.25f + leftHover * 0.6f)
 
         rightButton.set(
-            centerX + valueBoxWidth / 2 + 16f * scale,
+            centerX + valueBoxWidth / 2 + 14f * scale,
             y - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
         )
-        ui.button(rightButton, UITheme.secondary, glowIntensity = rightHover * 0.6f)
+        ui.neonButton(rightButton, UITheme.secondary, UITheme.secondary, 0.25f + rightHover * 0.6f)
 
-        // Bigger value box
-        val boxHeight = 56f * scale
-        ui.panel(
+        // Bigger value box with gradient card style
+        val boxHeight = 52f * scale
+        ui.card(
             centerX - valueBoxWidth / 2,
             y - boxHeight / 2,
             valueBoxWidth,
             boxHeight,
             radius = 14f * scale,
             backgroundColor = UITheme.surfaceLight,
-            shadowOffset = 0f
+            glowColor = UITheme.accent,
+            glowIntensity = 0.2f
         )
     }
 
@@ -592,18 +574,37 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             UIFonts.heading, UITheme.textPrimary)
     }
 
-    private fun renderCheckbox(checkbox: Rectangle, hoverAnim: Float, checked: Boolean) {
+    private fun renderCheckbox(checkbox: Rectangle, @Suppress("UNUSED_PARAMETER") hoverAnim: Float, checked: Boolean) {
         val scale = UITheme.Dimensions.scale()
 
-        // Glow on hover
-        if (hoverAnim > 0.1f) {
-            ui.shapes.color = UITheme.withAlpha(UITheme.accent, hoverAnim * 0.25f)
-            ui.roundedRect(checkbox.x - 5f, checkbox.y - 5f,
-                checkbox.width + 10f, checkbox.height + 10f, 14f * scale, ui.shapes.color)
+        // Clean shadow (no glow)
+        ui.shapes.color = UITheme.withAlpha(com.badlogic.gdx.graphics.Color.BLACK, 0.3f)
+        ui.roundedRect(checkbox.x + 2f * scale, checkbox.y - 3f * scale, checkbox.width, checkbox.height, 12f * scale, ui.shapes.color)
+
+        // Checkbox background with gradient
+        val checkboxColor = if (checked) UITheme.accent else UITheme.surfaceLight
+        val bottomColor = UITheme.darken(checkboxColor, 0.08f)
+        val topColor = UITheme.brighten(checkboxColor, 0.04f)
+
+        // Draw gradient
+        val segments = 4
+        val segHeight = checkbox.height / segments
+        for (i in 0 until segments) {
+            val t = i.toFloat() / segments
+            val segColor = UITheme.lerp(bottomColor, topColor, t)
+            val segY = checkbox.y + i * segHeight
+            if (i == 0 || i == segments - 1) {
+                ui.roundedRect(checkbox.x, segY, checkbox.width, segHeight + 1, 12f * scale, segColor)
+            } else {
+                ui.shapes.color = segColor
+                ui.shapes.rect(checkbox.x, segY, checkbox.width, segHeight + 1)
+            }
         }
 
-        val checkboxColor = if (checked) UITheme.accent else UITheme.surfaceLight
-        ui.roundedRect(checkbox.x, checkbox.y, checkbox.width, checkbox.height, 12f * scale, checkboxColor)
+        // Subtle top highlight
+        ui.shapes.color = UITheme.withAlpha(com.badlogic.gdx.graphics.Color.WHITE, 0.12f)
+        ui.roundedRect(checkbox.x + 4f * scale, checkbox.y + checkbox.height - 5f * scale,
+            checkbox.width - 8f * scale, 3f * scale, 1.5f * scale, ui.shapes.color)
 
         // Checkmark
         if (checked) {

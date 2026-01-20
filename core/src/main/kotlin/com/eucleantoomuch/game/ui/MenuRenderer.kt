@@ -9,8 +9,8 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 
 /**
- * Modern main menu with EUC-themed design.
- * Features large touch-friendly buttons and clean typography.
+ * Modern main menu with "Neon Street" design.
+ * Features card-style buttons, neon glow effects, and horizontal landscape layout.
  */
 class MenuRenderer : Disposable {
     private val ui = UIRenderer()
@@ -28,25 +28,26 @@ class MenuRenderer : Disposable {
     private var settingsButtonHover = 0f
     private var creditsButtonHover = 0f
     private var exitButtonHover = 0f
-    private var titlePulse = 0f
     private var enterAnimProgress = 0f
 
-    // Particle system for background
-    private val particles = Array(40) { BackgroundParticle() }
+    // Trail particles (like EUC tire marks)
+    private val trailParticles = Array(25) { TrailParticle() }
 
-    private class BackgroundParticle {
+    private class TrailParticle {
         var x = MathUtils.random(0f, 1f)
         var y = MathUtils.random(0f, 1f)
-        var size = MathUtils.random(3f, 8f)
-        var speed = MathUtils.random(0.015f, 0.04f)
-        var alpha = MathUtils.random(0.15f, 0.4f)
+        var length = MathUtils.random(30f, 80f)
+        var speed = MathUtils.random(0.08f, 0.18f)
+        var alpha = MathUtils.random(0.08f, 0.2f)
+        var angle = MathUtils.random(-15f, 15f)
 
         fun update() {
-            y += speed * Gdx.graphics.deltaTime
-            if (y > 1.1f) {
-                y = -0.1f
+            y -= speed * Gdx.graphics.deltaTime
+            if (y < -0.15f) {
+                y = 1.1f
                 x = MathUtils.random(0f, 1f)
-                size = MathUtils.random(3f, 8f)
+                length = MathUtils.random(30f, 80f)
+                alpha = MathUtils.random(0.08f, 0.2f)
             }
         }
     }
@@ -62,14 +63,13 @@ class MenuRenderer : Disposable {
         val sw = ui.screenWidth
         val sh = ui.screenHeight
         val centerX = sw / 2
-        val centerY = sh / 2
+        val scale = UITheme.Dimensions.scale()
 
         // Update animations
         enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 3f)
-        titlePulse = UITheme.Anim.pulse(1.5f, 0.97f, 1f)
 
-        // Update particles
-        particles.forEach { it.update() }
+        // Update trail particles
+        trailParticles.forEach { it.update() }
 
         // Check hover state
         val touchX = Gdx.input.x.toFloat()
@@ -86,8 +86,6 @@ class MenuRenderer : Disposable {
         creditsButtonHover = UITheme.Anim.ease(creditsButtonHover, if (creditsHovered) 1f else 0f, 10f)
         exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 10f)
 
-        val scale = UITheme.Dimensions.scale()
-
         // === Draw Background Image ===
         ui.beginBatch()
         ui.batch.draw(backgroundTexture, 0f, 0f, sw, sh)
@@ -95,108 +93,139 @@ class MenuRenderer : Disposable {
 
         ui.beginShapes()
 
-        // Animated particles
-        particles.forEach { p ->
+        // Animated trail particles (tire marks effect) - orange falling lines
+        trailParticles.forEach { p ->
             ui.shapes.color = UITheme.withAlpha(UITheme.accent, p.alpha * enterAnimProgress)
-            ui.shapes.circle(p.x * sw, p.y * sh, p.size * scale)
+            val px = p.x * sw
+            val py = p.y * sh
+            val len = p.length * scale
+            // Draw as elongated shape
+            ui.shapes.rect(px - 2f * scale, py, 4f * scale, len)
         }
 
-        // === Buttons ===
-        val buttonWidth = 480f * scale
-        val buttonHeight = UITheme.Dimensions.buttonHeight
-        val smallButtonWidth = 230f * scale
-        val smallButtonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 24f * scale
+        // === HORIZONTAL LAYOUT ===
+        // Left side: Main action buttons (PLAY big, others smaller)
+        // Right side: Stats cards
 
-        val buttonsStartY = centerY + 80f * scale
-        playButton.set(centerX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
-        calibrateButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
-        settingsButton.set(centerX - buttonWidth / 2, buttonsStartY - buttonHeight * 2 - buttonSpacing * 2, buttonWidth, buttonHeight)
+        val margin = 50f * scale
+        val leftSectionWidth = sw * 0.55f
+        val rightSectionWidth = sw * 0.45f
+        val leftCenterX = margin + (leftSectionWidth - margin) / 2
+        val rightCenterX = leftSectionWidth + (rightSectionWidth - margin) / 2
 
-        // Credits and Exit buttons side by side (small)
-        val smallButtonsY = buttonsStartY - buttonHeight * 3 - buttonSpacing * 4
-        val smallButtonSpacing = 24f * scale
-        creditsButton.set(centerX - smallButtonWidth - smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        exitButton.set(centerX + smallButtonSpacing / 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        // === LEFT SIDE: Buttons ===
+        // PLAY button - large and prominent
+        val playWidth = 460f * scale
+        val playHeight = 150f * scale
+        val playX = leftCenterX - playWidth / 2
+        val playY = sh * 0.55f
 
-        // Apply enter animation
-        val playY = playButton.y - (1 - enterAnimProgress) * 120
-        val calibrateY = calibrateButton.y - (1 - enterAnimProgress) * 180
-        val settingsY = settingsButton.y - (1 - enterAnimProgress) * 240
-        val creditsY = creditsButton.y - (1 - enterAnimProgress) * 300
-        val exitY = exitButton.y - (1 - enterAnimProgress) * 300
+        playButton.set(playX, playY - (1 - enterAnimProgress) * 100, playWidth, playHeight)
+        ui.neonButton(playButton, UITheme.accent, UITheme.accent, 0.4f + playButtonHover * 0.6f)
 
-        // Draw buttons with modern style
-        val playRect = Rectangle(playButton.x, playY, playButton.width, playButton.height)
-        ui.button(playRect, UITheme.accent, pressedOffset = 0f, glowIntensity = playButtonHover * 0.9f)
+        // Secondary buttons - all same size, 2x2 grid below PLAY
+        val secButtonWidth = 220f * scale
+        val secButtonHeight = 110f * scale
+        val secButtonGap = 35f * scale
+        val secButtonsY = playY - playHeight - 45f * scale
 
-        val calibrateRect = Rectangle(calibrateButton.x, calibrateY, calibrateButton.width, calibrateButton.height)
-        ui.button(calibrateRect, UITheme.secondary, pressedOffset = 0f, glowIntensity = calibrateButtonHover * 0.6f)
+        // Row 1: Calibrate and Settings
+        val calibrateX = leftCenterX - secButtonWidth - secButtonGap / 2
+        calibrateButton.set(calibrateX, secButtonsY - (1 - enterAnimProgress) * 150, secButtonWidth, secButtonHeight)
+        ui.neonButton(calibrateButton, UITheme.secondary, UITheme.secondary, calibrateButtonHover * 0.7f)
 
-        val settingsRect = Rectangle(settingsButton.x, settingsY, settingsButton.width, settingsButton.height)
-        ui.button(settingsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = settingsButtonHover * 0.4f)
+        val settingsX = leftCenterX + secButtonGap / 2
+        settingsButton.set(settingsX, secButtonsY - (1 - enterAnimProgress) * 150, secButtonWidth, secButtonHeight)
+        ui.neonButton(settingsButton, UITheme.surfaceLight, UITheme.textSecondary, settingsButtonHover * 0.5f)
 
-        val creditsRect = Rectangle(creditsButton.x, creditsY, creditsButton.width, creditsButton.height)
-        ui.button(creditsRect, UITheme.surfaceLight, pressedOffset = 0f, glowIntensity = creditsButtonHover * 0.4f)
+        // Row 2: Credits and Exit - same size as row 1
+        val row2Y = secButtonsY - secButtonHeight - secButtonGap
 
-        val exitRect = Rectangle(exitButton.x, exitY, exitButton.width, exitButton.height)
-        ui.button(exitRect, UITheme.danger, pressedOffset = 0f, glowIntensity = exitButtonHover * 0.6f)
+        creditsButton.set(calibrateX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
+        ui.neonButton(creditsButton, UITheme.surfaceLight, UITheme.textMuted, creditsButtonHover * 0.4f)
 
-        // Stats panel at bottom
-        val statsHeight = 110f * scale
-        ui.panel(0f, 0f, sw, statsHeight, radius = 0f, shadowOffset = 0f,
-            backgroundColor = UITheme.withAlpha(UITheme.surface, 0.95f))
+        exitButton.set(settingsX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
+        ui.neonButton(exitButton, UITheme.danger, UITheme.danger, exitButtonHover * 0.6f)
 
-        // Accent line at top of stats panel
-        ui.shapes.color = UITheme.accent
-        ui.shapes.rect(0f, statsHeight - 4f, sw, 4f)
+        // === RIGHT SIDE: Stats Cards ===
+        val cardWidth = 280f * scale
+        val cardHeight = 120f * scale
+        val cardGap = 25f * scale
+        val cardsStartY = sh * 0.56f
+        val cardsOffsetX = 30f * scale  // Shift cards to the right
+
+        // High Score card
+        val scoreCardY = cardsStartY - (1 - enterAnimProgress) * 80
+        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, scoreCardY, cardWidth, cardHeight,
+            glowColor = if (highScore > 0) UITheme.accent else null,
+            glowIntensity = if (highScore > 0) 0.3f else 0f)
+
+        // Near Misses card
+        val nearMissCardY = scoreCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
+        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, nearMissCardY, cardWidth, cardHeight,
+            glowColor = if (maxNearMisses > 0) UITheme.cyan else null,
+            glowIntensity = if (maxNearMisses > 0) 0.25f else 0f)
+
+        // Best Distance card
+        val distCardY = nearMissCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
+        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, distCardY, cardWidth, cardHeight,
+            glowColor = if (maxDistance > 100) UITheme.primary else null,
+            glowIntensity = if (maxDistance > 100) 0.25f else 0f)
+
+        // Separator line between sections
+        ui.separator(leftSectionWidth - 20f * scale, margin, sh - margin * 2, UITheme.surfaceBorder)
+
+        // Bottom hint bar
+        val hintHeight = 50f * scale
+        ui.glassPanel(0f, 0f, sw, hintHeight, radius = 0f, borderGlow = UITheme.accent)
 
         ui.endShapes()
 
         // === Draw Text ===
         ui.beginBatch()
 
-        // Button labels with larger text
-        ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
-        ui.textCentered("CALIBRATE", calibrateRect.x + calibrateRect.width / 2, calibrateRect.y + calibrateRect.height / 2, UIFonts.button, UITheme.textPrimary)
-        ui.textCentered("SETTINGS", settingsRect.x + settingsRect.width / 2, settingsRect.y + settingsRect.height / 2, UIFonts.button, UITheme.textPrimary)
-        ui.textCentered("CREDITS", creditsRect.x + creditsRect.width / 2, creditsRect.y + creditsRect.height / 2, UIFonts.body, UITheme.textPrimary)
-        ui.textCentered("EXIT", exitRect.x + exitRect.width / 2, exitRect.y + exitRect.height / 2, UIFonts.body, UITheme.textPrimary)
+        // Title removed - it's on the background image
 
-        // Stats with improved layout - 3 columns
-        val statsLabelY = 90f * scale
-        val statsValueY = statsLabelY - 35f * scale
-        val sideMargin = 60f * scale
+        // Button labels
+        ui.textCentered("PLAY", playButton.x + playButton.width / 2, playButton.y + playButton.height / 2,
+            UIFonts.title, UITheme.textPrimary)
+        ui.textCentered("CALIBRATE", calibrateButton.x + calibrateButton.width / 2, calibrateButton.y + calibrateButton.height / 2,
+            UIFonts.body, UITheme.textPrimary)
+        ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2, settingsButton.y + settingsButton.height / 2,
+            UIFonts.body, UITheme.textPrimary)
+        ui.textCentered("CREDITS", creditsButton.x + creditsButton.width / 2, creditsButton.y + creditsButton.height / 2,
+            UIFonts.body, UITheme.textSecondary)
+        ui.textCentered("EXIT", exitButton.x + exitButton.width / 2, exitButton.y + exitButton.height / 2,
+            UIFonts.body, UITheme.textPrimary)
 
-        // High score (left)
-        UIFonts.caption.color = UITheme.textSecondary
-        UIFonts.caption.draw(ui.batch, "HIGH SCORE", sideMargin, statsLabelY)
+        // Stats card content
+        val cardLabelOffset = 30f * scale
+        val cardValueOffset = -15f * scale
+        val cardTextCenterX = rightCenterX + cardsOffsetX
 
-        UIFonts.heading.color = UITheme.accent
-        UIFonts.heading.draw(ui.batch, highScore.toString(), sideMargin, statsValueY)
+        // High Score
+        ui.textCentered("HIGH SCORE", cardTextCenterX, scoreCardY + cardHeight - cardLabelOffset,
+            UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered(highScore.toString(), cardTextCenterX, scoreCardY + cardHeight / 2 + cardValueOffset,
+            UIFonts.heading, UITheme.accent)
 
-        // Near misses record (left of center, closer to HIGH SCORE)
-        val nearMissX = sideMargin + 180f * scale
-        UIFonts.caption.color = UITheme.textSecondary
-        UIFonts.caption.draw(ui.batch, "NEAR MISSES", nearMissX, statsLabelY)
+        // Near Misses
+        ui.textCentered("NEAR MISSES", cardTextCenterX, nearMissCardY + cardHeight - cardLabelOffset,
+            UIFonts.caption, UITheme.textSecondary)
+        val nearMissColor = if (maxNearMisses > 0) UITheme.cyan else UITheme.textPrimary
+        ui.textCentered(maxNearMisses.toString(), cardTextCenterX, nearMissCardY + cardHeight / 2 + cardValueOffset,
+            UIFonts.heading, nearMissColor)
 
-        val nearMissColor = if (maxNearMisses > 0) UITheme.accent else UITheme.textPrimary
-        UIFonts.heading.color = nearMissColor
-        UIFonts.heading.draw(ui.batch, maxNearMisses.toString(), nearMissX, statsValueY)
+        // Best Distance
+        ui.textCentered("BEST DISTANCE", cardTextCenterX, distCardY + cardHeight - cardLabelOffset,
+            UIFonts.caption, UITheme.textSecondary)
+        val distColor = if (maxDistance > 100) UITheme.primary else UITheme.textPrimary
+        ui.textCentered("${maxDistance.toInt()}m", cardTextCenterX, distCardY + cardHeight / 2 + cardValueOffset,
+            UIFonts.heading, distColor)
 
-        // Best distance (right)
-        UIFonts.caption.color = UITheme.textSecondary
-        val distLabel = "BEST DISTANCE"
-        ui.layout.setText(UIFonts.caption, distLabel)
-        UIFonts.caption.draw(ui.batch, distLabel, sw - ui.layout.width - sideMargin, statsLabelY)
-
-        val distValue = "${maxDistance.toInt()}m"
-        ui.layout.setText(UIFonts.heading, distValue)
-        UIFonts.heading.color = UITheme.textPrimary
-        UIFonts.heading.draw(ui.batch, distValue, sw - ui.layout.width - sideMargin, statsValueY)
-
-        // Center hint
-        ui.textCentered("Tilt to control - Lean to accelerate", centerX, 55f * scale, UIFonts.caption, UITheme.textMuted)
+        // Bottom hint
+        ui.textCentered("Tilt to steer  ~  Lean forward to accelerate", centerX, hintHeight / 2,
+            UIFonts.caption, UITheme.textMuted)
 
         ui.endBatch()
 

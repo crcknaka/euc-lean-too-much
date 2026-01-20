@@ -78,7 +78,7 @@ class GameOverRenderer : Disposable {
         val scale = UITheme.Dimensions.scale()
 
         // Update animations
-        overlayAlpha = UITheme.Anim.ease(overlayAlpha, 0.88f, 4f)
+        overlayAlpha = UITheme.Anim.ease(overlayAlpha, 0.55f, 4f)
         panelScale = UITheme.Anim.ease(panelScale, 1f, 5f)
         statsReveal = UITheme.Anim.ease(statsReveal, 1f, 3f)
 
@@ -95,59 +95,85 @@ class GameOverRenderer : Disposable {
 
         ui.beginShapes()
 
-        // Dark overlay with vignette effect
+        // Simple dark overlay (no gradient segments)
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
         ui.shapes.rect(0f, 0f, sw, sh)
 
-        // Panel dimensions with scale animation - wider panel
-        val panelWidth = 640f * scale * panelScale
-        val panelHeight = 680f * scale * panelScale  // Taller to fit all stats and buttons
+        // === HORIZONTAL LAYOUT ===
+        // Left side: Title, safety tip, stats
+        // Right side: Buttons
+
+        val panelWidth = (sw * 0.85f).coerceAtMost(1000f * scale) * panelScale
+        val panelHeight = (sh * 0.75f).coerceAtMost(500f * scale) * panelScale
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 
-        // Panel glow for new high score
-        if (isNewHighScore && panelScale > 0.9f) {
-            val glowPulse = UITheme.Anim.pulse(3f, 0.25f, 0.55f)
-            for (i in 5 downTo 1) {
-                ui.roundedRect(
-                    panelX - i * 5, panelY - i * 5,
-                    panelWidth + i * 10, panelHeight + i * 10,
-                    UITheme.Dimensions.panelRadius + i * 3,
-                    UITheme.withAlpha(UITheme.accent, glowPulse * 0.12f * i)
-                )
-            }
-        }
+        // Glass panel (clean, no glow)
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
+            tintColor = UITheme.surfaceSolid)
 
-        // Main panel
-        ui.panel(panelX, panelY, panelWidth, panelHeight,
-            backgroundColor = UITheme.surface,
-            borderColor = if (isNewHighScore) UITheme.accent else UITheme.surfaceBorder)
+        // Layout sections
+        val leftWidth = panelWidth * 0.6f
+        val rightWidth = panelWidth * 0.4f
+        val leftCenterX = panelX + leftWidth / 2
+        val rightCenterX = panelX + leftWidth + rightWidth / 2
+        val contentPadding = 40f * scale
 
-        // Button layout - three buttons: RETRY, REPLAY, MENU
-        val buttonWidth = if (hasReplayFrames) 180f * scale else 240f * scale
-        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 20f * scale
-        val numButtons = if (hasReplayFrames) 3 else 2
-        val totalWidth = buttonWidth * numButtons + buttonSpacing * (numButtons - 1)
-        val buttonsY = panelY + 50f * scale  // Lower position for buttons
+        // === LEFT SIDE: Stats in cards ===
+        val cardWidth = (leftWidth - contentPadding * 2) / 2 - 10f * scale
+        val cardHeight = 80f * scale
+        val cardGap = 12f * scale
 
+        // Score card (top left) - positioned lower to make room for title and safety tip
+        val scoreCardX = panelX + contentPadding
+        val scoreCardY = panelY + panelHeight - 280f * scale
+        ui.card(scoreCardX, scoreCardY, cardWidth, cardHeight,
+            radius = 16f * scale,
+            glowColor = UITheme.accent, glowIntensity = 0.3f * statsReveal)
+
+        // Distance card (top right)
+        val distCardX = scoreCardX + cardWidth + cardGap
+        ui.card(distCardX, scoreCardY, cardWidth, cardHeight,
+            radius = 16f * scale,
+            glowColor = UITheme.primary, glowIntensity = 0.2f * statsReveal)
+
+        // Speed card (bottom left)
+        val speedCardY = scoreCardY - cardHeight - cardGap
+        ui.card(scoreCardX, speedCardY, cardWidth, cardHeight,
+            radius = 16f * scale,
+            glowColor = UITheme.cyan, glowIntensity = 0.2f * statsReveal)
+
+        // Near misses card (bottom right)
+        val missCardX = scoreCardX + cardWidth + cardGap
+        val missGlow = if (session.nearMisses > 0) UITheme.warning else null
+        ui.card(missCardX, speedCardY, cardWidth, cardHeight,
+            radius = 16f * scale,
+            glowColor = missGlow, glowIntensity = 0.25f * statsReveal)
+
+        // === RIGHT SIDE: Buttons ===
+        val buttonWidth = rightWidth - contentPadding * 2
+        val buttonHeight = 70f * scale
+        val buttonGap = 18f * scale
+
+        // Retry button (main action) - moved lower
+        val retryY = panelY + panelHeight - 160f * scale
+        retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
+        ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.4f + retryHover * 0.6f)
+
+        // Replay button (if available) - same size
         if (hasReplayFrames) {
-            // Three buttons: RETRY, REPLAY, MENU
-            retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
-            replayButton.set(centerX - buttonWidth / 2, buttonsY, buttonWidth, buttonHeight)
-            menuButton.set(centerX + totalWidth / 2 - buttonWidth, buttonsY, buttonWidth, buttonHeight)
+            val replayY = retryY - buttonHeight - buttonGap
+            replayButton.set(rightCenterX - buttonWidth / 2, replayY, buttonWidth, buttonHeight)
+            ui.neonButton(replayButton, UITheme.warning, UITheme.warning, replayHover * 0.5f)
+
+            val menuY = replayY - buttonHeight - buttonGap
+            menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
+            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
         } else {
-            // Two buttons: RETRY, MENU
-            retryButton.set(centerX - totalWidth / 2, buttonsY, buttonWidth, buttonHeight)
-            menuButton.set(centerX + buttonSpacing / 2, buttonsY, buttonWidth, buttonHeight)
+            val menuY = retryY - buttonHeight - buttonGap
+            menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
+            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
         }
-
-        // Buttons with modern style
-        ui.button(retryButton, UITheme.accent, glowIntensity = retryHover * 0.7f)
-        if (hasReplayFrames) {
-            ui.button(replayButton, UITheme.warning, glowIntensity = replayHover * 0.5f)
-        }
-        ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)
 
         ui.endShapes()
 
@@ -155,90 +181,73 @@ class GameOverRenderer : Disposable {
         ui.beginBatch()
 
         if (panelScale > 0.5f) {
-            // Title
-            val titleY = panelY + panelHeight - 65f * scale
+            // Title - moved lower
+            val titleY = panelY + panelHeight - 70f * scale
             val titleColor = if (isNewHighScore) {
                 UITheme.lerp(UITheme.danger, UITheme.accent, UITheme.Anim.pulse(2f, 0f, 1f))
             } else {
                 UITheme.danger
             }
-            ui.textCentered("GAME OVER", centerX, titleY, UIFonts.title, titleColor)
+            ui.textCentered("GAME OVER", leftCenterX, titleY, UIFonts.title, titleColor)
 
-            // Safety tip under title - large with pulsing attention animation
-            var statsStartY = titleY - 75f * scale  // More space between GAME OVER and tip
+            // Safety tip below title
             if (currentSafetyTip.isNotEmpty()) {
                 safetyTipAnim += Gdx.graphics.deltaTime
-
-                // Pulsing glow effect - stronger at start, then settles
                 val glowIntensity = if (safetyTipAnim < 2f) {
-                    // First 2 seconds: strong pulsing to grab attention
                     UITheme.Anim.pulse(3f, 0.6f, 1f)
                 } else {
-                    // After: gentle pulse
                     UITheme.Anim.pulse(2f, 0.85f, 1f)
                 }
-
-                // Color shifts between warning yellow and white for attention
-                val tipColor = if (safetyTipAnim < 2f) {
-                    UITheme.lerp(UITheme.warning, UITheme.textPrimary, UITheme.Anim.pulse(4f, 0f, 1f))
-                } else {
-                    UITheme.lerp(UITheme.warning, UITheme.textSecondary, 0.3f)
-                }
-
-                val finalColor = UITheme.withAlpha(tipColor, glowIntensity)
-                ui.textCentered(currentSafetyTip, centerX, statsStartY, UIFonts.heading, finalColor)
-                statsStartY -= 60f * scale
+                val tipColor = UITheme.withAlpha(UITheme.warning, glowIntensity)
+                ui.textCentered(currentSafetyTip, leftCenterX, titleY - 60f * scale, UIFonts.heading, tipColor)
             }
 
-            // New high score badge
+            // New high score badge - below safety tip
             if (isNewHighScore) {
                 val badgePulse = UITheme.Anim.pulse(4f, 0.8f, 1f)
                 val badgeColor = UITheme.lerp(UITheme.accent, UITheme.accentBright, badgePulse)
-                ui.textCentered("NEW HIGH SCORE!", centerX, statsStartY, UIFonts.heading, badgeColor)
-                statsStartY -= 70f * scale
+                ui.textCentered("NEW HIGH SCORE!", leftCenterX, titleY - 110f * scale, UIFonts.body, badgeColor)
             }
 
-            // Stats with reveal animation
-            val statsAlpha = (statsReveal * 1.5f - 0.5f).coerceIn(0f, 1f)
-            if (statsAlpha > 0) {
-                val lineHeight = 75f * scale
-                val columnOffset = 130f * scale  // Half-width between SCORE and DISTANCE columns
+            // Stats card content
+            val statsAlpha = statsReveal
+            val labelOffset = 18f * scale
+            val valueOffset = -18f * scale
 
-                // Score and Distance in one row
-                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("SCORE", centerX - columnOffset, statsStartY, UIFonts.caption, UIFonts.caption.color)
-                UIFonts.heading.color = UITheme.withAlpha(UITheme.accent, statsAlpha)
-                ui.textCentered(session.score.toString(), centerX - columnOffset, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+            // Score
+            ui.textCentered("SCORE", scoreCardX + cardWidth / 2, scoreCardY + cardHeight - labelOffset,
+                UIFonts.caption, UITheme.withAlpha(UITheme.textSecondary, statsAlpha))
+            ui.textCentered(session.score.toString(), scoreCardX + cardWidth / 2, scoreCardY + cardHeight / 2 + valueOffset,
+                UIFonts.heading, UITheme.withAlpha(UITheme.accent, statsAlpha))
 
-                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("DISTANCE", centerX + columnOffset, statsStartY, UIFonts.caption, UIFonts.caption.color)
-                UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
-                ui.textCentered("${session.distanceTraveled.toInt()} m", centerX + columnOffset, statsStartY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+            // Distance
+            ui.textCentered("DISTANCE", distCardX + cardWidth / 2, scoreCardY + cardHeight - labelOffset,
+                UIFonts.caption, UITheme.withAlpha(UITheme.textSecondary, statsAlpha))
+            ui.textCentered("${session.distanceTraveled.toInt()}m", distCardX + cardWidth / 2, scoreCardY + cardHeight / 2 + valueOffset,
+                UIFonts.heading, UITheme.withAlpha(UITheme.primary, statsAlpha))
 
-                // Top Speed and Near Misses in one row
-                val secondRowY = statsStartY - lineHeight * 1.25f
-                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("TOP SPEED", centerX - columnOffset, secondRowY, UIFonts.caption, UIFonts.caption.color)
-                UIFonts.heading.color = UITheme.withAlpha(UITheme.textPrimary, statsAlpha)
-                ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", centerX - columnOffset, secondRowY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
+            // Speed
+            ui.textCentered("TOP SPEED", scoreCardX + cardWidth / 2, speedCardY + cardHeight - labelOffset,
+                UIFonts.caption, UITheme.withAlpha(UITheme.textSecondary, statsAlpha))
+            ui.textCentered("${(session.maxSpeed * 3.6f).toInt()} km/h", scoreCardX + cardWidth / 2, speedCardY + cardHeight / 2 + valueOffset,
+                UIFonts.heading, UITheme.withAlpha(UITheme.cyan, statsAlpha))
 
-                UIFonts.caption.color = UITheme.withAlpha(UITheme.textSecondary, statsAlpha)
-                ui.textCentered("NEAR MISSES", centerX + columnOffset, secondRowY, UIFonts.caption, UIFonts.caption.color)
-                // Color based on count - green if any, gray if none
-                val nearMissColor = if (session.nearMisses > 0) UITheme.accent else UITheme.textPrimary
-                UIFonts.heading.color = UITheme.withAlpha(nearMissColor, statsAlpha)
-                ui.textCentered(session.nearMisses.toString(), centerX + columnOffset, secondRowY - 42f * scale, UIFonts.heading, UIFonts.heading.color)
-            }
+            // Near misses
+            ui.textCentered("NEAR MISSES", missCardX + cardWidth / 2, speedCardY + cardHeight - labelOffset,
+                UIFonts.caption, UITheme.withAlpha(UITheme.textSecondary, statsAlpha))
+            val nearMissColor = if (session.nearMisses > 0) UITheme.warning else UITheme.textPrimary
+            ui.textCentered(session.nearMisses.toString(), missCardX + cardWidth / 2, speedCardY + cardHeight / 2 + valueOffset,
+                UIFonts.heading, UITheme.withAlpha(nearMissColor, statsAlpha))
 
-            // Button labels with larger text
+            // Button labels
             ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
             if (hasReplayFrames) {
                 ui.textCentered("REPLAY", replayButton.x + replayButton.width / 2, replayButton.y + replayButton.height / 2,
-                    UIFonts.button, UITheme.textPrimary)
+                    UIFonts.body, UITheme.textPrimary)
             }
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
-                UIFonts.button, UITheme.textPrimary)
+                UIFonts.body, UITheme.textPrimary)
         }
 
         ui.endBatch()

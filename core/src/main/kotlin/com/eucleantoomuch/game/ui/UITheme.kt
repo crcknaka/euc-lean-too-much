@@ -7,6 +7,7 @@ import com.badlogic.gdx.math.MathUtils
 
 /**
  * Modern UI Theme with colors, animations, and utilities
+ * Style: "Neon Street" - urban EUC culture with neon accents
  */
 object UITheme {
     // === Primary Colors ===
@@ -21,6 +22,7 @@ object UITheme {
     // === Accent Colors ===
     val accent = Color(0xFF6B00FF.toInt())         // Orange (#ff6b00)
     val accentBright = Color(0xFF8C33FF.toInt())   // Bright orange
+    val accentGlow = Color(0xFF6B0066.toInt())     // Orange with alpha for glow
 
     // === Danger/Warning Colors ===
     val danger = Color(0xEF4444FF.toInt())         // Red
@@ -28,12 +30,14 @@ object UITheme {
     val warning = Color(0xF59E0BFF.toInt())        // Amber
     val warningBright = Color(0xFBBF24FF.toInt())  // Bright amber
 
-    // === Neutral Colors ===
-    val background = Color(0x0F0F17FF.toInt())     // Very dark blue-gray
-    val backgroundLight = Color(0x1A1A25FF.toInt()) // Slightly lighter
-    val surface = Color(0x1E1E2EFF.toInt())        // Card/panel surface
-    val surfaceLight = Color(0x2A2A3EFF.toInt())   // Elevated surface
-    val surfaceBorder = Color(0x3A3A4EFF.toInt())  // Border color
+    // === Neutral Colors - Deep space theme ===
+    val background = Color(0x0A0A12FF.toInt())     // Deeper dark blue-black
+    val backgroundLight = Color(0x12121CFF.toInt()) // Slightly lighter
+    val surface = Color(0x16162299.toInt())        // Card surface with transparency
+    val surfaceSolid = Color(0x1A1A28FF.toInt())   // Solid card surface
+    val surfaceLight = Color(0x242438FF.toInt())   // Elevated surface
+    val surfaceBorder = Color(0x3A3A5088.toInt())  // Border color with alpha
+    val surfaceGlass = Color(0x20203318.toInt())   // Glass effect base
 
     // === Text Colors ===
     val textPrimary = Color(0xF8FAFCFF.toInt())    // White-ish
@@ -43,7 +47,21 @@ object UITheme {
 
     // === Special Colors ===
     val cyan = Color(0x22D3EEFF.toInt())           // Cyan for special effects
+    val cyanGlow = Color(0x22D3EE66.toInt())       // Cyan glow
     val purple = Color(0xA855F7FF.toInt())         // Purple accent
+    val purpleGlow = Color(0xA855F766.toInt())     // Purple glow
+
+    // === Gradient Pairs ===
+    object Gradients {
+        val backgroundTop = Color(0x0D0D1AFF.toInt())
+        val backgroundBottom = Color(0x06060CFF.toInt())
+        val panelTop = Color(0x1E1E30FF.toInt())
+        val panelBottom = Color(0x14141FFF.toInt())
+        val accentTop = Color(0xFF8533FF.toInt())
+        val accentBottom = Color(0xE55A00FF.toInt())
+        val glassTop = Color(0xFFFFFF15.toInt())
+        val glassBottom = Color(0xFFFFFF05.toInt())
+    }
 
     // === Dimensions (base values, multiply by scale()) ===
     // Modern, larger UI elements for better touch targets and visibility

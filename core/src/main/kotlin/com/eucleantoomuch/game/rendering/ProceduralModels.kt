@@ -19,7 +19,6 @@ import com.eucleantoomuch.game.util.Constants
 class ProceduralModels : Disposable {
     private val modelBuilder = ModelBuilder()
     private val models = mutableListOf<Model>()
-    private val glbLoader = GLBLoader()
     private var eucGlbAsset: SceneAsset? = null
 
     private val attributes = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
@@ -113,25 +112,39 @@ class ProceduralModels : Disposable {
     var isEucPbr = false
         private set
 
-    fun createEucModel(): Model {
+    fun createEucModel(wheelId: String = "standard"): Model {
+        // Map wheel IDs to GLB files
+        val glbFileName = when (wheelId) {
+            "performance" -> "monowheel2.glb"
+            else -> "monowheel.glb"
+        }
+
+        Gdx.app.log("ProceduralModels", "Loading EUC model for wheelId='$wheelId', file='$glbFileName'")
+
         // Try to load external model, fallback to procedural
         return try {
-            val modelFile = Gdx.files.internal("monowheel.glb")
+            val modelFile = Gdx.files.internal(glbFileName)
             if (modelFile.exists()) {
                 // External model loaded - apply scale and rotation
                 eucModelScale = 0.35f  // Slightly bigger
                 eucModelRotationX = 0f  // No vertical flip
                 eucModelRotationY = 0f    // No horizontal flip
-                eucGlbAsset = glbLoader.load(modelFile)
+
+                // Create new loader to avoid caching issues
+                val loader = GLBLoader()
+                eucGlbAsset = loader.load(modelFile)
                 isEucPbr = true
+                Gdx.app.log("ProceduralModels", "Successfully loaded $glbFileName")
                 eucGlbAsset!!.scene.model.also { models.add(it) }
             } else {
+                Gdx.app.error("ProceduralModels", "$glbFileName not found, using procedural model")
                 eucModelScale = 1f
                 isEucPbr = false
                 createProceduralEucModel()
             }
         } catch (e: Exception) {
-            Gdx.app.error("ProceduralModels", "Failed to load monowheel.glb: ${e.message}")
+            Gdx.app.error("ProceduralModels", "Failed to load $glbFileName: ${e.message}")
+            e.printStackTrace()
             eucModelScale = 1f
             isEucPbr = false
             createProceduralEucModel()

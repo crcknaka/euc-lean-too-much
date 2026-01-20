@@ -23,7 +23,6 @@ class EntityFactory(
     private val engine: Engine,
     private val models: ProceduralModels
 ) {
-    private val eucModel by lazy { models.createEucModel() }
     private val riderModel by lazy { models.createRiderModel() }
     private val leftArmModel by lazy { models.createArmModel(isLeft = true) }
     private val rightArmModel by lazy { models.createArmModel(isLeft = false) }
@@ -34,7 +33,8 @@ class EntityFactory(
     fun createPlayer(wheelType: WheelType = WheelType.Standard): Entity {
         val entity = engine.createEntity()
 
-        // Create model instance first - this triggers lazy init and sets eucModelScale
+        // Load EUC model for the selected wheel type
+        val eucModel = models.createEucModel(wheelType.id)
         val eucModelInstance = ModelInstance(eucModel)
 
         // Now read the scale (after lazy init has set it)

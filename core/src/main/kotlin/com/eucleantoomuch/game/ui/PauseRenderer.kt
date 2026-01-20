@@ -7,8 +7,8 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 
 /**
- * Modern pause menu with large, easy-to-tap buttons.
- * Clean vertical layout for quick navigation.
+ * Modern pause menu with glassmorphism effect.
+ * Horizontal layout optimized for landscape mobile screens.
  */
 class PauseRenderer : Disposable {
     private val ui = UIRenderer()
@@ -41,7 +41,7 @@ class PauseRenderer : Disposable {
         val scale = UITheme.Dimensions.scale()
 
         // Update animations
-        overlayAlpha = UITheme.Anim.ease(overlayAlpha, 0.78f, 6f)
+        overlayAlpha = UITheme.Anim.ease(overlayAlpha, 0.7f, 6f)
         panelScale = UITheme.Anim.ease(panelScale, 1f, 6f)
 
         // Check hover
@@ -54,40 +54,58 @@ class PauseRenderer : Disposable {
 
         ui.beginShapes()
 
-        // Dark overlay
-        ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
-        ui.shapes.rect(0f, 0f, sw, sh)
+        // Full gradient background overlay with visible color transition
+        val topBgColor = UITheme.withAlpha(Color(0x1a1a30FF.toInt()), overlayAlpha)
+        val bottomBgColor = UITheme.withAlpha(Color(0x0a0a18FF.toInt()), overlayAlpha)
+        for (i in 0 until 12) {
+            val t = i / 12f
+            val segColor = UITheme.lerp(bottomBgColor, topBgColor, t)
+            ui.shapes.color = segColor
+            ui.shapes.rect(0f, sh * t, sw, sh / 12f + 1)
+        }
 
-        // Panel dimensions with scale animation (taller for 4 buttons)
-        val panelWidth = 480f * scale * panelScale
-        val panelHeight = 720f * scale * panelScale  // Increased height for 4 buttons
+        // Glass panel - wider for horizontal layout, taller for more vertical space
+        val panelWidth = 700f * scale * panelScale
+        val panelHeight = 480f * scale * panelScale  // Increased height
         val panelX = centerX - panelWidth / 2
-        val panelY = centerY - panelHeight / 2
+        val panelY = centerY - panelHeight / 2  // Centered
 
-        // Main panel with accent color border
-        ui.panel(panelX, panelY, panelWidth, panelHeight,
-            backgroundColor = UITheme.surface,
-            borderColor = UITheme.accent)
+        // Glass effect panel
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
+            tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.85f),
+            borderGlow = UITheme.accent)
 
-        // Button layout - vertical stack with generous spacing
-        val buttonWidth = 340f * scale
-        val buttonHeight = UITheme.Dimensions.buttonHeightSmall
-        val buttonSpacing = 22f * scale
-        val buttonX = centerX - buttonWidth / 2
+        // Accent line at top
+        ui.shapes.color = UITheme.accent
+        ui.roundedRect(panelX + 30f * scale, panelY + panelHeight - 8f * scale,
+            panelWidth - 60f * scale, 4f * scale, 2f * scale, UITheme.accent)
 
-        // Calculate buttons from top to bottom (more space from title)
-        val firstButtonY = panelY + panelHeight - 220f * scale  // More space below title
+        // === HORIZONTAL BUTTON LAYOUT ===
+        // Two rows: Resume (big) on top, 3 smaller buttons below
+        val buttonGap = 20f * scale
 
-        resumeButton.set(buttonX, firstButtonY, buttonWidth, buttonHeight)
-        restartButton.set(buttonX, firstButtonY - buttonHeight - buttonSpacing, buttonWidth, buttonHeight)
-        settingsButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 2, buttonWidth, buttonHeight)
-        menuButton.set(buttonX, firstButtonY - (buttonHeight + buttonSpacing) * 3, buttonWidth, buttonHeight)
+        // Resume button - full width, positioned lower in panel
+        val resumeWidth = panelWidth - 80f * scale
+        val resumeHeight = 100f * scale
+        val resumeX = panelX + 40f * scale
+        val resumeY = panelY + panelHeight - 280f * scale  // Moved down more
 
-        // Buttons with modern styling
-        ui.button(resumeButton, UITheme.accent, glowIntensity = resumeHover * 0.7f)
-        ui.button(restartButton, UITheme.secondary, glowIntensity = restartHover * 0.6f)
-        ui.button(settingsButton, UITheme.surfaceLight, glowIntensity = settingsHover * 0.4f)
-        ui.button(menuButton, UITheme.surfaceLight, glowIntensity = menuHover * 0.4f)
+        resumeButton.set(resumeX, resumeY, resumeWidth, resumeHeight)
+        ui.neonButton(resumeButton, UITheme.accent, UITheme.accent, 0.3f + resumeHover * 0.7f)
+
+        // Second row: 3 buttons side by side
+        val smallButtonWidth = (resumeWidth - buttonGap * 2) / 3
+        val smallButtonHeight = 80f * scale
+        val smallButtonsY = resumeY - resumeHeight - 30f * scale
+
+        restartButton.set(resumeX, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        ui.neonButton(restartButton, UITheme.secondary, UITheme.secondary, restartHover * 0.6f)
+
+        settingsButton.set(resumeX + smallButtonWidth + buttonGap, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        ui.neonButton(settingsButton, UITheme.surfaceLight, UITheme.textSecondary, settingsHover * 0.4f)
+
+        menuButton.set(resumeX + (smallButtonWidth + buttonGap) * 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.danger, menuHover * 0.5f)
 
         ui.endShapes()
 
@@ -95,19 +113,22 @@ class PauseRenderer : Disposable {
         ui.beginBatch()
 
         if (panelScale > 0.5f) {
-            // Title with more top padding
-            val titleY = panelY + panelHeight - 70f * scale  // More space from top edge
+            // Title - positioned lower
+            val titleY = panelY + panelHeight - 90f * scale
             ui.textCentered("PAUSED", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
-            // Button labels with larger font
-            ui.textCentered("RESUME", resumeButton.x + resumeButton.width / 2, resumeButton.y + resumeButton.height / 2,
-                UIFonts.button, UITheme.textPrimary)
-            ui.textCentered("RESTART", restartButton.x + restartButton.width / 2, restartButton.y + restartButton.height / 2,
-                UIFonts.button, UITheme.textPrimary)
-            ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2, settingsButton.y + settingsButton.height / 2,
-                UIFonts.button, UITheme.textPrimary)
-            ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
-                UIFonts.button, UITheme.textPrimary)
+            // Button labels
+            ui.textCentered("RESUME", resumeButton.x + resumeButton.width / 2,
+                resumeButton.y + resumeButton.height / 2, UIFonts.button, UITheme.textPrimary)
+
+            ui.textCentered("RESTART", restartButton.x + restartButton.width / 2,
+                restartButton.y + restartButton.height / 2, UIFonts.body, UITheme.textPrimary)
+
+            ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2,
+                settingsButton.y + settingsButton.height / 2, UIFonts.body, UITheme.textPrimary)
+
+            ui.textCentered("MENU", menuButton.x + menuButton.width / 2,
+                menuButton.y + menuButton.height / 2, UIFonts.body, UITheme.textPrimary)
         }
 
         ui.endBatch()

@@ -330,6 +330,263 @@ class UIRenderer : Disposable {
         font.draw(batch, text, x, y)
     }
 
+    // === NEW: Neon Street Style Components ===
+
+    /** DEPRECATED: Glow removed for clean look. Does nothing now. */
+    @Suppress("UNUSED_PARAMETER")
+    fun neonGlow(
+        x: Float, y: Float, width: Float, height: Float,
+        radius: Float, glowColor: Color, intensity: Float = 1f, layers: Int = 4
+    ) {
+        // No glow - clean look
+    }
+
+    /** Draw a clean modern card with gradient - NO GLOW */
+    fun card(
+        x: Float, y: Float, width: Float, height: Float,
+        radius: Float = UITheme.Dimensions.panelRadius,
+        backgroundColor: Color = UITheme.surfaceSolid,
+        @Suppress("UNUSED_PARAMETER") glowColor: Color? = null,
+        @Suppress("UNUSED_PARAMETER") glowIntensity: Float = 0.5f
+    ) {
+        val scale = UITheme.Dimensions.scale()
+
+        // Clean shadow (no glow)
+        roundedRect(
+            x + 3f * scale, y - 6f * scale,
+            width, height, radius,
+            UITheme.withAlpha(Color.BLACK, 0.35f)
+        )
+
+        // Gradient background (darker at bottom, lighter at top)
+        val bottomColor = UITheme.darken(backgroundColor, 0.06f)
+        val topColor = UITheme.brighten(backgroundColor, 0.04f)
+        val segments = 5
+        val segHeight = height / segments
+        for (i in 0 until segments) {
+            val t = i.toFloat() / segments
+            val segColor = UITheme.lerp(bottomColor, topColor, t)
+            val segY = y + i * segHeight
+            if (i == 0 || i == segments - 1) {
+                roundedRect(x, segY, width, segHeight + 1, radius, segColor)
+            } else {
+                shapes.color = segColor
+                shapes.rect(x, segY, width, segHeight + 1)
+            }
+        }
+
+        // Subtle top edge highlight for depth
+        shapes.color = UITheme.withAlpha(Color.WHITE, 0.1f)
+        roundedRect(x + radius, y + height - 2f * scale, width - radius * 2, 2f * scale, 1f, shapes.color)
+    }
+
+    /** Draw a clean modern panel with gradient - NO GLOW */
+    fun glassPanel(
+        x: Float, y: Float, width: Float, height: Float,
+        radius: Float = UITheme.Dimensions.panelRadius,
+        tintColor: Color = UITheme.surfaceGlass,
+        @Suppress("UNUSED_PARAMETER") borderGlow: Color? = null
+    ) {
+        val scale = UITheme.Dimensions.scale()
+
+        // Clean shadow (no glow)
+        roundedRect(
+            x + 4f * scale, y - 8f * scale,
+            width, height, radius,
+            UITheme.withAlpha(Color.BLACK, 0.4f)
+        )
+
+        // Panel gradient background (darker at bottom, lighter at top)
+        val baseColor = if (tintColor.a < 0.5f) UITheme.surfaceSolid else tintColor
+        val bottomColor = UITheme.darken(baseColor, 0.08f)
+        val topColor = UITheme.brighten(baseColor, 0.04f)
+        val segments = 6
+        val segHeight = height / segments
+        for (i in 0 until segments) {
+            val t = i.toFloat() / segments
+            val segColor = UITheme.lerp(bottomColor, topColor, t)
+            val segY = y + i * segHeight
+            if (i == 0 || i == segments - 1) {
+                roundedRect(x, segY, width, segHeight + 1, radius, segColor)
+            } else {
+                shapes.color = segColor
+                shapes.rect(x, segY, width, segHeight + 1)
+            }
+        }
+
+        // Subtle top edge highlight for depth
+        shapes.color = UITheme.withAlpha(Color.WHITE, 0.1f)
+        roundedRect(x + radius / 2, y + height - 3f * scale, width - radius, 3f * scale, 1.5f, shapes.color)
+
+        // Clean border outline
+        shapes.end()
+        shapes.begin(ShapeRenderer.ShapeType.Line)
+        Gdx.gl.glLineWidth(1.5f)
+        roundedRectOutline(x, y, width, height, radius, UITheme.withAlpha(Color.WHITE, 0.08f))
+        shapes.end()
+        shapes.begin(ShapeRenderer.ShapeType.Filled)
+    }
+
+    /** Draw a clean modern button with gradient fill - NO GLOW */
+    fun neonButton(
+        rect: Rectangle,
+        color: Color,
+        @Suppress("UNUSED_PARAMETER") glowColor: Color = color,
+        @Suppress("UNUSED_PARAMETER") glowIntensity: Float = 0f,
+        pressedOffset: Float = 0f
+    ) {
+        val x = rect.x
+        val y = rect.y - pressedOffset
+        val radius = UITheme.Dimensions.buttonRadius
+        val scale = UITheme.Dimensions.scale()
+
+        // Clean shadow (no glow)
+        val shadowOffset = (5f * scale - pressedOffset * 2).coerceAtLeast(0f)
+        if (shadowOffset > 0) {
+            roundedRect(
+                x + 2f * scale, y - shadowOffset,
+                rect.width, rect.height, radius,
+                UITheme.withAlpha(Color.BLACK, 0.35f)
+            )
+        }
+
+        // Button body with gradient (darker at bottom, brighter at top)
+        val bottomColor = UITheme.darken(color, 0.12f)
+        val topColor = UITheme.brighten(color, 0.08f)
+        val gradientSegments = 6
+        val segmentHeight = rect.height / gradientSegments
+        for (i in 0 until gradientSegments) {
+            val t = i.toFloat() / gradientSegments
+            val segColor = UITheme.lerp(bottomColor, topColor, t)
+            val segY = y + i * segmentHeight
+            if (i == 0) {
+                roundedRect(x, segY, rect.width, segmentHeight + 1, radius, segColor)
+            } else if (i == gradientSegments - 1) {
+                roundedRect(x, segY, rect.width, segmentHeight, radius, segColor)
+            } else {
+                shapes.color = segColor
+                shapes.rect(x, segY, rect.width, segmentHeight + 1)
+            }
+        }
+
+        // Subtle top edge highlight for depth
+        shapes.color = UITheme.withAlpha(Color.WHITE, 0.15f)
+        roundedRect(x + 4f * scale, y + rect.height - 6f * scale, rect.width - 8f * scale, 3f * scale, 1.5f * scale, shapes.color)
+    }
+
+    /** Draw a clean circular icon button - NO GLOW */
+    fun iconButton(
+        cx: Float, cy: Float, radius: Float,
+        color: Color,
+        @Suppress("UNUSED_PARAMETER") glowColor: Color = color,
+        @Suppress("UNUSED_PARAMETER") glowIntensity: Float = 0f
+    ) {
+        val scale = UITheme.Dimensions.scale()
+
+        // Clean shadow (no glow)
+        shapes.color = UITheme.withAlpha(Color.BLACK, 0.3f)
+        shapes.circle(cx + 2f * scale, cy - 3f * scale, radius)
+
+        // Button with subtle gradient effect (darker at edges)
+        shapes.color = UITheme.darken(color, 0.05f)
+        shapes.circle(cx, cy, radius)
+
+        // Brighter center for depth
+        shapes.color = UITheme.brighten(color, 0.05f)
+        shapes.circle(cx, cy, radius * 0.85f)
+
+        // Subtle top highlight
+        shapes.color = UITheme.withAlpha(Color.WHITE, 0.1f)
+        shapes.circle(cx, cy + radius * 0.3f, radius * 0.5f)
+    }
+
+    /** Draw a clean progress bar - NO GLOW */
+    fun neonBar(
+        x: Float, y: Float, width: Float, height: Float,
+        progress: Float, // 0-1
+        backgroundColor: Color = UITheme.surfaceLight,
+        fillColor: Color = UITheme.accent,
+        @Suppress("UNUSED_PARAMETER") glowIntensity: Float = 0.5f
+    ) {
+        val radius = height / 2
+
+        // Background
+        roundedRect(x, y, width, height, radius, backgroundColor)
+
+        // Fill with gradient (no glow)
+        val fillWidth = (width * progress).coerceAtLeast(radius * 2)
+        if (progress > 0) {
+            val bottomFill = UITheme.darken(fillColor, 0.08f)
+            val topFill = UITheme.brighten(fillColor, 0.05f)
+            // Simple gradient by drawing two layers
+            roundedRect(x, y, fillWidth, height, radius, bottomFill)
+            roundedRect(x, y + height * 0.4f, fillWidth, height * 0.5f, radius * 0.6f, topFill)
+        }
+    }
+
+    /** Draw a clean badge (small rounded label) - NO GLOW */
+    fun badge(
+        x: Float, y: Float, width: Float, height: Float,
+        color: Color,
+        @Suppress("UNUSED_PARAMETER") glowIntensity: Float = 0f
+    ) {
+        val radius = height / 2
+        val scale = UITheme.Dimensions.scale()
+
+        // Clean shadow (no glow)
+        shapes.color = UITheme.withAlpha(Color.BLACK, 0.25f)
+        roundedRect(x + 1f * scale, y - 2f * scale, width, height, radius, shapes.color)
+
+        // Badge with subtle gradient
+        val bottomColor = UITheme.darken(color, 0.05f)
+        roundedRect(x, y, width, height, radius, bottomColor)
+        roundedRect(x, y + height * 0.5f, width, height * 0.4f, radius * 0.7f, color)
+    }
+
+    /** Draw a full-screen gradient background */
+    fun gradientBackground(topColor: Color = UITheme.Gradients.backgroundTop, bottomColor: Color = UITheme.Gradients.backgroundBottom) {
+        val segments = 12
+        val segHeight = screenHeight / segments
+        for (i in 0 until segments) {
+            val t = i.toFloat() / segments
+            val segColor = UITheme.lerp(bottomColor, topColor, t)
+            shapes.color = segColor
+            shapes.rect(0f, i * segHeight, screenWidth, segHeight + 1)
+        }
+    }
+
+    /** Draw a separator line with gradient fade */
+    fun separator(x: Float, y: Float, width: Float, color: Color = UITheme.surfaceBorder) {
+        val scale = UITheme.Dimensions.scale()
+        val height = 2f * scale
+
+        // Draw faded edges
+        val fadeWidth = width * 0.2f
+        val segments = 10
+
+        // Left fade
+        for (i in 0 until segments) {
+            val t = i.toFloat() / segments
+            val segX = x + fadeWidth * t / segments * i
+            val segWidth = fadeWidth / segments
+            shapes.color = UITheme.withAlpha(color, t * 0.6f)
+            shapes.rect(segX, y, segWidth, height)
+        }
+
+        // Center solid
+        shapes.color = UITheme.withAlpha(color, 0.6f)
+        shapes.rect(x + fadeWidth, y, width - fadeWidth * 2, height)
+
+        // Right fade
+        for (i in 0 until segments) {
+            val t = 1f - i.toFloat() / segments
+            val segX = x + width - fadeWidth + fadeWidth * i / segments
+            val segWidth = fadeWidth / segments
+            shapes.color = UITheme.withAlpha(color, t * 0.6f)
+            shapes.rect(segX, y, segWidth, height)
+        }
+    }
+
     override fun dispose() {
         batch.dispose()
         shapes.dispose()
