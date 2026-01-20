@@ -2,23 +2,20 @@ package com.eucleantoomuch.game.ui
 
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
-import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.PerspectiveCamera
-import com.badlogic.gdx.graphics.g3d.Environment
-import com.badlogic.gdx.graphics.g3d.Model
-import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
-import com.badlogic.gdx.graphics.g3d.Material
-import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
-import com.badlogic.gdx.graphics.VertexAttributes
-import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.state.SettingsManager
+import net.mgsx.gltf.loaders.glb.GLBLoader
+import net.mgsx.gltf.scene3d.scene.SceneAsset
+import net.mgsx.gltf.scene3d.scene.SceneManager
+import net.mgsx.gltf.scene3d.scene.Scene
+import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
 
 /**
  * Wheel selection screen - allows player to choose between 3 EUC types.
@@ -47,14 +44,12 @@ class WheelSelectionRenderer(
     private var currentIndex = 0  // Default to Standard (first in list)
     private val wheels = WheelType.ALL
 
-    // 3D preview
+    // 3D preview with PBR rendering
     private lateinit var previewCamera: PerspectiveCamera
-    private lateinit var previewBatch: ModelBatch
-    private lateinit var previewEnvironment: Environment
-    private val wheelModelInstances = mutableMapOf<String, ModelInstance>()
-    private val wheelModels = mutableListOf<Model>()
-    private val modelBuilder = ModelBuilder()
-    private val attributes = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
+    private lateinit var sceneManager: SceneManager
+    private val glbLoader = GLBLoader()
+    private val wheelSceneAssets = mutableMapOf<String, SceneAsset>()
+    private val wheelScenes = mutableMapOf<String, Scene>()
 
     enum class Action {
         NONE, START, BACK
@@ -70,63 +65,53 @@ class WheelSelectionRenderer(
 
     private fun initPreview() {
         previewCamera = PerspectiveCamera(45f, 400f, 400f)
-        previewCamera.position.set(0f, 0.4f, -1.0f)
-        previewCamera.lookAt(0f, 0.2f, 0f)
+        previewCamera.position.set(0f, 0.6f, -1.0f)
+        previewCamera.lookAt(0f, 0.4f, 0f)
         previewCamera.near = 0.1f
         previewCamera.far = 10f
         previewCamera.update()
 
-        previewBatch = ModelBatch()
-        previewEnvironment = Environment().apply {
-            set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
-            add(DirectionalLight().set(0.9f, 0.9f, 0.9f, -0.5f, -1f, 0.5f))
-            add(DirectionalLight().set(0.4f, 0.4f, 0.5f, 0.5f, -0.5f, -0.5f))
-        }
+        // Setup SceneManager for PBR rendering
+        sceneManager = SceneManager()
+        sceneManager.setCamera(previewCamera)
+        sceneManager.setAmbientLight(0.02f)  // Low ambient like in game
 
-        // Create model instances for each wheel type
-        wheels.forEach { wheel ->
-            val model = createWheelModel(wheel)
-            wheelModels.add(model)
-            wheelModelInstances[wheel.id] = ModelInstance(model)
-        }
+        // Add directional light - similar to GameRenderer settings
+        val light = DirectionalLightEx()
+        light.direction.set(-0.5f, -1f, 0.5f).nor()
+        light.color.set(1f, 1f, 1f, 1f)
+        light.intensity = 5.5f  // Match game lighting
+        sceneManager.environment.add(light)
+
+        // Load GLB models for each wheel type
+        loadWheelModels()
     }
 
-    private fun createWheelModel(wheelType: WheelType): Model {
-        modelBuilder.begin()
-
-        // Wheel (cylinder)
-        val wheelColor = Color(0.1f, 0.1f, 0.1f, 1f)  // Black tire
-        val wheelMaterial = Material(ColorAttribute.createDiffuse(wheelColor))
-        val wheelPart = modelBuilder.part("wheel", GL20.GL_TRIANGLES, attributes, wheelMaterial)
-        wheelPart.cylinder(
-            wheelType.wheelRadius * 2,
-            0.12f,
-            wheelType.wheelRadius * 2,
-            20
+    private fun loadWheelModels() {
+        // Map wheel types to their GLB files
+        val wheelFiles = mapOf(
+            "standard" to "monowheel.glb",
+            "performance" to "monowheel2.glb"
         )
 
-        // Body - use wheelType.bodyColor
-        val bodyMaterial = Material(ColorAttribute.createDiffuse(wheelType.bodyColor))
-        val bodyPart = modelBuilder.part("body", GL20.GL_TRIANGLES, attributes, bodyMaterial)
-        bodyPart.setVertexTransform(Matrix4().translate(0f, 0.28f, 0f))
-        bodyPart.box(0.16f, 0.35f, 0.22f)
-
-        // Accent trim on top
-        val accentMaterial = Material(ColorAttribute.createDiffuse(wheelType.accentColor))
-        val accentPart = modelBuilder.part("accent", GL20.GL_TRIANGLES, attributes, accentMaterial)
-        accentPart.setVertexTransform(Matrix4().translate(0f, 0.47f, 0f))
-        accentPart.box(0.17f, 0.03f, 0.23f)
-
-        // Side accents
-        val sideAccent1 = modelBuilder.part("side1", GL20.GL_TRIANGLES, attributes, accentMaterial)
-        sideAccent1.setVertexTransform(Matrix4().translate(-0.085f, 0.28f, 0f))
-        sideAccent1.box(0.02f, 0.25f, 0.18f)
-
-        val sideAccent2 = modelBuilder.part("side2", GL20.GL_TRIANGLES, attributes, accentMaterial)
-        sideAccent2.setVertexTransform(Matrix4().translate(0.085f, 0.28f, 0f))
-        sideAccent2.box(0.02f, 0.25f, 0.18f)
-
-        return modelBuilder.end()
+        wheels.forEach { wheel ->
+            val fileName = wheelFiles[wheel.id] ?: "monowheel.glb"
+            try {
+                val modelFile = Gdx.files.internal(fileName)
+                if (modelFile.exists()) {
+                    val asset = glbLoader.load(modelFile)
+                    wheelSceneAssets[wheel.id] = asset
+                    val scene = Scene(asset.scene)
+                    scene.modelInstance.transform.setToScaling(0.175f, 0.175f, 0.175f)
+                    wheelScenes[wheel.id] = scene
+                    Gdx.app.log("WheelSelection", "Loaded $fileName for ${wheel.id}")
+                } else {
+                    Gdx.app.error("WheelSelection", "$fileName not found")
+                }
+            } catch (e: Exception) {
+                Gdx.app.error("WheelSelection", "Failed to load $fileName: ${e.message}")
+            }
+        }
     }
 
     fun render(): Action {
@@ -173,32 +158,47 @@ class WheelSelectionRenderer(
             ui.shapes.rect(0f, stripY, sw, stripHeight)
         }
 
-        // Main panel - extends to bottom of screen
-        val panelWidth = 700f * scale * enterAnimProgress
-        val panelTopY = sh - 60f * scale  // Top of panel with small margin
-        val panelHeight = panelTopY * enterAnimProgress  // Extends to bottom
+        // === HORIZONTAL LAYOUT for landscape orientation ===
+        // Main panel - full screen with margins
+        val panelMargin = 40f * scale
+        val panelWidth = (sw - panelMargin * 2) * enterAnimProgress
+        val panelHeight = (sh - panelMargin * 2) * enterAnimProgress
         val panelX = centerX - panelWidth / 2
-        val panelY = 0f  // Start from bottom
+        val panelY = panelMargin
 
         ui.panel(panelX, panelY, panelWidth, panelHeight,
             radius = UITheme.Dimensions.panelRadius,
             backgroundColor = UITheme.surface)
 
-        // 3D Preview area background
-        val previewSize = 280f * scale
-        val previewX = centerX - previewSize / 2
-        val previewY = panelY + panelHeight - 120f * scale - previewSize
-        ui.roundedRect(previewX - 10f * scale, previewY - 10f * scale,
-            previewSize + 20f * scale, previewSize + 20f * scale,
-            16f * scale, UITheme.surfaceLight)
+        // Layout: Left side = 3D preview, Right side = info/stats/buttons
+        val leftSectionWidth = panelWidth * 0.45f
+        val rightSectionWidth = panelWidth * 0.55f
+        val leftSectionX = panelX
+        val rightSectionX = panelX + leftSectionWidth
 
-        // Arrow button dimensions
+        // Title at top center
+        val titleY = panelY + panelHeight - 40f * scale
+
+        // === LEFT SIDE: 3D Preview with arrows ===
+        val previewSize = (panelHeight - 120f * scale).coerceAtMost(leftSectionWidth - 100f * scale)
+        val previewX = leftSectionX + leftSectionWidth / 2
+        val previewY = panelY + (panelHeight - previewSize) / 2 - 20f * scale
+
+        // Preview background
+        ui.roundedRect(
+            previewX - previewSize / 2 - 10f * scale,
+            previewY - 10f * scale,
+            previewSize + 20f * scale,
+            previewSize + 20f * scale,
+            16f * scale, UITheme.surfaceLight
+        )
+
+        // Arrow buttons on sides of preview
         val arrowButtonSize = UITheme.Dimensions.arrowButtonSize
-        val valueBoxWidth = 320f * scale
 
         // Left arrow button
         leftButton.set(
-            centerX - valueBoxWidth / 2 - arrowButtonSize - 20f * scale,
+            leftSectionX + 20f * scale,
             previewY + previewSize / 2 - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
@@ -207,71 +207,81 @@ class WheelSelectionRenderer(
 
         // Right arrow button
         rightButton.set(
-            centerX + valueBoxWidth / 2 + 20f * scale,
+            leftSectionX + leftSectionWidth - arrowButtonSize - 20f * scale,
             previewY + previewSize / 2 - arrowButtonSize / 2,
             arrowButtonSize,
             arrowButtonSize
         )
         ui.button(rightButton, UITheme.secondary, glowIntensity = rightButtonHover * 0.6f)
 
-        // Stats section background - more space for wheel description above
-        val statsY = previewY - 310f * scale
-        val statsHeight = 150f * scale
-        ui.roundedRect(panelX + 40f * scale, statsY, panelWidth - 80f * scale, statsHeight,
-            12f * scale, UITheme.surfaceLight)
+        // === RIGHT SIDE: Info, Stats, Buttons ===
+        val rightCenterX = rightSectionX + rightSectionWidth / 2
+        val contentStartY = panelY + panelHeight - 100f * scale
+
+        // Wheel name area
+        val nameY = contentStartY - 20f * scale
+        val sizeY = nameY - 50f * scale
+        val descY = sizeY - 40f * scale
+
+        // Stats section
+        val statsTopY = descY - 50f * scale
+        val statsHeight = 130f * scale
+        val statsWidth = rightSectionWidth - 80f * scale
+        val statsX = rightSectionX + 40f * scale
+        val statsY = statsTopY - statsHeight
+
+        ui.roundedRect(statsX, statsY, statsWidth, statsHeight, 12f * scale, UITheme.surfaceLight)
 
         // Stat bars
-        val barWidth = 180f * scale
-        val barHeight = 16f * scale
-        val barStartX = centerX + 30f * scale
-        val barSpacing = 45f * scale
+        val barWidth = 160f * scale
+        val barHeight = 14f * scale
+        val barStartX = rightCenterX + 20f * scale
+        val barSpacing = 38f * scale
 
-        // Speed bar background
-        val speedBarY = statsY + statsHeight - 50f * scale
+        // Speed bar
+        val speedBarY = statsY + statsHeight - 40f * scale
         ui.roundedRect(barStartX, speedBarY, barWidth, barHeight, barHeight / 2, UITheme.surface)
-        // Speed bar fill
         val speedNorm = currentWheel.maxSpeed / 27.8f
         val speedFillWidth = (barWidth * speedNorm).coerceAtLeast(barHeight)
         ui.roundedRect(barStartX, speedBarY, speedFillWidth, barHeight, barHeight / 2, UITheme.accent)
 
-        // Stability bar background
+        // Stability bar
         val stabilityBarY = speedBarY - barSpacing
         ui.roundedRect(barStartX, stabilityBarY, barWidth, barHeight, barHeight / 2, UITheme.surface)
-        // Stability bar fill (inverse of pwmSensitivity, higher criticalLean = more stable)
         val stabilityNorm = ((currentWheel.criticalLean - 0.85f) / 0.25f).coerceIn(0f, 1f)
         val stabilityFillWidth = (barWidth * stabilityNorm).coerceAtLeast(barHeight)
         ui.roundedRect(barStartX, stabilityBarY, stabilityFillWidth, barHeight, barHeight / 2, UITheme.primary)
 
-        // Handling bar background
+        // Handling bar
         val handlingBarY = stabilityBarY - barSpacing
         ui.roundedRect(barStartX, handlingBarY, barWidth, barHeight, barHeight / 2, UITheme.surface)
-        // Handling bar fill (turn responsiveness)
         val handlingNorm = ((currentWheel.turnResponsiveness - 2f) / 3f).coerceIn(0f, 1f)
         val handlingFillWidth = (barWidth * handlingNorm).coerceAtLeast(barHeight)
         ui.roundedRect(barStartX, handlingBarY, handlingFillWidth, barHeight, barHeight / 2, UITheme.secondary)
 
-        // Start button - positioned lower
-        val buttonWidth = 280f * scale
+        // Buttons at bottom of right section
+        val buttonWidth = 160f * scale
         val buttonHeight = UITheme.Dimensions.buttonHeight
-        startButton.set(centerX - buttonWidth / 2, statsY - 160f * scale, buttonWidth, buttonHeight)
-        ui.button(startButton, UITheme.accent, glowIntensity = startButtonHover * 0.8f)
+        val buttonGap = 20f * scale
+        val buttonsY = panelY + 30f * scale
 
-        // Back button - more space below START
-        val backButtonWidth = 200f * scale
-        val backButtonHeight = UITheme.Dimensions.buttonHeightSmall
-        backButton.set(centerX - backButtonWidth / 2, startButton.y - backButtonHeight - 35f * scale, backButtonWidth, backButtonHeight)
-        ui.button(backButton, UITheme.surfaceLight, glowIntensity = backButtonHover * 0.4f)
+        // Back button on the left
+        backButton.set(rightCenterX - buttonGap / 2 - buttonWidth, buttonsY, buttonWidth, buttonHeight)
+        ui.button(backButton, UITheme.surfaceLight, glowIntensity = backButtonHover * 0.5f)
+
+        // Start button on the right
+        startButton.set(rightCenterX + buttonGap / 2, buttonsY, buttonWidth, buttonHeight)
+        ui.button(startButton, UITheme.accent, glowIntensity = startButtonHover * 0.8f)
 
         ui.endShapes()
 
         // === Render 3D Preview ===
-        render3DPreview(centerX, previewY, previewSize, currentWheel)
+        render3DPreview(previewX, previewY, previewSize, currentWheel)
 
         // === Draw Text ===
         ui.beginBatch()
 
-        // Title
-        val titleY = panelY + panelHeight - 50f * scale
+        // Title at top
         ui.textCentered("SELECT YOUR WHEEL", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
         // Arrow symbols
@@ -284,49 +294,35 @@ class WheelSelectionRenderer(
             rightButton.y + rightButton.height / 2,
             UIFonts.heading, UITheme.textPrimary)
 
-        // Wheel name - more space below preview
-        val nameY = previewY - 45f * scale
-        ui.textCentered(currentWheel.displayName, centerX, nameY, UIFonts.heading, UITheme.accent)
-
-        // Wheel size - more space below name
-        val sizeY = nameY - 45f * scale
-        ui.textCentered("${currentWheel.wheelSizeInches}\" wheel", centerX, sizeY, UIFonts.body, UITheme.textSecondary)
-
-        // Description - more space below size
-        val descY = sizeY - 35f * scale
-        ui.textCentered(currentWheel.description, centerX, descY, UIFonts.caption, UITheme.textMuted)
+        // Wheel info on right side
+        ui.textCentered(currentWheel.displayName, rightCenterX, nameY, UIFonts.heading, UITheme.accent)
+        ui.textCentered("${currentWheel.wheelSizeInches}\" wheel", rightCenterX, sizeY, UIFonts.body, UITheme.textSecondary)
+        ui.textCentered(currentWheel.description, rightCenterX, descY, UIFonts.caption, UITheme.textMuted)
 
         // Stats labels
-        val labelX = panelX + 60f * scale
+        val labelX = statsX + 20f * scale
         UIFonts.body.color = UITheme.textSecondary
         UIFonts.body.draw(ui.batch, "SPEED", labelX, speedBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
         UIFonts.body.draw(ui.batch, "STABILITY", labelX, stabilityBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
         UIFonts.body.draw(ui.batch, "HANDLING", labelX, handlingBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
 
-
         // Button labels
+        ui.textCentered("BACK", backButton.x + backButton.width / 2,
+            backButton.y + backButton.height / 2, UIFonts.button, UITheme.textSecondary)
         ui.textCentered("START", startButton.x + startButton.width / 2,
             startButton.y + startButton.height / 2, UIFonts.button, UITheme.textPrimary)
-        ui.textCentered("BACK", backButton.x + backButton.width / 2,
-            backButton.y + backButton.height / 2, UIFonts.body, UITheme.textSecondary)
-
-        // Wheel indicator dots
-        val dotY = previewY - 10f * scale
-        val dotSpacing = 20f * scale
-        val dotRadius = 6f * scale
-        for (i in wheels.indices) {
-            val dotX = centerX + (i - 1) * dotSpacing
-            val dotColor = if (i == currentIndex) UITheme.accent else UITheme.surfaceLight
-            // Draw dots using text circles since we're in batch mode
-        }
 
         ui.endBatch()
 
-        // Draw indicator dots (need shapes for this)
+        // Wheel indicator dots below preview
+        val dotY = previewY - 30f * scale
+        val dotSpacing = 20f * scale
+        val dotRadius = 6f * scale
+
         ui.beginShapes()
         val totalDotsWidth = (wheels.size - 1) * dotSpacing
         for (i in wheels.indices) {
-            val dotX = centerX - totalDotsWidth / 2 + i * dotSpacing
+            val dotX = previewX - totalDotsWidth / 2 + i * dotSpacing
             val dotColor = if (i == currentIndex) UITheme.accent else UITheme.surfaceBorder
             ui.shapes.color = dotColor
             ui.shapes.circle(dotX, dotY, dotRadius)
@@ -338,10 +334,6 @@ class WheelSelectionRenderer(
     }
 
     private fun render3DPreview(centerX: Float, y: Float, size: Float, wheel: WheelType) {
-        // Save current viewport
-        val prevViewportX = Gdx.graphics.backBufferWidth
-        val prevViewportY = Gdx.graphics.backBufferHeight
-
         // Set viewport for 3D preview area
         val viewportX = (centerX - size / 2).toInt()
         val viewportY = y.toInt()
@@ -354,14 +346,21 @@ class WheelSelectionRenderer(
         previewCamera.viewportWidth = size
         previewCamera.viewportHeight = size
         previewCamera.update()
+        sceneManager.setCamera(previewCamera)
 
-        val modelInstance = wheelModelInstances[wheel.id] ?: return
-        modelInstance.transform.idt()
-        modelInstance.transform.rotate(0f, 1f, 0f, wheelRotation)
+        // Get the scene for current wheel
+        val scene = wheelScenes[wheel.id] ?: return
 
-        previewBatch.begin(previewCamera)
-        previewBatch.render(modelInstance, previewEnvironment)
-        previewBatch.end()
+        // Update rotation
+        scene.modelInstance.transform.setToScaling(0.175f, 0.175f, 0.175f)
+        scene.modelInstance.transform.rotate(0f, 1f, 0f, wheelRotation)
+
+        // Render with SceneManager
+        sceneManager.getRenderableProviders().clear()
+        sceneManager.addScene(scene)
+        sceneManager.update(Gdx.graphics.deltaTime)
+        sceneManager.render()
+        sceneManager.removeScene(scene)
 
         // Restore full viewport
         Gdx.gl.glViewport(0, 0, Gdx.graphics.width, Gdx.graphics.height)
@@ -422,15 +421,22 @@ class WheelSelectionRenderer(
 
     fun recreate() {
         ui.recreate()
-        previewBatch.dispose()
-        previewBatch = ModelBatch()
+        sceneManager.dispose()
+        sceneManager = SceneManager()
+        sceneManager.setCamera(previewCamera)
+        sceneManager.setAmbientLight(0.02f)
+        val light = DirectionalLightEx()
+        light.direction.set(-0.5f, -1f, 0.5f).nor()
+        light.color.set(1f, 1f, 1f, 1f)
+        light.intensity = 5.5f
+        sceneManager.environment.add(light)
     }
 
     override fun dispose() {
         ui.dispose()
-        previewBatch.dispose()
-        wheelModels.forEach { it.dispose() }
-        wheelModels.clear()
-        wheelModelInstances.clear()
+        sceneManager.dispose()
+        wheelSceneAssets.values.forEach { it.dispose() }
+        wheelSceneAssets.clear()
+        wheelScenes.clear()
     }
 }
