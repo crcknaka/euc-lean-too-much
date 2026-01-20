@@ -35,6 +35,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     // Gameplay tab controls
     private val avasLeftButton = Rectangle()
     private val avasRightButton = Rectangle()
+    private val pwmWarningLeftButton = Rectangle()
+    private val pwmWarningRightButton = Rectangle()
     private val musicCheckbox = Rectangle()
     private val beepsCheckbox = Rectangle()
     private val noHudCheckbox = Rectangle()
@@ -61,6 +63,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     // Gameplay tab hovers
     private var avasLeftButtonHover = 0f
     private var avasRightButtonHover = 0f
+    private var pwmWarningLeftButtonHover = 0f
+    private var pwmWarningRightButtonHover = 0f
     private var musicCheckboxHover = 0f
     private var beepsCheckboxHover = 0f
     private var noHudCheckboxHover = 0f
@@ -129,12 +133,16 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         } else {
             val avasLeftHovered = avasLeftButton.contains(touchX, touchY)
             val avasRightHovered = avasRightButton.contains(touchX, touchY)
+            val pwmLeftHovered = pwmWarningLeftButton.contains(touchX, touchY)
+            val pwmRightHovered = pwmWarningRightButton.contains(touchX, touchY)
             val musicHovered = musicCheckbox.contains(touchX, touchY)
             val beepsHovered = beepsCheckbox.contains(touchX, touchY)
             val noHudHovered = noHudCheckbox.contains(touchX, touchY)
 
             avasLeftButtonHover = UITheme.Anim.ease(avasLeftButtonHover, if (avasLeftHovered) 1f else 0f, 10f)
             avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
+            pwmWarningLeftButtonHover = UITheme.Anim.ease(pwmWarningLeftButtonHover, if (pwmLeftHovered) 1f else 0f, 10f)
+            pwmWarningRightButtonHover = UITheme.Anim.ease(pwmWarningRightButtonHover, if (pwmRightHovered) 1f else 0f, 10f)
             musicCheckboxHover = UITheme.Anim.ease(musicCheckboxHover, if (musicHovered) 1f else 0f, 10f)
             beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
             noHudCheckboxHover = UITheme.Anim.ease(noHudCheckboxHover, if (noHudHovered) 1f else 0f, 10f)
@@ -251,8 +259,16 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 avasLeftButtonHover, avasRightButtonHover
             )
 
+            // PWM Warning (Beeps threshold)
+            val pwmWarningY = avasY - rowHeight
+            renderSelectorSetting(
+                contentCenterX, pwmWarningY, valueBoxWidth, arrowButtonSize,
+                pwmWarningLeftButton, pwmWarningRightButton,
+                pwmWarningLeftButtonHover, pwmWarningRightButtonHover
+            )
+
             // Music & Beeps Checkboxes (same row)
-            val checkboxRowY = avasY - rowHeight
+            val checkboxRowY = pwmWarningY - rowHeight
             val checkboxLeftX = panelX + 60f * scale  // Music on left
             val checkboxRightX = contentCenterX + 40f * scale  // Beeps on right
 
@@ -351,7 +367,13 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             renderArrowText(avasLeftButton, avasRightButton)
             ui.textCentered(settingsManager.getAvasModeName(), contentCenterX, avasY, UIFonts.body, UITheme.accent)
 
+            val pwmWarningY = avasY - rowHeight
+            ui.textCentered("PWM Beeps", contentCenterX, pwmWarningY + 50f * scale, UIFonts.body, UITheme.textSecondary)
+            renderArrowText(pwmWarningLeftButton, pwmWarningRightButton)
+            ui.textCentered(settingsManager.getPwmWarningName(), contentCenterX, pwmWarningY, UIFonts.body, UITheme.accent)
+
             // Music & Beeps labels (same row)
+            val checkboxRowY = pwmWarningY - rowHeight
             UIFonts.body.color = UITheme.textPrimary
             UIFonts.body.draw(ui.batch, "Music", musicCheckbox.x + checkboxLabelOffset,
                 musicCheckbox.y + musicCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
@@ -455,6 +477,16 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 if (avasRightButton.contains(touchX, touchY)) {
                     UIFeedback.tap()
                     settingsManager.setAvasModeByIndex((avasIndex + 1).coerceAtMost(SettingsManager.AVAS_OPTIONS.size - 1))
+                }
+
+                val pwmIndex = settingsManager.getPwmWarningIndex()
+                if (pwmWarningLeftButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setPwmWarningByIndex((pwmIndex - 1).coerceAtLeast(0))
+                }
+                if (pwmWarningRightButton.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.setPwmWarningByIndex((pwmIndex + 1).coerceAtMost(SettingsManager.PWM_WARNING_OPTIONS.size - 1))
                 }
 
                 if (musicCheckbox.contains(touchX, touchY)) {

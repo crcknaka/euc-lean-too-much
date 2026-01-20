@@ -109,8 +109,21 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // Update speed lines
         updateSpeedLines(sw, sh, scale)
 
-        // No HUD mode - skip all UI rendering
+        // No HUD mode - skip most UI rendering, but still show FPS if enabled
         if (settingsManager.noHud) {
+            // Only render FPS counter in No HUD mode if showFps is enabled
+            if (settingsManager.showFps) {
+                ui.beginBatch()
+                val fps = Gdx.graphics.framesPerSecond
+                val fpsColor = when {
+                    fps >= 55 -> UITheme.accent
+                    fps >= 30 -> UITheme.warning
+                    else -> UITheme.danger
+                }
+                UIFonts.caption.color = fpsColor
+                UIFonts.caption.draw(ui.batch, "FPS: $fps", 14f * scale, sh - 14f * scale)
+                ui.endBatch()
+            }
             return
         }
 
