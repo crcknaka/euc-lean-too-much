@@ -101,7 +101,7 @@ class RagdollRenderer : Disposable {
         }
 
         // Rider scale to match ProceduralModels
-        val riderScale = 1.4f
+        val riderScale = 1.55f
 
         // Head with helmet - composite model
         modelBuilder.begin()

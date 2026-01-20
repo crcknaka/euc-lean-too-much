@@ -699,8 +699,7 @@ class EucGame(
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
-                riderTransform.position.x -= 0.05f  // Slightly right to center on wheel
-                riderTransform.position.y += 0.7f  // Stand on top of EUC
+                riderTransform.position.y += 0.55f  // Stand on top of EUC (lowered)
                 riderTransform.yaw = playerTransform.yaw
                 riderTransform.updateRotationFromYaw()
             }
@@ -1375,10 +1374,9 @@ class EucGame(
                 // Update rider position with fall animation offsets
                 riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                     riderTransform.position.set(playerTransform.position)
-                    riderTransform.position.x -= 0.05f
 
                     val pitchCompensation = (fallAnimationController.riderPitch / 90f) * 0.5f
-                    val baseY = 0.7f + fallAnimationController.riderYOffset + pitchCompensation
+                    val baseY = 0.55f + fallAnimationController.riderYOffset + pitchCompensation
                     riderTransform.position.y = (playerTransform.position.y + baseY).coerceAtLeast(0.3f)
 
                     riderTransform.position.z += fallAnimationController.riderForwardOffset
@@ -1516,8 +1514,7 @@ class EucGame(
             // Update rider position and lean
             riderEntity?.getComponent(TransformComponent::class.java)?.let { transform ->
                 transform.position.set(currentFrame.playerPosition)
-                transform.position.x -= 0.05f
-                transform.position.y += 0.7f
+                transform.position.y += 0.55f
                 transform.yaw = currentFrame.playerYaw
                 transform.updateRotationFromYaw()
             }

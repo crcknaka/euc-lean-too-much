@@ -211,11 +211,13 @@ class RagdollPhysics : Disposable {
         forwardLean: Float,
         yawRad: Float
     ) {
-        // EUC as a simple box collider
-        val halfHeight = 0.225f
-        eucShape = btBoxShape(Vector3(0.075f, halfHeight, halfHeight))
+        // EUC as a cylinder collider oriented along X axis (wheel shape)
+        val wheelRadius = 0.35f  // Match visual model size
+        val wheelWidth = 0.15f   // Thickness of the wheel
+        eucShape = btCylinderShapeX(Vector3(wheelWidth / 2f, wheelRadius, wheelRadius))
+        val halfHeight = wheelRadius
 
-        val eucMass = 18f  // Lighter for more dramatic movement
+        val eucMass = 30f  // Realistic EUC weight (~25-30 kg)
         val eucInertia = Vector3()
         eucShape!!.calculateLocalInertia(eucMass, eucInertia)
 
@@ -232,44 +234,44 @@ class RagdollPhysics : Disposable {
         tempMatrix.idt()
         tempMatrix.translate(eucPosition.x, startY, eucPosition.z)
         tempMatrix.rotate(Vector3.Y, eucYaw)
-        // Start tilted
-        tempMatrix.rotate(Vector3.Z, fallDirection * 20f)
-        tempMatrix.rotate(Vector3.X, -forwardLean * 15f)
+        // Start slightly tilted
+        tempMatrix.rotate(Vector3.Z, fallDirection * 15f)
+        tempMatrix.rotate(Vector3.X, -forwardLean * 10f)
 
         eucMotionState = btDefaultMotionState(tempMatrix)
         val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
         eucBody = btRigidBody(eucInfo)
-        eucBody!!.friction = 0.6f
-        eucBody!!.restitution = 0.3f  // Some bounce
-        eucBody!!.setDamping(0.1f, 0.15f)  // Low damping for more tumbling
+        eucBody!!.friction = 0.7f  // Good friction for rolling
+        eucBody!!.restitution = 0.25f  // Moderate bounce
+        eucBody!!.setDamping(0.2f, 0.4f)  // Higher damping for smoother, less jittery motion
 
-        // Enable CCD
+        // Disable deactivation so wheel keeps moving (like ragdoll parts)
+        eucBody!!.activationState = 4  // DISABLE_DEACTIVATION
+
+        // Enable CCD for fast-moving objects
         eucBody!!.setCcdMotionThreshold(0.05f)
-        eucBody!!.setCcdSweptSphereRadius(halfHeight * 0.9f)
+        eucBody!!.setCcdSweptSphereRadius(wheelRadius * 0.8f)
 
-        // Speed factor - more dramatic at higher speeds
-        val speedFactor = (playerVelocity / 10f).coerceIn(0.5f, 2f)
+        // Forward momentum - wheel keeps forward velocity
+        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.8f
+        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.8f
 
-        // Forward momentum - keeps going forward
-        val forwardX = kotlin.math.sin(yawRad) * playerVelocity * 0.7f
-        val forwardZ = kotlin.math.cos(yawRad) * playerVelocity * 0.7f
-
-        // Side kick based on lean and speed
-        val sideKick = (2f + playerVelocity * 0.3f) * fallDirection
+        // Side kick based on lean - moderate side push
+        val sideKick = (1.5f + playerVelocity * 0.15f) * fallDirection
         val sideX = kotlin.math.cos(yawRad) * sideKick
         val sideZ = -kotlin.math.sin(yawRad) * sideKick
 
-        // Upward kick - higher at higher speeds for tumbling
-        val upKick = 1f + playerVelocity * 0.15f
+        // Upward kick - small bounce
+        val upKick = 0.5f + playerVelocity * 0.08f
 
         eucBody!!.linearVelocity = Vector3(forwardX + sideX, upKick, forwardZ + sideZ)
 
-        // Angular velocity - tumble and spin based on speed
-        val tumbleSpeed = (3f + playerVelocity * 0.5f) * speedFactor
+        // Angular velocity - gentle tumble, not crazy spinning
+        val gentleTumble = 1.5f + playerVelocity * 0.1f
         eucBody!!.angularVelocity = Vector3(
-            -forwardLean * tumbleSpeed,           // Pitch tumble
-            sideLean * tumbleSpeed * 0.5f,        // Yaw spin
-            fallDirection * tumbleSpeed * 1.5f    // Roll to the side
+            fallDirection * gentleTumble,        // Slight roll to the side
+            sideLean * gentleTumble * 0.2f,      // Minor yaw
+            -forwardLean * gentleTumble * 0.3f   // Minor pitch
         )
 
         dynamicsWorld.addRigidBody(eucBody)
@@ -285,7 +287,7 @@ class RagdollPhysics : Disposable {
         yawRad: Float
     ) {
         // Rider scale to match visual models
-        val riderScale = 1.4f
+        val riderScale = 1.55f
 
         // Base position (hip level, above EUC)
         val baseX = eucPosition.x
@@ -423,7 +425,7 @@ class RagdollPhysics : Disposable {
     ) {
         // torsoHeight is full height, box half-extent is torsoHeight/2
         val torsoHalfHeight = torsoHeight / 2
-        val riderScale = 1.4f
+        val riderScale = 1.55f
         val torsoWidth = 0.175f * riderScale
 
         // Neck joint (head to torso) - connect top of torso to bottom of head

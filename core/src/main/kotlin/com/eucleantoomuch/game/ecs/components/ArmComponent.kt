@@ -40,8 +40,8 @@ class ArmComponent : Component, Pool.Poolable {
     // Shoulder attachment offsets from rider body center (set once based on model)
     // Torso is at Y=1.0 with height 0.6, so top of torso (shoulders) is at Y=1.3
     // Torso width is 0.35, half = 0.175. Add arm thickness (0.09) to place arms outside body
-    var shoulderOffsetX: Float = (0.175f + 0.05f) * 1.4f  // Half torso width + gap, * rider scale
-    var shoulderOffsetY: Float = 1.25f * 1.4f    // Slightly below top of torso (shoulder joint)
+    var shoulderOffsetX: Float = (0.175f + 0.05f) * 1.55f  // Half torso width + gap, * rider scale
+    var shoulderOffsetY: Float = 1.30f * 1.55f    // Higher - closer to shoulders
     var shoulderOffsetZ: Float = 0f
 
     companion object {

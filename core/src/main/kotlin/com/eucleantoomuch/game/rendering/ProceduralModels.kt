@@ -9,17 +9,18 @@ import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.Model
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
-import com.badlogic.gdx.graphics.g3d.loader.G3dModelLoader
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.utils.Disposable
-import com.badlogic.gdx.utils.UBJsonReader
+import net.mgsx.gltf.loaders.glb.GLBLoader
+import net.mgsx.gltf.scene3d.scene.SceneAsset
 import com.eucleantoomuch.game.util.Constants
 
 class ProceduralModels : Disposable {
     private val modelBuilder = ModelBuilder()
     private val models = mutableListOf<Model>()
-    private val modelLoader = G3dModelLoader(UBJsonReader())
+    private val glbLoader = GLBLoader()
+    private var eucGlbAsset: SceneAsset? = null
 
     private val attributes = (VertexAttributes.Usage.Position or VertexAttributes.Usage.Normal).toLong()
 
@@ -108,26 +109,40 @@ class ProceduralModels : Disposable {
     var eucModelRotationY = 0f
         private set
 
+    // Flag to indicate if EUC model is PBR (loaded from GLB)
+    var isEucPbr = false
+        private set
+
     fun createEucModel(): Model {
         // Try to load external model, fallback to procedural
         return try {
-            val modelFile = Gdx.files.internal("monowheel.g3db")
+            val modelFile = Gdx.files.internal("monowheel.glb")
             if (modelFile.exists()) {
                 // External model loaded - apply scale and rotation
-                eucModelScale = 0.005f  // Bigger scale
-                eucModelRotationX = 180f  // Flip vertically
-                eucModelRotationY = 0f    // No horizontal flip (was facing backwards)
-                modelLoader.loadModel(modelFile).also { models.add(it) }
+                eucModelScale = 0.35f  // Slightly bigger
+                eucModelRotationX = 0f  // No vertical flip
+                eucModelRotationY = 0f    // No horizontal flip
+                eucGlbAsset = glbLoader.load(modelFile)
+                isEucPbr = true
+                eucGlbAsset!!.scene.model.also { models.add(it) }
             } else {
                 eucModelScale = 1f
+                isEucPbr = false
                 createProceduralEucModel()
             }
         } catch (e: Exception) {
-            Gdx.app.error("ProceduralModels", "Failed to load monowheel.g3db: ${e.message}")
+            Gdx.app.error("ProceduralModels", "Failed to load monowheel.glb: ${e.message}")
             eucModelScale = 1f
+            isEucPbr = false
             createProceduralEucModel()
         }
     }
+
+    /**
+     * Get the SceneAsset for EUC model (for PBR rendering)
+     * Returns null if procedural model is used
+     */
+    fun getEucSceneAsset(): SceneAsset? = eucGlbAsset
 
     private fun createProceduralEucModel(): Model {
         modelBuilder.begin()
@@ -152,7 +167,7 @@ class ProceduralModels : Disposable {
     }
 
     // Rider scale constant for consistency
-    val riderScale = 1.4f
+    val riderScale = 1.55f
 
     fun createRiderModel(): Model {
         modelBuilder.begin()
@@ -161,12 +176,12 @@ class ProceduralModels : Disposable {
 
         // Left leg
         val leftLegPart = modelBuilder.part("left_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.1f * riderScale, 0.35f * riderScale, 0f))
+        leftLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-0.15f * riderScale, 0.35f * riderScale, 0f))
         leftLegPart.box(0.12f * riderScale, 0.7f * riderScale, 0.14f * riderScale)
 
         // Right leg
         val rightLegPart = modelBuilder.part("right_leg", GL20.GL_TRIANGLES, attributes, pantsMaterial)
-        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.1f * riderScale, 0.35f * riderScale, 0f))
+        rightLegPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0.15f * riderScale, 0.35f * riderScale, 0f))
         rightLegPart.box(0.12f * riderScale, 0.7f * riderScale, 0.14f * riderScale)
 
         // Body/torso
@@ -1547,5 +1562,7 @@ class ProceduralModels : Disposable {
     override fun dispose() {
         models.forEach { it.dispose() }
         models.clear()
+        eucGlbAsset?.dispose()
+        eucGlbAsset = null
     }
 }

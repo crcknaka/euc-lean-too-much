@@ -17,7 +17,7 @@ class HeadComponent : Component, Pool.Poolable {
     var animTime: Float = 0f
 
     // Head attachment offset from rider body (neck position)
-    val riderScale = 1.4f
+    val riderScale = 1.55f
     var offsetX: Float = 0f
     var offsetY: Float = 1.38f * riderScale  // Just below where head was in model
     var offsetZ: Float = 0f

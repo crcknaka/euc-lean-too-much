@@ -17,6 +17,7 @@ import com.eucleantoomuch.game.ecs.components.VelocityComponent
 import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.rendering.ProceduralModels
 import com.eucleantoomuch.game.util.Constants
+import net.mgsx.gltf.scene3d.scene.Scene
 
 class EntityFactory(
     private val engine: Engine,
@@ -57,7 +58,15 @@ class EntityFactory(
 
         // Model (EUC + Rider combined conceptually, we'll render separately)
         entity.add(ModelComponent().apply {
-            modelInstance = eucModelInstance
+            if (models.isEucPbr && models.getEucSceneAsset() != null) {
+                // Create Scene for PBR rendering with proper materials
+                scene = Scene(models.getEucSceneAsset()!!.scene)
+                modelInstance = scene!!.modelInstance
+                isPbr = true
+            } else {
+                modelInstance = eucModelInstance
+                isPbr = false
+            }
         })
 
         // Player marker
