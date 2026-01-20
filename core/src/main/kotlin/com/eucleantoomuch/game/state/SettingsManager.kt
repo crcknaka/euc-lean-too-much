@@ -20,6 +20,7 @@ class SettingsManager {
         private const val KEY_MUSIC_ENABLED = "musicEnabled"
         private const val KEY_GRAPHICS_PRESET = "graphicsPreset"
         private const val KEY_SHADOWS_ENABLED = "shadowsEnabled"
+        private const val KEY_NO_HUD = "noHud"
 
         // Graphics presets: 0 = Normal (no post-processing), 1 = High (all effects)
         val GRAPHICS_PRESET_OPTIONS = listOf(
@@ -221,6 +222,14 @@ class SettingsManager {
         get() = prefs.getBoolean(KEY_SHADOWS_ENABLED, true)  // Default on
         set(value) {
             prefs.putBoolean(KEY_SHADOWS_ENABLED, value)
+            prefs.flush()
+        }
+
+    // No HUD mode - hides all UI elements during gameplay
+    var noHud: Boolean
+        get() = prefs.getBoolean(KEY_NO_HUD, false)  // Default off
+        set(value) {
+            prefs.putBoolean(KEY_NO_HUD, value)
             prefs.flush()
         }
 }

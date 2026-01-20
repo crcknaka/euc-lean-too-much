@@ -3,6 +3,7 @@ package com.eucleantoomuch.game.ui
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
@@ -13,6 +14,7 @@ import com.badlogic.gdx.utils.Disposable
  */
 class MenuRenderer : Disposable {
     private val ui = UIRenderer()
+    private val backgroundTexture: Texture = Texture(Gdx.files.internal("background.jpg"))
 
     private val playButton = Rectangle()
     private val calibrateButton = Rectangle()
@@ -86,19 +88,12 @@ class MenuRenderer : Disposable {
 
         val scale = UITheme.Dimensions.scale()
 
-        // === Draw Background ===
-        ui.beginShapes()
+        // === Draw Background Image ===
+        ui.beginBatch()
+        ui.batch.draw(backgroundTexture, 0f, 0f, sw, sh)
+        ui.endBatch()
 
-        // Gradient background with subtle animation
-        val bgTop = UITheme.backgroundLight
-        val bgBottom = UITheme.background
-        for (i in 0 until 20) {
-            val t = i / 20f
-            val stripY = sh * t
-            val stripHeight = sh / 20f + 1
-            ui.shapes.color = UITheme.lerp(bgBottom, bgTop, t)
-            ui.shapes.rect(0f, stripY, sw, stripHeight)
-        }
+        ui.beginShapes()
 
         // Animated particles
         particles.forEach { p ->
@@ -160,17 +155,6 @@ class MenuRenderer : Disposable {
 
         // === Draw Text ===
         ui.beginBatch()
-
-        // Title "EUC RIDER" with subtle animation
-        val titleY = sh - 80f * scale + (1 - enterAnimProgress) * 60
-        val titleScale = titlePulse
-        UIFonts.display.data.setScale(UIFonts.display.data.scaleX * titleScale)
-        ui.textCentered("EUC RIDER", centerX, titleY, UIFonts.display, UITheme.textPrimary)
-        UIFonts.display.data.setScale(UIFonts.display.data.scaleX / titleScale)
-
-        // Subtitle with glow effect
-        val subtitleY = titleY - 90f * scale
-        ui.textCentered("Lean too much", centerX, subtitleY, UIFonts.heading, UITheme.accent)
 
         // Button labels with larger text
         ui.textCentered("PLAY", playRect.x + playRect.width / 2, playRect.y + playRect.height / 2, UIFonts.button, UITheme.textPrimary)
@@ -270,6 +254,7 @@ class MenuRenderer : Disposable {
     }
 
     override fun dispose() {
+        backgroundTexture.dispose()
         ui.dispose()
     }
 }

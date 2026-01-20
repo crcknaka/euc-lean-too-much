@@ -47,6 +47,13 @@ class EucPhysicsSystem(
     private var wobbleActive = false               // Whether wobble triggered this time
     private var wasFlooringIt = false              // Track previous frame's flooring state
 
+    // Balance sway at low speed (rider balancing)
+    private val balanceSwayMaxSpeed = 15f / 3.6f   // 15 km/h in m/s - no sway above this
+    private val balanceSwayMinSpeed = 1f / 3.6f    // 1 km/h in m/s - full sway below this
+    private val balanceSwayAmplitude = 0.04f       // Maximum sway amplitude (reduced for subtler effect)
+    private val balanceSwayFrequency = 1.2f        // Oscillations per second
+    private var balanceSwayPhase = 0f              // Current phase of sway oscillation
+
     override fun processEntity(entity: Entity, deltaTime: Float) {
         val euc = eucMapper.get(entity)
         val velocity = velocityMapper.get(entity)
@@ -98,12 +105,16 @@ class EucPhysicsSystem(
         )
 
         // Calculate turn rate based on side lean (using wheel-specific responsiveness)
-        val turnRate = EucPhysics.calculateTurnRate(
+        var turnRate = EucPhysics.calculateTurnRate(
             euc.sideLean,
             euc.speed,
             euc.turnResponsiveness,
             euc.maxSpeed
         )
+
+        // Low speed balance sway (rider balancing) - adds turn adjustment
+        val balanceTurn = updateBalanceSway(euc, deltaTime)
+        turnRate += balanceTurn
 
         // Update velocity - forward is +Z in our coordinate system
         velocity.linear.set(0f, 0f, euc.speed)
@@ -132,6 +143,48 @@ class EucPhysicsSystem(
 
     private fun  lerp(start: Float, end: Float, alpha: Float): Float {
         return start + (end - start) * alpha
+    }
+
+    /**
+     * Update balance sway effect at low speeds.
+     * Rider turns left-right as if balancing when moving slowly (1-15 km/h).
+     * Effect fades out as speed increases.
+     * Returns the turn rate adjustment to add to angular velocity.
+     */
+    private fun updateBalanceSway(euc: EucComponent, deltaTime: Float): Float {
+        // Only apply sway at low speeds
+        if (euc.speed < balanceSwayMinSpeed) {
+            // Below minimum speed (nearly stopped) - no sway
+            balanceSwayPhase = 0f
+            return 0f
+        }
+
+        if (euc.speed > balanceSwayMaxSpeed) {
+            // Above max speed - no sway, reset phase smoothly
+            balanceSwayPhase = 0f
+            return 0f
+        }
+
+        // Calculate sway intensity based on speed (more sway at lower speeds)
+        // At 1 km/h: full intensity, at 15 km/h: zero intensity
+        val speedRange = balanceSwayMaxSpeed - balanceSwayMinSpeed
+        val speedFactor = 1f - ((euc.speed - balanceSwayMinSpeed) / speedRange).coerceIn(0f, 1f)
+
+        // Update sway phase
+        balanceSwayPhase += deltaTime * balanceSwayFrequency * 2f * Math.PI.toFloat()
+        if (balanceSwayPhase > Math.PI.toFloat() * 4f) {
+            balanceSwayPhase -= Math.PI.toFloat() * 4f
+        }
+
+        // Calculate turn rate for balance sway (actual turning, not just visual)
+        // Use cosine derivative for smooth direction changes
+        val balanceTurnRate = kotlin.math.cos(balanceSwayPhase) * balanceSwayAmplitude * speedFactor * 40f
+
+        // Also apply slight visual side lean for realism
+        val swayOffset = sin(balanceSwayPhase) * balanceSwayAmplitude * speedFactor * 0.5f
+        euc.visualSideLean += swayOffset
+
+        return balanceTurnRate
     }
 
     /**

@@ -109,6 +109,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // Update speed lines
         updateSpeedLines(sw, sh, scale)
 
+        // No HUD mode - skip all UI rendering
+        if (settingsManager.noHud) {
+            return
+        }
+
         ui.beginShapes()
 
         // === Speed Lines Effect ===

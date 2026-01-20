@@ -37,6 +37,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private val avasRightButton = Rectangle()
     private val musicCheckbox = Rectangle()
     private val beepsCheckbox = Rectangle()
+    private val noHudCheckbox = Rectangle()
 
     // Footer links
     private val privacyPolicyButton = Rectangle()
@@ -62,6 +63,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
     private var avasRightButtonHover = 0f
     private var musicCheckboxHover = 0f
     private var beepsCheckboxHover = 0f
+    private var noHudCheckboxHover = 0f
 
     private var privacyButtonHover = 0f
     private var termsButtonHover = 0f
@@ -129,11 +131,13 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             val avasRightHovered = avasRightButton.contains(touchX, touchY)
             val musicHovered = musicCheckbox.contains(touchX, touchY)
             val beepsHovered = beepsCheckbox.contains(touchX, touchY)
+            val noHudHovered = noHudCheckbox.contains(touchX, touchY)
 
             avasLeftButtonHover = UITheme.Anim.ease(avasLeftButtonHover, if (avasLeftHovered) 1f else 0f, 10f)
             avasRightButtonHover = UITheme.Anim.ease(avasRightButtonHover, if (avasRightHovered) 1f else 0f, 10f)
             musicCheckboxHover = UITheme.Anim.ease(musicCheckboxHover, if (musicHovered) 1f else 0f, 10f)
             beepsCheckboxHover = UITheme.Anim.ease(beepsCheckboxHover, if (beepsHovered) 1f else 0f, 10f)
+            noHudCheckboxHover = UITheme.Anim.ease(noHudCheckboxHover, if (noHudHovered) 1f else 0f, 10f)
         }
 
         // === Draw Background ===
@@ -257,13 +261,18 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
             beepsCheckbox.set(checkboxRightX, checkboxRowY - checkboxSize / 2, checkboxSize, checkboxSize)
             renderCheckbox(beepsCheckbox, beepsCheckboxHover, settingsManager.beepsEnabled)
+
+            // No HUD checkbox (separate row below Music/Beeps)
+            val noHudRowY = checkboxRowY - rowHeight
+            noHudCheckbox.set(checkboxLeftX, noHudRowY - checkboxSize / 2, checkboxSize, checkboxSize)
+            renderCheckbox(noHudCheckbox, noHudCheckboxHover, settingsManager.noHud)
         }
 
         // === Footer Links (Privacy & Terms) ===
         val linkButtonHeight = 38f * scale
         val linkButtonY = panelY + 30f * scale
-        val privacyButtonWidth = 150f * scale
-        val termsButtonWidth = 100f * scale
+        val privacyButtonWidth = 180f * scale
+        val termsButtonWidth = 130f * scale
         val linkSpacing = 16f * scale
 
         privacyPolicyButton.set(
@@ -348,6 +357,10 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 musicCheckbox.y + musicCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
             UIFonts.body.draw(ui.batch, "Beeps", beepsCheckbox.x + checkboxLabelOffset,
                 beepsCheckbox.y + beepsCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
+
+            // No HUD label
+            UIFonts.body.draw(ui.batch, "No HUD", noHudCheckbox.x + checkboxLabelOffset,
+                noHudCheckbox.y + noHudCheckbox.height / 2 + UIFonts.body.lineHeight / 3)
         }
 
         // Footer link text
@@ -451,6 +464,10 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 if (beepsCheckbox.contains(touchX, touchY)) {
                     UIFeedback.tap()
                     settingsManager.beepsEnabled = !settingsManager.beepsEnabled
+                }
+                if (noHudCheckbox.contains(touchX, touchY)) {
+                    UIFeedback.tap()
+                    settingsManager.noHud = !settingsManager.noHud
                 }
             }
 
