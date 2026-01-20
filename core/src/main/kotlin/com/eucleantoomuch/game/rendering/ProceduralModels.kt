@@ -47,6 +47,8 @@ class ProceduralModels : Disposable {
     private val dirtColor = Color(0.4f, 0.3f, 0.2f, 1f)          // Brown dirt
     private val treeTrunkColor = Color(0.4f, 0.28f, 0.18f, 1f)   // Brown trunk
     private val treeLeavesColor = Color(0.2f, 0.45f, 0.2f, 1f)   // Green leaves
+    private val birchTrunkColor = Color(0.9f, 0.88f, 0.85f, 1f)  // White birch trunk
+    private val birchLeavesColor = Color(0.35f, 0.55f, 0.25f, 1f) // Lighter green for birch
     private val lampPostColor = Color(0.25f, 0.25f, 0.25f, 1f)   // Dark gray metal
     private val benchWoodColor = Color(0.5f, 0.35f, 0.2f, 1f)    // Wood brown
     private val benchMetalColor = Color(0.2f, 0.2f, 0.2f, 1f)    // Dark metal
@@ -419,7 +421,10 @@ class ProceduralModels : Disposable {
         val darkWindows = mutableListOf<WindowPos>()
         val litWindows = mutableListOf<WindowPos>()
 
-        // Collect all window positions
+        // Collect all window positions - only on inner side facing road (positive X side)
+        // Buildings on left side of road have road on their +X side
+        // Buildings on right side of road have road on their -X side
+        // Since we create one model and flip it, we only need windows on ONE side (+X)
         for (floor in 0 until numFloors) {
             val windowY = floor * floorHeight + floorHeight * 0.6f
             val isGroundFloor = floor == 0
@@ -432,9 +437,8 @@ class ProceduralModels : Disposable {
                 val isLit = Math.random() < 0.3
                 val list = if (isLit) litWindows else darkWindows
 
-                // Left side window
-                list.add(WindowPos(-width / 2 - 0.02f, windowY, windowZ))
-                // Right side window
+                // Only inner side window (facing road) - positive X side
+                // The model will be mirrored for the other side of the road
                 list.add(WindowPos(width / 2 + 0.02f, windowY, windowZ))
             }
         }
@@ -459,27 +463,16 @@ class ProceduralModels : Disposable {
             }
         }
 
-        // Left side door
-        val doorLeft = modelBuilder.part("door_left", GL20.GL_TRIANGLES, attributes, doorMat)
-        doorLeft.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-width / 2 - 0.03f, doorHeight / 2, 0f))
-        doorLeft.box(0.06f, doorHeight, doorWidth)
+        // Only inner side door (facing road) - positive X side
+        val door = modelBuilder.part("door", GL20.GL_TRIANGLES, attributes, doorMat)
+        door.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.03f, doorHeight / 2, 0f))
+        door.box(0.06f, doorHeight, doorWidth)
 
-        // Right side door
-        val doorRight = modelBuilder.part("door_right", GL20.GL_TRIANGLES, attributes, doorMat)
-        doorRight.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.03f, doorHeight / 2, 0f))
-        doorRight.box(0.06f, doorHeight, doorWidth)
-
-        // Door frames
+        // Door frame - only on inner side
         val frameThickness = 0.15f
-        // Left door frame
-        val frameLeftTop = modelBuilder.part("frame_l_top", GL20.GL_TRIANGLES, attributes, trimMat)
-        frameLeftTop.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-width / 2 - 0.04f, doorHeight + frameThickness / 2, 0f))
-        frameLeftTop.box(0.08f, frameThickness, doorWidth + frameThickness * 2)
-
-        // Right door frame
-        val frameRightTop = modelBuilder.part("frame_r_top", GL20.GL_TRIANGLES, attributes, trimMat)
-        frameRightTop.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.04f, doorHeight + frameThickness / 2, 0f))
-        frameRightTop.box(0.08f, frameThickness, doorWidth + frameThickness * 2)
+        val frameTop = modelBuilder.part("frame_top", GL20.GL_TRIANGLES, attributes, trimMat)
+        frameTop.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(width / 2 + 0.04f, doorHeight + frameThickness / 2, 0f))
+        frameTop.box(0.08f, frameThickness, doorWidth + frameThickness * 2)
 
         // Roof ledge
         val ledgeHeight = 0.3f
@@ -850,6 +843,49 @@ class ProceduralModels : Disposable {
         val crownPart = modelBuilder.part("crown", GL20.GL_TRIANGLES, attributes, leavesMaterial)
         crownPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight + crownRadius, 0f))
         crownPart.sphere(crownRadius * 2, crownRadius * 2, crownRadius * 2, 10, 10)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
+    /**
+     * Creates a birch tree with thin white trunk and multiple leaf clusters.
+     */
+    fun createBirchTreeModel(height: Float = 10f): Model {
+        modelBuilder.begin()
+
+        val trunkMaterial = Material(ColorAttribute.createDiffuse(birchTrunkColor))
+        val leavesMaterial = Material(ColorAttribute.createDiffuse(birchLeavesColor))
+
+        val trunkHeight = height * 0.7f
+        val trunkRadius = 0.15f  // Thin trunk
+
+        // Main trunk (cylinder)
+        val trunkPart = modelBuilder.part("trunk", GL20.GL_TRIANGLES, attributes, trunkMaterial)
+        trunkPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, trunkHeight / 2, 0f))
+        trunkPart.cylinder(trunkRadius * 2, trunkHeight, trunkRadius * 2, 8)
+
+        // Multiple leaf clusters at different heights (drooping birch style)
+        val clusterCount = 4
+        for (i in 0 until clusterCount) {
+            val clusterY = trunkHeight * 0.5f + (trunkHeight * 0.5f * i / clusterCount)
+            val clusterRadius = height * 0.2f * (1f - i * 0.1f)  // Slightly smaller at top
+
+            // Main cluster
+            val clusterPart = modelBuilder.part("leaves_$i", GL20.GL_TRIANGLES, attributes, leavesMaterial)
+            clusterPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, clusterY, 0f))
+            clusterPart.sphere(clusterRadius * 2.5f, clusterRadius * 1.2f, clusterRadius * 2.5f, 8, 8)
+
+            // Side drooping clusters
+            if (i < clusterCount - 1) {
+                val sidePart1 = modelBuilder.part("leaves_side_${i}_1", GL20.GL_TRIANGLES, attributes, leavesMaterial)
+                sidePart1.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(clusterRadius * 0.8f, clusterY - clusterRadius * 0.3f, 0f))
+                sidePart1.sphere(clusterRadius * 1.5f, clusterRadius * 0.8f, clusterRadius * 1.5f, 6, 6)
+
+                val sidePart2 = modelBuilder.part("leaves_side_${i}_2", GL20.GL_TRIANGLES, attributes, leavesMaterial)
+                sidePart2.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(-clusterRadius * 0.8f, clusterY - clusterRadius * 0.3f, 0f))
+                sidePart2.sphere(clusterRadius * 1.5f, clusterRadius * 0.8f, clusterRadius * 1.5f, 6, 6)
+            }
+        }
 
         return modelBuilder.end().also { models.add(it) }
     }

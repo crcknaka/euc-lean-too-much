@@ -1573,6 +1573,9 @@ class EucGame(
             ReplayRenderer.Action.TOGGLE_SLOWMO -> {
                 replaySystem.toggleSlowMo()
             }
+            ReplayRenderer.Action.TOGGLE_REVERSE -> {
+                replaySystem.toggleReverse()
+            }
             ReplayRenderer.Action.SEEK -> {
                 replaySystem.seekTo(result.seekPosition)
             }

@@ -198,6 +198,14 @@ class WorldGenerator(
         // Add a tall round tree (rare)
         treeModels.add(ModelInstance(models.createRoundTreeModel(MathUtils.random(12f, 15f))))
 
+        // Add birch trees
+        for (i in 0..4) {
+            val height = MathUtils.random(8f, 12f)
+            treeModels.add(ModelInstance(models.createBirchTreeModel(height)))
+        }
+        // Add a tall birch (rare)
+        treeModels.add(ModelInstance(models.createBirchTreeModel(MathUtils.random(13f, 16f))))
+
         // Create other scenery models
         lampPostModel = ModelInstance(models.createLampPostModel())
         benchModel = ModelInstance(models.createBenchModel())
@@ -762,13 +770,59 @@ class WorldGenerator(
                 isLeftSide = false
             ))
 
+            // Add trees between buildings (in the gaps along Z axis) - ~40% chance per gap
+            // Buildings have depth of 8m and spacing of ~12m, so gap is about 4m wide
+            // Gap center is between current building and next one
+            val gapCenterZ = z + buildingSpacing / 2
+
+            if (MathUtils.random() < 0.4f) {
+                // Tree on left side - same X line as buildings, in Z gap between them
+                val treeX = -Constants.BUILDING_OFFSET_X - leftXOffset
+                entities.add(createBetweenBuildingsTree(treeX, gapCenterZ, chunkIndex))
+            }
+            if (MathUtils.random() < 0.4f) {
+                // Tree on right side - same X line as buildings, in Z gap between them
+                val treeX = Constants.BUILDING_OFFSET_X + rightXOffset
+                entities.add(createBetweenBuildingsTree(treeX, gapCenterZ, chunkIndex))
+            }
+
             z += buildingSpacing + MathUtils.random(-3f, 3f)
         }
 
         return entities
     }
 
-    @Suppress("UNUSED_PARAMETER")
+    /**
+     * Creates a tree entity positioned between buildings.
+     * Uses slightly smaller trees that fit well in gaps.
+     */
+    private fun createBetweenBuildingsTree(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0f, z)
+            yaw = MathUtils.random(0f, 360f)
+        })
+
+        val modelInstance = ModelInstance(treeModels.random().model)
+
+        // Scale down slightly to fit between buildings
+        val treeScale = MathUtils.random(0.6f, 0.85f)
+        modelInstance.transform.scale(treeScale, treeScale, treeScale)
+
+        entity.add(ModelComponent().apply {
+            this.modelInstance = modelInstance
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.BUILDING
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
     private fun createBuildingEntity(
         x: Float,
         z: Float,
@@ -776,12 +830,19 @@ class WorldGenerator(
         detailedModel: ModelInstance,
         simpleModel: ModelInstance,
         chunkIndex: Int,
-        isLeftSide: Boolean  // Kept for potential future directional shadows
+        isLeftSide: Boolean  // Used to rotate building so windows/doors face road
     ): Entity {
         val entity = engine.createEntity()
 
+        // Rotate building so windows/doors face the road
+        // Left side buildings: windows on +X side already face road (no rotation)
+        // Right side buildings: need 180° rotation so +X side faces road (towards negative X)
+        val yaw = if (isLeftSide) 0f else 180f
+
         val transform = TransformComponent().apply {
             position.set(x, 0f, z)
+            this.yaw = yaw
+            updateRotationFromYaw()
         }
         entity.add(transform)
 

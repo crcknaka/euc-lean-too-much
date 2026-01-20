@@ -17,6 +17,7 @@ class ReplayRenderer : Disposable {
     // Control buttons
     private val playPauseButton = Rectangle()
     private val slowMoButton = Rectangle()
+    private val reverseButton = Rectangle()
     private val exitButton = Rectangle()
     private val timelineBar = Rectangle()
 
@@ -25,6 +26,7 @@ class ReplayRenderer : Disposable {
     private var controlsY = 0f
     private var playPauseHover = 0f
     private var slowMoHover = 0f
+    private var reverseHover = 0f
     private var exitHover = 0f
     private var timelineHover = 0f
 
@@ -32,7 +34,7 @@ class ReplayRenderer : Disposable {
     private var isDraggingTimeline = false
 
     enum class Action {
-        NONE, EXIT, TOGGLE_PAUSE, TOGGLE_SLOWMO, SEEK
+        NONE, EXIT, TOGGLE_PAUSE, TOGGLE_SLOWMO, TOGGLE_REVERSE, SEEK
     }
 
     data class Result(
@@ -59,6 +61,7 @@ class ReplayRenderer : Disposable {
 
         playPauseHover = UITheme.Anim.ease(playPauseHover, if (playPauseButton.contains(touchX, touchY)) 1f else 0f, 10f)
         slowMoHover = UITheme.Anim.ease(slowMoHover, if (slowMoButton.contains(touchX, touchY)) 1f else 0f, 10f)
+        reverseHover = UITheme.Anim.ease(reverseHover, if (reverseButton.contains(touchX, touchY)) 1f else 0f, 10f)
         exitHover = UITheme.Anim.ease(exitHover, if (exitButton.contains(touchX, touchY)) 1f else 0f, 10f)
         timelineHover = UITheme.Anim.ease(timelineHover, if (timelineBar.contains(touchX, touchY) || isDraggingTimeline) 1f else 0f, 10f)
 
@@ -91,6 +94,14 @@ class ReplayRenderer : Disposable {
         // Slow-Mo button (left of play/pause)
         slowMoButton.set(
             playPauseButton.x - buttonSpacing - smallButtonSize,
+            controlsY - smallButtonSize / 2,
+            smallButtonSize,
+            smallButtonSize
+        )
+
+        // Reverse button (right of play/pause)
+        reverseButton.set(
+            playPauseButton.x + playPauseButton.width + buttonSpacing,
             controlsY - smallButtonSize / 2,
             smallButtonSize,
             smallButtonSize
@@ -167,6 +178,16 @@ class ReplayRenderer : Disposable {
             UITheme.lerp(slowMoColor, UITheme.accentBright, slowMoHover * 0.3f)
         )
 
+        // Reverse button
+        val isReversed = replaySystem.isReversed()
+        val reverseColor = if (isReversed) UITheme.accent else UITheme.surfaceLight
+        ui.roundedRect(
+            reverseButton.x, reverseButton.y,
+            reverseButton.width, reverseButton.height,
+            smallButtonSize / 4,
+            UITheme.lerp(reverseColor, UITheme.accentBright, reverseHover * 0.3f)
+        )
+
         // Exit button
         ui.roundedRect(
             exitButton.x, exitButton.y,
@@ -183,8 +204,9 @@ class ReplayRenderer : Disposable {
         // Title
         ui.textCentered("REPLAY", centerX, sh - topBarHeight / 2, UIFonts.heading, UITheme.textPrimary)
 
-        // Speed indicator
-        val speedText = if (isSlowMo) "0.25x" else "1x"
+        // Speed indicator (show direction and speed)
+        val speedMagnitude = if (isSlowMo) "0.25x" else "1x"
+        val speedText = if (isReversed) "<< $speedMagnitude" else "$speedMagnitude >>"
         ui.textCentered(speedText, sw - 130f * scale, sh - topBarHeight / 2, UIFonts.body, UITheme.textSecondary)
 
         // Play/Pause icon (simple text for now)
@@ -195,6 +217,10 @@ class ReplayRenderer : Disposable {
         // Slow-Mo label
         ui.textCentered("SLO", slowMoButton.x + slowMoButton.width / 2,
             slowMoButton.y + slowMoButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+
+        // Reverse label
+        ui.textCentered("<<", reverseButton.x + reverseButton.width / 2,
+            reverseButton.y + reverseButton.height / 2, UIFonts.body, UITheme.textPrimary)
 
         // Exit X
         ui.textCentered("X", exitButton.x + exitButton.width / 2,
@@ -236,6 +262,10 @@ class ReplayRenderer : Disposable {
                     UIFeedback.click()
                     result = Result(Action.TOGGLE_SLOWMO)
                 }
+                reverseButton.contains(touchX, touchY) -> {
+                    UIFeedback.click()
+                    result = Result(Action.TOGGLE_REVERSE)
+                }
                 exitButton.contains(touchX, touchY) -> {
                     UIFeedback.click()
                     result = Result(Action.EXIT)
@@ -251,6 +281,10 @@ class ReplayRenderer : Disposable {
         if (Gdx.input.isKeyJustPressed(Input.Keys.S)) {
             UIFeedback.click()
             result = Result(Action.TOGGLE_SLOWMO)
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.R)) {
+            UIFeedback.click()
+            result = Result(Action.TOGGLE_REVERSE)
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK)) {
             UIFeedback.click()

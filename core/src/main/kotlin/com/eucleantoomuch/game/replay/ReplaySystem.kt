@@ -115,11 +115,18 @@ class ReplaySystem {
 
         playbackTime += delta * playbackSpeed
 
-        // Loop back to start when reaching end
+        val startTime = frameBuffer.first().timestamp
         val endTime = frameBuffer.last().timestamp
+
+        // Handle forward playback - loop back to start when reaching end
         if (playbackTime > endTime) {
-            playbackTime = frameBuffer.first().timestamp
+            playbackTime = startTime
             justLooped = true  // Signal that we reached the crash point
+        }
+
+        // Handle reverse playback - loop back to end when reaching start
+        if (playbackTime < startTime) {
+            playbackTime = endTime
         }
 
         updateCurrentFrame()
@@ -249,12 +256,26 @@ class ReplaySystem {
     }
 
     fun toggleSlowMo() {
-        playbackSpeed = if (playbackSpeed == 1f) 0.25f else 1f
+        // Cycle: 1x -> 0.25x -> -0.25x -> -1x -> 1x (keeps direction when toggling)
+        playbackSpeed = when {
+            playbackSpeed == 1f -> 0.25f
+            playbackSpeed == 0.25f -> 1f
+            playbackSpeed == -1f -> -0.25f
+            playbackSpeed == -0.25f -> -1f
+            else -> 1f
+        }
+    }
+
+    fun toggleReverse() {
+        // Toggle playback direction (keeps speed magnitude)
+        playbackSpeed = -playbackSpeed
     }
 
     fun setPlaybackSpeed(speed: Float) {
         playbackSpeed = speed
     }
+
+    fun isReversed(): Boolean = playbackSpeed < 0f
 
     fun seekTo(normalizedPosition: Float) {
         if (frameBuffer.isEmpty()) return
@@ -286,7 +307,7 @@ class ReplaySystem {
     fun getCurrentFrame(): ReplayFrame? = currentFrame
     fun isPlaying(): Boolean = isPlaying
     fun isPaused(): Boolean = isPaused
-    fun isSlowMo(): Boolean = playbackSpeed < 1f
+    fun isSlowMo(): Boolean = kotlin.math.abs(playbackSpeed) < 1f
     fun getPlaybackSpeed(): Float = playbackSpeed
     fun hasFrames(): Boolean = frameBuffer.isNotEmpty()
 
