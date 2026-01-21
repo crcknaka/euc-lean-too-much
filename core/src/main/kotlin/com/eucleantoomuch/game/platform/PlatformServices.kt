@@ -142,6 +142,13 @@ interface PlatformServices {
      * @param volume Volume multiplier (0.0 to 1.0), defaults to 1.0
      */
     fun playBenchImpactSound(volume: Float = 1f)
+
+    // === Powerup Sound Effect ===
+
+    /**
+     * Play powerup pickup sound when collecting a battery powerup.
+     */
+    fun playPowerupSound()
 }
 
 /**
@@ -225,6 +232,10 @@ class DefaultPlatformServices : PlatformServices {
     }
 
     override fun playBenchImpactSound(volume: Float) {
+        // No-op on desktop/unsupported platforms
+    }
+
+    override fun playPowerupSound() {
         // No-op on desktop/unsupported platforms
     }
 }

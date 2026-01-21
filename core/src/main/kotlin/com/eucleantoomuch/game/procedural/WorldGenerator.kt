@@ -97,11 +97,18 @@ class WorldGenerator(
     // Tower crane model
     private var towerCraneModel: ModelInstance
 
+    // Powerup model (battery pickup)
+    private var powerupGlbAsset: SceneAsset? = null
+    private var powerupGlbScale = 1f
+
     // Track which chunks have zebra crossings
     private var lastZebraCrossingChunk = -10  // Start with no recent crossing
 
     // Track tower crane placement to avoid clustering
     private var lastCraneChunk = -20  // Start with no recent crane
+
+    // Track powerup placement to avoid clustering
+    private var lastPowerupChunk = -10  // Start with no recent powerup
 
     init {
         // Initialize shadow models eagerly to avoid first-frame hitches
@@ -259,6 +266,19 @@ class WorldGenerator(
 
         // Create tower crane model
         towerCraneModel = ModelInstance(models.createTowerCraneModel())
+
+        // Load powerup GLB model
+        try {
+            val powerupFile = Gdx.files.internal("powerup.glb")
+            powerupGlbAsset = GLBLoader().load(powerupFile)
+            val boundingBox = powerupGlbAsset!!.scene.model.calculateBoundingBox(com.badlogic.gdx.math.collision.BoundingBox())
+            // Scale to be about 1.2m tall (bigger for better visibility)
+            powerupGlbScale = 1.2f / maxOf(boundingBox.height, 0.01f)
+            Gdx.app.log("WorldGenerator", "Powerup GLB loaded, scale: $powerupGlbScale")
+        } catch (e: Exception) {
+            Gdx.app.log("WorldGenerator", "powerup.glb not loaded: ${e.message}")
+            powerupGlbAsset = null
+        }
     }
 
     fun setRenderDistance(distance: Float) {
@@ -338,6 +358,11 @@ class WorldGenerator(
         if (chunkIndex > 0) {
             // Generate obstacles (skip area near zebra crossing)
             entities.addAll(generateObstacles(chunkStartZ, totalDistance, hasZebraCrossing))
+        }
+
+        // Generate powerups (battery pickups) - start after chunk 2
+        if (chunkIndex > 2) {
+            entities.addAll(generatePowerups(chunkIndex, chunkStartZ))
         }
 
         activeChunks[chunkIndex] = entities
@@ -1710,11 +1735,75 @@ class WorldGenerator(
         nextFlockId = 0
         // Reset tower crane tracking
         lastCraneChunk = -20
+        // Reset powerup tracking
+        lastPowerupChunk = -10
+    }
+
+    /**
+     * Generate powerups (battery pickups) in this chunk.
+     * Powerups appear occasionally on the road to help restore battery.
+     */
+    private fun generatePowerups(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Only generate if model loaded
+        if (powerupGlbAsset == null) return entities
+
+        // Powerups appear every 3-6 chunks (not too frequent)
+        val chunksSinceLastPowerup = chunkIndex - lastPowerupChunk
+        if (chunksSinceLastPowerup < 3) return entities
+
+        // 40% chance if enough chunks have passed
+        if (MathUtils.random() < 0.4f) {
+            lastPowerupChunk = chunkIndex
+
+            // Random position on road
+            val x = MathUtils.random(-Constants.ROAD_WIDTH / 2 + 1f, Constants.ROAD_WIDTH / 2 - 1f)
+            val z = chunkStartZ + MathUtils.random(5f, Constants.CHUNK_LENGTH - 5f)
+
+            entities.add(createPowerupEntity(x, z, chunkIndex))
+        }
+
+        return entities
+    }
+
+    private fun createPowerupEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0.5f, z)  // Float slightly above ground
+            scale.set(powerupGlbScale, powerupGlbScale, powerupGlbScale)
+        })
+
+        entity.add(ModelComponent().apply {
+            scene = Scene(powerupGlbAsset!!.scene)
+            modelInstance = scene!!.modelInstance
+            isPbr = true
+        })
+
+        entity.add(PowerupComponent().apply {
+            type = PowerupType.BATTERY
+            batteryRestoreAmount = 0.15f  // Restore 15% battery
+        })
+
+        entity.add(ColliderComponent().apply {
+            setSize(1f, 1.5f, 1f)  // Pickup hitbox
+            collisionGroup = CollisionGroups.OBSTACLE  // Reuse obstacle group for detection
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
     }
 
     fun dispose() {
         carGlbAsset?.dispose()
         taxiGlbAsset?.dispose()
         sportscarGlbAsset?.dispose()
+        powerupGlbAsset?.dispose()
     }
 }

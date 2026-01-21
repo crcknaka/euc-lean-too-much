@@ -114,14 +114,15 @@ class WheelSelectionRenderer(
     private fun loadWheelModels() {
         // Map wheel types to their GLB files
         val wheelFiles = mapOf(
-            "standard" to "monowheel.glb",
-            "performance" to "monowheel2.glb"
+            "simple" to "nicola.glb",
+            "standard" to "v12.glb",
+            "performance" to "lynx.glb"
         )
 
         Gdx.app.log("WheelSelection", "Loading wheel models for ${wheels.size} wheels: ${wheels.map { it.id }}")
 
         wheels.forEach { wheel ->
-            val fileName = wheelFiles[wheel.id] ?: "monowheel.glb"
+            val fileName = wheelFiles[wheel.id] ?: "v12.glb"
             Gdx.app.log("WheelSelection", "Attempting to load $fileName for wheel id='${wheel.id}'")
             try {
                 val modelFile = Gdx.files.internal(fileName)
@@ -251,7 +252,7 @@ class WheelSelectionRenderer(
 
         // Stats section (card style)
         val statsTopY = descY - 50f * scale
-        val statsHeight = 130f * scale
+        val statsHeight = 170f * scale  // Increased for 4 stats
         val statsWidth = rightSectionWidth - 80f * scale
         val statsX = rightSectionX + 40f * scale
         val statsY = statsTopY - statsHeight
@@ -281,6 +282,12 @@ class WheelSelectionRenderer(
         val handlingNorm = ((currentWheel.turnResponsiveness - 2f) / 3f).coerceIn(0f, 1f)
         ui.neonBar(barStartX, handlingBarY, barWidth, barHeight, handlingNorm,
             backgroundColor = UITheme.surface, fillColor = UITheme.secondary)
+
+        // Battery bar
+        val batteryBarY = handlingBarY - barSpacing
+        val batteryNorm = currentWheel.batteryCapacity / 4000f  // 4000 mAh is max (Speed Demon)
+        ui.neonBar(barStartX, batteryBarY, barWidth, barHeight, batteryNorm,
+            backgroundColor = UITheme.surface, fillColor = UITheme.warning)
 
         // Buttons at bottom of right section - horizontal layout
         // START button - large like PLAY in main menu
@@ -335,6 +342,7 @@ class WheelSelectionRenderer(
         UIFonts.body.draw(ui.batch, "SPEED", labelX, speedBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
         UIFonts.body.draw(ui.batch, "STABILITY", labelX, stabilityBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
         UIFonts.body.draw(ui.batch, "HANDLING", labelX, handlingBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
+        UIFonts.body.draw(ui.batch, "BATTERY", labelX, batteryBarY + barHeight / 2 + UIFonts.body.lineHeight / 3)
 
         // Button labels
         ui.textCentered("BACK", backButton.x + backButton.width / 2,

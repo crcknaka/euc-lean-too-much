@@ -60,4 +60,11 @@ object Families {
         ArmComponent::class.java,
         HeadComponent::class.java
     ).get()
+
+    // Powerup entities (collectible items)
+    val powerups: Family = Family.all(
+        PowerupComponent::class.java,
+        TransformComponent::class.java,
+        ColliderComponent::class.java
+    ).get()
 }

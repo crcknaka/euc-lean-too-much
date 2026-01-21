@@ -23,6 +23,8 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var speedBarSmooth = 0f
     private var pwmWarningFlash = 0f
     private var pwmSmooth = 0f
+    private var batterySmooth = 1f
+    private var batteryLowFlash = 0f
 
     // Speed effect state
     private var speedEffectIntensity = 0f
@@ -97,6 +99,16 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             pwmWarningFlash = UITheme.Anim.ease(pwmWarningFlash, 0f, 5f)
         }
 
+        // Smooth battery level
+        batterySmooth = UITheme.Anim.ease(batterySmooth, session.batteryLevel, 3f)
+
+        // Battery low flash
+        if (session.isBatteryLow) {
+            batteryLowFlash += Gdx.graphics.deltaTime * 6f
+        } else {
+            batteryLowFlash = UITheme.Anim.ease(batteryLowFlash, 0f, 5f)
+        }
+
         // Speed effect - starts at 70 km/h, full intensity at 100+ km/h
         val speedKmh = euc.speed * 3.6f
         val targetIntensity = ((speedKmh - 70f) / 30f).coerceIn(0f, 1f)
@@ -154,6 +166,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // === PWM Panel (above speed panel) ===
         drawPwmPanel(euc)
 
+        // === Battery Panel (above PWM panel) ===
+        drawBatteryPanel(session)
+
         // === Lean Indicator (bottom right) ===
         drawLeanIndicator(euc)
 
@@ -184,6 +199,14 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
             drawWarningBadge("PWM $pwmPercent%", warningColor, warningBaseY + 140f * scale)
+        }
+
+        // Battery low warning
+        if (batteryLowFlash > 0.1f) {
+            val batteryPercent = session.batteryPercent
+            val warningPulse = MathUtils.sin(batteryLowFlash * 6f) * 0.5f + 0.5f
+            val warningColor = UITheme.lerp(UITheme.warning, UITheme.danger, warningPulse)
+            drawWarningBadge("BATTERY LOW $batteryPercent%", warningColor, warningBaseY + 280f * scale)
         }
 
         // Near miss notification
@@ -327,6 +350,62 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.layout.setText(UIFonts.body, "$pwmPercent%")
         UIFonts.caption.color = UITheme.textMuted
         UIFonts.caption.draw(ui.batch, "PWM", panelX + 22f * scale + ui.layout.width, panelY + panelHeight - 18f * scale)
+
+        ui.endBatch()
+        ui.beginShapes()
+    }
+
+    private fun drawBatteryPanel(session: GameSession) {
+        val scale = UITheme.Dimensions.scale()
+        val panelWidth = 200f * scale
+        val panelHeight = 85f * scale
+        val panelX = 25f * scale
+        val panelY = 240f * scale  // Above PWM panel (145 + 85 + 10 margin)
+
+        // Battery color based on level
+        val batteryColor = when {
+            batterySmooth > 0.5f -> UITheme.primary
+            batterySmooth > 0.2f -> UITheme.warning
+            else -> UITheme.danger
+        }
+
+        // Glass panel with danger glow at low battery
+        val glowIntensity = if (batterySmooth < 0.2f) {
+            ((0.2f - batterySmooth) / 0.2f) * UITheme.Anim.pulse(5f, 0.4f, 0.8f)
+        } else 0f
+        if (glowIntensity > 0) {
+            ui.neonGlow(panelX, panelY, panelWidth, panelHeight, 14f * scale, batteryColor, glowIntensity, 3)
+        }
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
+            radius = 14f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
+
+        // Battery bar
+        val barX = panelX + 14f * scale
+        val barY = panelY + 12f * scale
+        val barWidth = panelWidth - 28f * scale
+        val barHeight = 12f * scale
+
+        ui.neonBar(barX, barY, barWidth, barHeight, batterySmooth,
+            backgroundColor = UITheme.withAlpha(UITheme.surfaceLight, 0.6f),
+            fillColor = batteryColor,
+            glowIntensity = if (batterySmooth < 0.2f) 0.7f else 0.2f)
+
+        // Low battery marker at 20%
+        val markerLowX = barX + barWidth * 0.2f
+        ui.shapes.color = UITheme.withAlpha(UITheme.warning, 0.6f)
+        ui.shapes.rectLine(markerLowX, barY - 2f, markerLowX, barY + barHeight + 2f, 2f * scale)
+
+        // Battery text
+        ui.endShapes()
+        ui.beginBatch()
+
+        val batteryPercent = session.batteryPercent
+        UIFonts.body.color = batteryColor
+        UIFonts.body.draw(ui.batch, "$batteryPercent%", panelX + 16f * scale, panelY + panelHeight - 14f * scale)
+
+        ui.layout.setText(UIFonts.body, "$batteryPercent%")
+        UIFonts.caption.color = UITheme.textMuted
+        UIFonts.caption.draw(ui.batch, "BATTERY", panelX + 22f * scale + ui.layout.width, panelY + panelHeight - 18f * scale)
 
         ui.endBatch()
         ui.beginShapes()
@@ -648,6 +727,8 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         pwmSmooth = 0f
         nearMissTimer = 0f
         wobbleShakeX = 0f
+        batterySmooth = 1f
+        batteryLowFlash = 0f
         wobbleShakeY = 0f
         wobbleShakePhase = 0f
     }

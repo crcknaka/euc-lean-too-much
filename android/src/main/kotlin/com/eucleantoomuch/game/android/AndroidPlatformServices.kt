@@ -68,6 +68,7 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     private val genericHitSound: Int = soundPool.load(context, R.raw.hit1, 1)
     private val carCrashSound: Int = soundPool.load(context, R.raw.carcrash, 1)
     private val benchImpactSound: Int = soundPool.load(context, R.raw.bench, 1)
+    private val powerupSound: Int = soundPool.load(context, R.raw.powerup, 1)
 
     override fun vibrate(durationMs: Long, amplitude: Int) {
         if (!hasVibrator()) return
@@ -702,5 +703,9 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
 
     override fun playBenchImpactSound(volume: Float) {
         soundPool.play(benchImpactSound, volume, volume, 1, 0, 1f)
+    }
+
+    override fun playPowerupSound() {
+        soundPool.play(powerupSound, 1f, 1f, 1, 0, 1f)
     }
 }

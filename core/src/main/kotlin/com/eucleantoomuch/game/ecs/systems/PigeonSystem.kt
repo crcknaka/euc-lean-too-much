@@ -41,7 +41,7 @@ class PigeonSystem(
 
     // External startle sources (ragdoll impacts, falling pedestrians)
     private val startleSources = mutableListOf<Vector3>()
-    private val startleRadius = 4f  // Radius for startle from external sources
+    private val startleRadius = 6f  // Radius for startle from external sources (increased for ragdoll impacts)
 
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)

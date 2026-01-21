@@ -13,6 +13,7 @@ import kotlin.math.abs
 class CollisionSystem : EntitySystem(5) {
     private lateinit var playerEntities: ImmutableArray<Entity>
     private lateinit var obstacleEntities: ImmutableArray<Entity>
+    private lateinit var powerupEntities: ImmutableArray<Entity>
 
     private val transformMapper = ComponentMapper.getFor(TransformComponent::class.java)
     private val colliderMapper = ComponentMapper.getFor(ColliderComponent::class.java)
@@ -20,11 +21,13 @@ class CollisionSystem : EntitySystem(5) {
     private val eucMapper = ComponentMapper.getFor(EucComponent::class.java)
     private val playerMapper = ComponentMapper.getFor(PlayerComponent::class.java)
     private val pedestrianMapper = ComponentMapper.getFor(PedestrianComponent::class.java)
+    private val powerupMapper = ComponentMapper.getFor(PowerupComponent::class.java)
 
     var onCollision: ((ObstacleType, Boolean) -> Unit)? = null  // Type, causesGameOver
     var onNearMiss: (() -> Unit)? = null  // Called when player passes close to pedestrian
     var onPedestrianHit: ((Entity) -> Unit)? = null  // Called when player hits a pedestrian
     var onKnockableHit: ((Entity) -> Unit)? = null  // Called when player hits a knockable object (trash can)
+    var onPowerupCollected: ((PowerupComponent) -> Unit)? = null  // Called when player collects a powerup
 
     // Near miss tracking - distance threshold for "close call"
     private val nearMissThresholdPedestrian = 1.2f  // Distance in meters for pedestrian near miss
@@ -33,6 +36,7 @@ class CollisionSystem : EntitySystem(5) {
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)
         obstacleEntities = engine.getEntitiesFor(Families.obstacles)
+        powerupEntities = engine.getEntitiesFor(Families.powerups)
     }
 
     override fun update(deltaTime: Float) {
@@ -106,6 +110,49 @@ class CollisionSystem : EntitySystem(5) {
                     }
                 }
             }
+        }
+
+        // Check collision with powerups
+        checkPowerupCollisions(playerTransform, playerCollider)
+    }
+
+    private fun checkPowerupCollisions(
+        playerTransform: TransformComponent,
+        playerCollider: ColliderComponent
+    ) {
+        val playerZ = playerTransform.position.z
+        val playerX = playerTransform.position.x
+        val entitiesToRemove = mutableListOf<Entity>()
+
+        for (powerupEntity in powerupEntities) {
+            val powerupTransform = transformMapper.get(powerupEntity) ?: continue
+            val powerupComponent = powerupMapper.get(powerupEntity) ?: continue
+
+            // Skip already collected
+            if (powerupComponent.isCollected) continue
+
+            // Quick Z distance check
+            val zDist = powerupTransform.position.z - playerZ
+            if (zDist > 10f || zDist < -5f) continue
+
+            val powerupCollider = colliderMapper.get(powerupEntity) ?: continue
+            powerupCollider.updateBounds(powerupTransform.position)
+
+            // Use simpler distance-based collision for powerups (more forgiving pickup radius)
+            val xDist = abs(playerX - powerupTransform.position.x)
+            val zDistAbs = abs(zDist)
+            val pickupRadius = 1.5f  // Generous pickup radius
+
+            if (xDist < pickupRadius && zDistAbs < pickupRadius) {
+                powerupComponent.isCollected = true
+                onPowerupCollected?.invoke(powerupComponent)
+                entitiesToRemove.add(powerupEntity)
+            }
+        }
+
+        // Remove collected powerups
+        for (entity in entitiesToRemove) {
+            engine.removeEntity(entity)
         }
     }
 

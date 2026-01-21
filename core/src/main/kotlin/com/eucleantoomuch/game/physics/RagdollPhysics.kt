@@ -102,6 +102,10 @@ class RagdollPhysics : Disposable {
     // Returns the entity that was hit and the impact velocity/direction
     var onRagdollHitPedestrian: ((pedestrianPosition: Vector3, impactVelocity: Vector3) -> Unit)? = null
 
+    // Callback when player ragdoll hits the ground (for startling pigeons, etc.)
+    // Returns the impact position
+    var onRagdollGroundImpact: ((impactPosition: Vector3) -> Unit)? = null
+
     // Track which colliders have already triggered sound (to avoid spam)
     private val triggeredColliders = mutableSetOf<btRigidBody>()
     private val triggeredSecondaryColliders = mutableSetOf<btRigidBody>()  // For secondary collisions
@@ -109,6 +113,11 @@ class RagdollPhysics : Disposable {
     private var lastSecondaryCollisionTime = 0f
     private val minCollisionInterval = 0.15f  // Minimum time between collision sounds
     private val minSecondaryCollisionInterval = 0.2f  // Slightly longer for secondary
+
+    // Track ground impacts for startling pigeons
+    private var hasTriggeredGroundImpact = false
+    private var lastGroundImpactTime = 0f
+    private val minGroundImpactInterval = 0.5f  // Don't spam ground impact events
 
     // Pedestrian ragdoll bodies - simplified 6-part ragdoll for performance
     data class PedestrianRagdoll(
@@ -589,6 +598,7 @@ class RagdollPhysics : Disposable {
         // Update collision timers
         lastCollisionTime += delta
         lastSecondaryCollisionTime += delta
+        lastGroundImpactTime += delta
 
         // Check for collisions and trigger sounds
         if (isActive) {
@@ -605,8 +615,6 @@ class RagdollPhysics : Disposable {
      * Check contact manifolds for ragdoll collisions with world objects.
      */
     private fun checkRagdollCollisions() {
-        if (onRagdollCollision == null) return
-
         val numManifolds = dispatcher.numManifolds
 
         for (i in 0 until numManifolds) {
@@ -625,10 +633,16 @@ class RagdollPhysics : Disposable {
 
             if (ragdollBody == null || worldBody == null) continue
 
+            // Check for ground collision (for startling pigeons)
+            if (worldBody == groundBody) {
+                checkGroundImpact(ragdollBody)
+                continue
+            }
+
             // Find the collider type (O(1) HashMap lookup instead of O(n) list search)
             val collider = worldColliderMap[worldBody]
 
-            // Skip if already triggered for this collider or if ground
+            // Skip if already triggered for this collider
             if (collider != null) {
                 if (collider.type == ColliderType.GROUND) continue
                 if (worldBody in triggeredColliders) continue
@@ -652,6 +666,23 @@ class RagdollPhysics : Disposable {
                 }
             }
         }
+    }
+
+    /**
+     * Check if ragdoll body hitting ground should trigger ground impact event.
+     * Used to startle pigeons when player falls near them.
+     */
+    private fun checkGroundImpact(ragdollBody: btRigidBody) {
+        if (onRagdollGroundImpact == null) return
+        if (lastGroundImpactTime < minGroundImpactInterval) return
+
+        // Get ragdoll body position for the impact location
+        val impactPos = Vector3()
+        ragdollBody.worldTransform.getTranslation(impactPos)
+
+        // Trigger ground impact event
+        lastGroundImpactTime = 0f
+        onRagdollGroundImpact?.invoke(impactPos)
     }
 
     /**
@@ -875,6 +906,7 @@ class RagdollPhysics : Disposable {
         triggeredSecondaryColliders.clear()
         lastCollisionTime = 0f
         lastSecondaryCollisionTime = 0f
+        lastGroundImpactTime = 0f
     }
 
     /**
@@ -1330,6 +1362,57 @@ class RagdollPhysics : Disposable {
         }
 
         return result
+    }
+
+    /**
+     * Apply external impulse to the player ragdoll (e.g., from a car hitting the ragdoll).
+     * @param impactPosition Position where the impact occurred
+     * @param impactVelocity Velocity/direction of the impacting object (used for impulse direction)
+     */
+    fun applyExternalImpulse(impactPosition: Vector3, impactVelocity: Vector3) {
+        if (!isActive) return
+
+        // Calculate impulse strength based on impact velocity
+        val impactSpeed = impactVelocity.len()
+        val impulseStrength = impactSpeed * 15f  // Scale factor for visible effect
+
+        // Apply impulse to torso (main body)
+        torso.body?.let { body ->
+            val impulse = Vector3(impactVelocity).nor().scl(impulseStrength)
+            impulse.y += impulseStrength * 0.3f  // Add some upward component
+            body.applyCentralImpulse(impulse)
+
+            // Also add some angular impulse for tumbling effect
+            val angularImpulse = Vector3(
+                impactVelocity.z * 2f,  // Tumble based on impact direction
+                0f,
+                -impactVelocity.x * 2f
+            )
+            body.applyTorqueImpulse(angularImpulse)
+        }
+
+        // Apply smaller impulse to head
+        head.body?.let { body ->
+            val impulse = Vector3(impactVelocity).nor().scl(impulseStrength * 0.8f)
+            impulse.y += impulseStrength * 0.4f
+            body.applyCentralImpulse(impulse)
+        }
+
+        // Apply to limbs with decreasing strength
+        val limbBodies = listOfNotNull(
+            leftUpperArm.body, leftLowerArm.body,
+            rightUpperArm.body, rightLowerArm.body,
+            leftUpperLeg.body, leftLowerLeg.body,
+            rightUpperLeg.body, rightLowerLeg.body
+        )
+        for (body in limbBodies) {
+            val impulse = Vector3(impactVelocity).nor().scl(impulseStrength * 0.5f)
+            impulse.y += impulseStrength * 0.2f
+            body.applyCentralImpulse(impulse)
+        }
+
+        // Trigger ground impact callback (for pigeons) at impact position
+        onRagdollGroundImpact?.invoke(impactPosition)
     }
 
     /**

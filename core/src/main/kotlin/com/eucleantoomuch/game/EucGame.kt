@@ -205,6 +205,11 @@ class EucGame(
             // Start ragdoll physics for knockable objects (trash cans)
             startTrashCanRagdoll(obstacleEntity)
         }
+        collisionSystem.onPowerupCollected = { powerupComponent ->
+            // Restore battery and play sound
+            session.restoreBattery(powerupComponent.batteryRestoreAmount)
+            platformServices.playPowerupSound()
+        }
 
         pigeonSystem = PigeonSystem(models, platformServices)
         cullingSystem = CullingSystem()
@@ -218,6 +223,7 @@ class EucGame(
         engine.addSystem(pigeonSystem)
         engine.addSystem(ArmAnimationSystem())
         engine.addSystem(HeadAnimationSystem())
+        engine.addSystem(PowerupAnimationSystem())
         engine.addSystem(collisionSystem)
         engine.addSystem(cullingSystem)
 
@@ -268,6 +274,11 @@ class EucGame(
             // Set up secondary collision callback for pedestrian ragdolls hitting objects (quieter)
             ragdollPhysics?.onSecondaryRagdollCollision = { colliderType ->
                 playSecondaryRagdollCollisionSound(colliderType)
+            }
+
+            // Set up ground impact callback to startle pigeons when ragdoll lands nearby
+            ragdollPhysics?.onRagdollGroundImpact = { impactPosition ->
+                pigeonSystem.addStartleSource(impactPosition)
             }
 
             // Set up pedestrian ragdoll rendering (always active during gameplay)
@@ -687,6 +698,13 @@ class EucGame(
         if (playerTransform != null && eucComponent != null) {
             session.update(delta, eucComponent.speed)
 
+            // Check for battery death - causes fall
+            if (session.isBatteryDead) {
+                platformServices.playGenericHitSound()
+                handlePlayerFall()
+                return
+            }
+
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
@@ -888,6 +906,7 @@ class EucGame(
         countdownTimer = 3f
         lastCountdownSecond = -1  // Reset for beep tracking
         session.reset()
+        session.setBatteryCapacity(wheelType.batteryCapacity)  // Set battery from wheel type
         hud.reset()
         isNewHighScore = false
         stateManager.transition(GameState.Countdown(3))
@@ -1084,6 +1103,11 @@ class EucGame(
     private val ragdollImpactDir = com.badlogic.gdx.math.Vector3()
     private val ragdollCollisionRadius = 0.8f  // Collision radius for ragdoll body
 
+    // Temp vectors for car-ragdoll collision checking
+    private val carCheckPos = com.badlogic.gdx.math.Vector3()
+    private val carVelocity = com.badlogic.gdx.math.Vector3()
+    private val carsHitRagdoll = mutableSetOf<Entity>()  // Track which cars already hit ragdoll
+
     /**
      * Check if any ragdoll body (player or pedestrian) collides with standing pedestrians.
      * If collision detected, knock down the standing pedestrian.
@@ -1191,6 +1215,77 @@ class EucGame(
         pigeonSystem.addStartleSource(pedestrianTransform.position)
     }
 
+    /**
+     * Check if moving cars collide with the player ragdoll.
+     * If collision detected, apply impulse to ragdoll and startle pigeons.
+     */
+    private fun checkRagdollCarCollisions() {
+        if (!useRagdollPhysics || ragdollPhysics == null) return
+        if (!ragdollPhysics!!.isActive()) return
+
+        // Get player ragdoll torso position
+        ragdollPhysics!!.getTorsoPosition(ragdollCheckPos)
+        if (ragdollCheckPos.isZero) return
+
+        // Get all cars
+        val cars = engine.getEntitiesFor(Families.cars)
+        if (cars.size() == 0) return
+
+        for (i in 0 until cars.size()) {
+            val carEntity = cars[i]
+
+            // Skip if already hit this car
+            if (carEntity in carsHitRagdoll) continue
+
+            val carTransform = carEntity.getComponent(TransformComponent::class.java) ?: continue
+            val carComponent = carEntity.getComponent(com.eucleantoomuch.game.ecs.components.CarComponent::class.java) ?: continue
+            val carCollider = carEntity.getComponent(com.eucleantoomuch.game.ecs.components.ColliderComponent::class.java)
+
+            // Car dimensions
+            val carHalfWidth = carCollider?.halfExtents?.x ?: 1.0f
+            val carHalfHeight = carCollider?.halfExtents?.y ?: 0.7f
+            val carHalfLength = carCollider?.halfExtents?.z ?: 2.2f
+
+            carCheckPos.set(carTransform.position)
+            carCheckPos.y += carHalfHeight  // Center of car
+
+            // Simple AABB check (car is axis-aligned or rotated 180)
+            val yawRad = Math.toRadians(carTransform.yaw.toDouble()).toFloat()
+            val cosYaw = kotlin.math.cos(yawRad)
+            val sinYaw = kotlin.math.sin(yawRad)
+
+            // Transform ragdoll position to car's local space
+            val localX = (ragdollCheckPos.x - carCheckPos.x) * cosYaw + (ragdollCheckPos.z - carCheckPos.z) * sinYaw
+            val localY = ragdollCheckPos.y - carCheckPos.y
+            val localZ = -(ragdollCheckPos.x - carCheckPos.x) * sinYaw + (ragdollCheckPos.z - carCheckPos.z) * cosYaw
+
+            // Check if ragdoll is inside car AABB (with some margin for ragdoll radius)
+            val margin = 0.5f
+            if (kotlin.math.abs(localX) < carHalfWidth + margin &&
+                kotlin.math.abs(localY) < carHalfHeight + margin &&
+                kotlin.math.abs(localZ) < carHalfLength + margin) {
+
+                // Collision detected!
+                carsHitRagdoll.add(carEntity)
+
+                // Calculate car velocity direction
+                carVelocity.set(0f, 0f, carComponent.speed)
+                carVelocity.rotate(com.badlogic.gdx.math.Vector3.Y, carTransform.yaw)
+
+                // Apply impulse to ragdoll
+                ragdollPhysics!!.applyExternalImpulse(ragdollCheckPos, carVelocity)
+
+                // Startle nearby pigeons
+                pigeonSystem.addStartleSource(ragdollCheckPos)
+
+                // Play car hit sound
+                platformServices.playGenericHitSound(0.8f)
+
+                Gdx.app.log("EucGame", "Car hit ragdoll! Speed: ${carComponent.speed}")
+            }
+        }
+    }
+
     private fun handlePlayerFall() {
         // God mode - prevent death
         if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.godMode) {
@@ -1278,6 +1373,9 @@ class EucGame(
 
         // Check if ragdoll bodies knock down standing pedestrians
         checkRagdollPedestrianCollisions()
+
+        // Check if moving cars hit the player ragdoll
+        checkRagdollCarCollisions()
 
         // Update ragdoll physics if active
         val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
@@ -1686,6 +1784,7 @@ class EucGame(
     private fun resetColliderTracking() {
         addedColliderEntities.clear()
         lastColliderUpdateZ = Float.MIN_VALUE
+        carsHitRagdoll.clear()  // Reset car collision tracking
     }
 
     // Temp matrix for pedestrian transform updates

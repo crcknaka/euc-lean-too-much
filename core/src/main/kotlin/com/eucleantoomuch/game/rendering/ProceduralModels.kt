@@ -115,8 +115,9 @@ class ProceduralModels : Disposable {
     fun createEucModel(wheelId: String = "standard"): Model {
         // Map wheel IDs to GLB files
         val glbFileName = when (wheelId) {
-            "performance" -> "monowheel2.glb"
-            else -> "monowheel.glb"
+            "simple" -> "nicola.glb"
+            "performance" -> "lynx.glb"
+            else -> "v12.glb"
         }
 
         Gdx.app.log("ProceduralModels", "Loading EUC model for wheelId='$wheelId', file='$glbFileName'")
