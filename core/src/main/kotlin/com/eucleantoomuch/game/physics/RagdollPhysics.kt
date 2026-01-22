@@ -81,6 +81,8 @@ class RagdollPhysics : Disposable {
         CAR,
         PEDESTRIAN,
         BENCH,
+        BUILDING,
+        TREE,
         GENERIC
     }
 
@@ -641,28 +643,43 @@ class RagdollPhysics : Disposable {
 
             // Find the collider type (O(1) HashMap lookup instead of O(n) list search)
             val collider = worldColliderMap[worldBody]
+            val colliderType = collider?.type ?: ColliderType.GENERIC
 
-            // Skip if already triggered for this collider
-            if (collider != null) {
-                if (collider.type == ColliderType.GROUND) continue
-                if (worldBody in triggeredColliders) continue
+            // Log if collider not found in map (debugging)
+            if (collider == null) {
+                Gdx.app.log("RagdollPhysics", "WARNING: Collision with object not in worldColliderMap, using GENERIC")
+            }
 
-                // Check if enough time has passed since last collision sound
-                if (lastCollisionTime < minCollisionInterval) continue
+            // Skip ground collisions (handled separately)
+            if (colliderType == ColliderType.GROUND) continue
 
-                // Check contact impulse - only trigger for significant impacts
-                var maxImpulse = 0f
-                for (j in 0 until numContacts) {
-                    val pt = manifold.getContactPoint(j)
-                    val impulse = pt.appliedImpulse
-                    if (impulse > maxImpulse) maxImpulse = impulse
-                }
+            // Skip if already triggered for this specific collider body
+            if (worldBody in triggeredColliders) continue
 
-                // Only trigger sound for significant impacts
-                if (maxImpulse > 5f) {
-                    triggeredColliders.add(worldBody)
-                    lastCollisionTime = 0f
-                    onRagdollCollision?.invoke(collider.type)
+            // Check if enough time has passed since last collision sound
+            if (lastCollisionTime < minCollisionInterval) continue
+
+            // Check contact impulse - only trigger for significant impacts
+            var maxImpulse = 0f
+            for (j in 0 until numContacts) {
+                val pt = manifold.getContactPoint(j)
+                val impulse = pt.appliedImpulse
+                if (impulse > maxImpulse) maxImpulse = impulse
+            }
+
+            // Only trigger sound for significant impacts (lowered threshold for better feedback)
+            if (maxImpulse > 2f) {
+                triggeredColliders.add(worldBody)
+                lastCollisionTime = 0f
+                Gdx.app.log("RagdollPhysics", "Ragdoll collision with $colliderType, impulse: $maxImpulse")
+                onRagdollCollision?.invoke(colliderType)
+
+                // Also trigger ground impact callback for startling pigeons at any collision
+                if (lastGroundImpactTime >= minGroundImpactInterval) {
+                    val impactPos = Vector3()
+                    ragdollBody.worldTransform.getTranslation(impactPos)
+                    lastGroundImpactTime = 0f
+                    onRagdollGroundImpact?.invoke(impactPos)
                 }
             }
         }

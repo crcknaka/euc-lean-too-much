@@ -1586,6 +1586,9 @@ class EucGame(
     private val obstacleMapper = com.badlogic.ashley.core.ComponentMapper.getFor(
         com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
     )
+    private val groundMapper = com.badlogic.ashley.core.ComponentMapper.getFor(
+        com.eucleantoomuch.game.ecs.components.GroundComponent::class.java
+    )
     private val transformMapperForCollider = com.badlogic.ashley.core.ComponentMapper.getFor(
         TransformComponent::class.java
     )
@@ -1595,8 +1598,8 @@ class EucGame(
     private fun addWorldCollidersForRagdoll(playerPos: com.badlogic.gdx.math.Vector3) {
         val physics = ragdollPhysics ?: return
 
-        // Search radius for nearby objects
-        val searchRadius = 20f
+        // Search radius for nearby objects - increased to reach buildings (14m from road center + margin)
+        val searchRadius = 30f
         val searchRadiusSq = searchRadius * searchRadius
 
         var colliderCount = 0
@@ -1630,9 +1633,16 @@ class EucGame(
             )
             tempHalfExtents.set(collider.halfExtents)
 
-            // Check obstacle type for special handling
+            // Check obstacle type and ground type for special handling
             val obstacle = obstacleMapper.get(entity)
-            val colliderType = obstacleTypeToColliderType(obstacle?.type)
+            val ground = groundMapper.get(entity)
+
+            // Determine collider type - check ground type for buildings
+            val colliderType = when {
+                ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
+                    RagdollPhysics.ColliderType.BUILDING
+                else -> obstacleTypeToColliderType(obstacle?.type)
+            }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
                 // Street lights are thin cylinders
@@ -1642,6 +1652,7 @@ class EucGame(
                     collider.halfExtents.y * 2f,
                     colliderType
                 )
+                Gdx.app.log("EucGame", "Added STREET_LIGHT cylinder collider at ${tempColliderPos.x}, ${tempColliderPos.z}")
             } else {
                 // Default: box collider
                 physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, colliderType)
@@ -1697,8 +1708,8 @@ class EucGame(
         if (ragdollPos.z - lastColliderUpdateZ < 5f) return
         lastColliderUpdateZ = ragdollPos.z
 
-        // Search radius for nearby objects
-        val searchRadius = 25f
+        // Search radius for nearby objects - increased to reach buildings
+        val searchRadius = 35f
         val searchRadiusSq = searchRadius * searchRadius
 
         var newColliderCount = 0
@@ -1734,9 +1745,16 @@ class EucGame(
             )
             tempHalfExtents.set(collider.halfExtents)
 
-            // Check obstacle type for special handling
+            // Check obstacle type and ground type for special handling
             val obstacle = obstacleMapper.get(entity)
-            val colliderType = obstacleTypeToColliderType(obstacle?.type)
+            val ground = groundMapper.get(entity)
+
+            // Determine collider type - check ground type for buildings
+            val colliderType = when {
+                ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
+                    RagdollPhysics.ColliderType.BUILDING
+                else -> obstacleTypeToColliderType(obstacle?.type)
+            }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
                 physics.addCylinderCollider(tempColliderPos, 0.15f, collider.halfExtents.y * 2f, colliderType)
@@ -1878,6 +1896,8 @@ class EucGame(
             RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound()
             RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound()
             RagdollPhysics.ColliderType.BENCH -> platformServices.playBenchImpactSound()
+            RagdollPhysics.ColliderType.BUILDING -> platformServices.playGenericHitSound()  // Building wall impact
+            RagdollPhysics.ColliderType.TREE -> platformServices.playGenericHitSound()  // Tree impact
             RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound()
             RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts handled by fall animation */ }
         }
@@ -1895,6 +1915,8 @@ class EucGame(
             RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound(0.4f)
             RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound(0.4f)
             RagdollPhysics.ColliderType.BENCH -> platformServices.playBenchImpactSound(0.4f)
+            RagdollPhysics.ColliderType.BUILDING -> platformServices.playGenericHitSound(0.4f)
+            RagdollPhysics.ColliderType.TREE -> platformServices.playGenericHitSound(0.4f)
             RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound(0.4f)
             RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts not needed for secondary */ }
         }
