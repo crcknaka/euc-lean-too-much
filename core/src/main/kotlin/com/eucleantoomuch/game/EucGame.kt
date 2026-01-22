@@ -1637,11 +1637,12 @@ class EucGame(
             val obstacle = obstacleMapper.get(entity)
             val ground = groundMapper.get(entity)
 
-            // Determine collider type - check ground type for buildings
+            // Determine collider type - obstacle type takes priority over ground type
             val colliderType = when {
+                obstacle != null -> obstacleTypeToColliderType(obstacle.type)
                 ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
                     RagdollPhysics.ColliderType.BUILDING
-                else -> obstacleTypeToColliderType(obstacle?.type)
+                else -> RagdollPhysics.ColliderType.GENERIC
             }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
@@ -1749,11 +1750,12 @@ class EucGame(
             val obstacle = obstacleMapper.get(entity)
             val ground = groundMapper.get(entity)
 
-            // Determine collider type - check ground type for buildings
+            // Determine collider type - obstacle type takes priority over ground type
             val colliderType = when {
+                obstacle != null -> obstacleTypeToColliderType(obstacle.type)
                 ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
                     RagdollPhysics.ColliderType.BUILDING
-                else -> obstacleTypeToColliderType(obstacle?.type)
+                else -> RagdollPhysics.ColliderType.GENERIC
             }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {

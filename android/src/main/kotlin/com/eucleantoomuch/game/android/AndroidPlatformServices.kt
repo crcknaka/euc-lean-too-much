@@ -249,6 +249,8 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
             var motorPhase = 0.0
             var motor2Phase = 0.0
             var motor3Phase = 0.0
+            var motor4Phase = 0.0
+            var motor5Phase = 0.0
             var tirePhase = 0.0
             var lastFilteredNoise = 0f
 
@@ -307,6 +309,8 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                 // === HARMONICS ===
                 val harmonic2Freq = motorBaseFreq * 2.0
                 val harmonic3Freq = motorBaseFreq * 3.0
+                val harmonic4Freq = motorBaseFreq * 4.0
+                val harmonic5Freq = motorBaseFreq * 5.0
 
                 val harmonic2Vol = when {
                     isElectric -> motorVolume * 0.05f  // Reduced harmonics for softer sound
@@ -350,9 +354,9 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                     val motor2 = sin(motor2Phase) * harmonic2Vol
                     val motor3 = sin(motor3Phase) * harmonic3Vol
 
-                    // V8 extra harmonics for rich sound
-                    val motor4 = if (isV8) sin(motorPhase * 4.0) * harmonic4Vol else 0.0
-                    val motor5 = if (isV8) sin(motorPhase * 5.0) * harmonic5Vol else 0.0
+                    // V8 extra harmonics for rich sound (use tracked phases)
+                    val motor4 = if (isV8) sin(motor4Phase) * harmonic4Vol else 0.0
+                    val motor5 = if (isV8) sin(motor5Phase) * harmonic5Vol else 0.0
 
                     // PWM strain / V8 growl
                     val strain = if (strainVol > 0.01f) {
@@ -390,12 +394,16 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
                     motorPhase += motorBaseFreq * phaseStep
                     motor2Phase += harmonic2Freq * phaseStep
                     motor3Phase += harmonic3Freq * phaseStep
+                    motor4Phase += harmonic4Freq * phaseStep
+                    motor5Phase += harmonic5Freq * phaseStep
                     tirePhase += tireFreq * phaseStep
 
                     // Keep phases in range to prevent precision loss
                     if (motorPhase > 2.0 * Math.PI) motorPhase -= 2.0 * Math.PI
                     if (motor2Phase > 2.0 * Math.PI) motor2Phase -= 2.0 * Math.PI
                     if (motor3Phase > 2.0 * Math.PI) motor3Phase -= 2.0 * Math.PI
+                    if (motor4Phase > 2.0 * Math.PI) motor4Phase -= 2.0 * Math.PI
+                    if (motor5Phase > 2.0 * Math.PI) motor5Phase -= 2.0 * Math.PI
                     if (tirePhase > 2.0 * Math.PI) tirePhase -= 2.0 * Math.PI
                 }
 
@@ -419,11 +427,8 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
      * Uses tanh-like curve for smooth saturation.
      */
     private fun softClip(x: Float): Float {
-        return when {
-            x > 1f -> 1f - 1f / (1f + x)
-            x < -1f -> -1f + 1f / (1f - x)
-            else -> x
-        }
+        // Smooth tanh saturation — no sharp knee, output bounded to [-1, 1]
+        return Math.tanh(x.toDouble()).toFloat()
     }
 
     // === Crash Sound Implementation ===

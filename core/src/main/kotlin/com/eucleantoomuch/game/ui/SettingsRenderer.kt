@@ -350,7 +350,8 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
             val row2Y = row1Y - rowHeight
             ui.textCentered("PWM Beeps", leftColCenterX, row2Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(pwmWarningLeftButton, pwmWarningRightButton)
-            ui.textCentered(settingsManager.getPwmWarningName(), leftColCenterX, row2Y, UIFonts.body, UITheme.accent)
+            val pwmColor = if (settingsManager.pwmWarning >= 90) UITheme.danger else UITheme.accent
+            ui.textCentered(settingsManager.getPwmWarningName(), leftColCenterX, row2Y, UIFonts.body, pwmColor)
             UIFonts.body.color = UITheme.textPrimary
             UIFonts.body.draw(ui.batch, "Beeps", rightColCenterX + checkboxLabelOffsetRight,
                 row2Y + UIFonts.body.lineHeight / 3)
