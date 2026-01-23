@@ -156,9 +156,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
 
         // === CENTERED COMPACT LAYOUT with breathing room ===
         // Panel is narrower, centered, with lots of space on sides
-        val panelMarginY = 45f * scale
-        val maxPanelWidth = 850f * scale  // Max width for comfortable reading
-        val panelWidth = (sw * 0.72f).coerceAtMost(maxPanelWidth) * enterAnimProgress
+        val panelMarginY = 35f * scale
+        val maxPanelWidth = 980f * scale  // Max width for comfortable reading
+        val panelWidth = (sw * 0.82f).coerceAtMost(maxPanelWidth) * enterAnimProgress
         val panelHeight = (sh - panelMarginY * 2) * enterAnimProgress
         val panelX = centerX - panelWidth / 2
         val panelY = panelMarginY
@@ -173,9 +173,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         val titleY = panelY + panelHeight - 55f * scale
 
         // === TABS - horizontal at top, below title ===
-        val tabWidth = 170f * scale
-        val tabHeight = 55f * scale
-        val tabGap = 15f * scale
+        val tabWidth = 210f * scale
+        val tabHeight = 68f * scale
+        val tabGap = 18f * scale
         val tabsY = titleY - 115f * scale  // Moved down
 
         // Graphics tab (left) - using neonButton
@@ -191,15 +191,15 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         ui.neonButton(gameplayTabButton, gameplayTabColor, UITheme.accent, gameplayTabGlow)
 
         // === CONTENT AREA - Two columns ===
-        val contentStartY = tabsY - 80f * scale
+        val contentStartY = tabsY - 90f * scale
         val contentWidth = panelWidth - 100f * scale
         val contentX = panelX + 50f * scale
         val leftColCenterX = contentX + contentWidth * 0.32f
         val rightColCenterX = contentX + contentWidth * 0.75f
-        val rowHeight = 90f * scale
-        val arrowButtonSize = 48f * scale
-        val valueBoxWidth = 140f * scale
-        val checkboxSize = 50f * scale
+        val rowHeight = 110f * scale
+        val arrowButtonSize = 64f * scale
+        val valueBoxWidth = 170f * scale
+        val checkboxSize = 64f * scale
 
         if (currentTab == 0) {
             // === GRAPHICS TAB ===
@@ -260,16 +260,16 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         }
 
         // === BOTTOM: Back button and links ===
-        val buttonWidth = 220f * scale
-        val buttonHeight = 70f * scale
-        val bottomY = panelY + 25f * scale
+        val buttonWidth = 260f * scale
+        val buttonHeight = 80f * scale
+        val bottomY = panelY + 30f * scale
         backButton.set(centerX - buttonWidth / 2, bottomY, buttonWidth, buttonHeight)
         ui.neonButton(backButton, UITheme.surfaceLight, UITheme.cyan, backButtonHover * 0.6f)
 
         // Footer links - on sides of back button
-        val linkButtonHeight = 40f * scale
-        val linkButtonWidth = 120f * scale
-        val linkGap = 15f * scale
+        val linkButtonHeight = 50f * scale
+        val linkButtonWidth = 140f * scale
+        val linkGap = 18f * scale
 
         // Privacy on the left of Back
         privacyPolicyButton.set(backButton.x - linkButtonWidth - linkGap, bottomY + (buttonHeight - linkButtonHeight) / 2, linkButtonWidth, linkButtonHeight)
@@ -292,9 +292,9 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         // Tab labels
         val tabTextColor = UITheme.textPrimary
         ui.textCentered("Graphics", graphicsTabButton.x + graphicsTabButton.width / 2,
-            graphicsTabButton.y + graphicsTabButton.height / 2, UIFonts.body, tabTextColor)
+            graphicsTabButton.y + graphicsTabButton.height / 2, UIFonts.button, tabTextColor)
         ui.textCentered("Gameplay", gameplayTabButton.x + gameplayTabButton.width / 2,
-            gameplayTabButton.y + gameplayTabButton.height / 2, UIFonts.body, tabTextColor)
+            gameplayTabButton.y + gameplayTabButton.height / 2, UIFonts.button, tabTextColor)
 
         // Back button text
         ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2,
@@ -317,7 +317,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         if (currentTab == 0) {
             // === GRAPHICS TAB TEXT ===
             val row1Y = contentStartY - 25f * scale
-            ui.textCentered("Graphics Quality", leftColCenterX, row1Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
+            ui.textCentered("Graphics Quality", leftColCenterX, row1Y + 52f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(graphicsPresetLeftButton, graphicsPresetRightButton)
             ui.textCentered(settingsManager.getGraphicsPresetName(), leftColCenterX, row1Y, UIFonts.body, UITheme.accent)
             UIFonts.body.color = UITheme.textPrimary
@@ -325,7 +325,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 row1Y + UIFonts.body.lineHeight / 3)
 
             val row2Y = row1Y - rowHeight
-            ui.textCentered("Render Distance", leftColCenterX, row2Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
+            ui.textCentered("Render Distance", leftColCenterX, row2Y + 52f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(renderDistanceLeftButton, renderDistanceRightButton)
             ui.textCentered(settingsManager.getRenderDistanceName(), leftColCenterX, row2Y, UIFonts.body, UITheme.accent)
             UIFonts.body.color = UITheme.textPrimary
@@ -333,14 +333,14 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 row2Y + UIFonts.body.lineHeight / 3)
 
             val row3Y = row2Y - rowHeight
-            ui.textCentered("Max FPS", leftColCenterX, row3Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
+            ui.textCentered("Max FPS", leftColCenterX, row3Y + 52f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(maxFpsLeftButton, maxFpsRightButton)
             ui.textCentered(settingsManager.getMaxFpsName(), leftColCenterX, row3Y, UIFonts.body, UITheme.accent)
 
         } else {
             // === GAMEPLAY TAB TEXT ===
             val row1Y = contentStartY - 25f * scale
-            ui.textCentered("AVAS Sound", leftColCenterX, row1Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
+            ui.textCentered("AVAS Sound", leftColCenterX, row1Y + 52f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(avasLeftButton, avasRightButton)
             ui.textCentered(settingsManager.getAvasModeName(), leftColCenterX, row1Y, UIFonts.body, UITheme.accent)
             UIFonts.body.color = UITheme.textPrimary
@@ -348,7 +348,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
                 row1Y + UIFonts.body.lineHeight / 3)
 
             val row2Y = row1Y - rowHeight
-            ui.textCentered("PWM Beeps", leftColCenterX, row2Y + 42f * scale, UIFonts.body, UITheme.textSecondary)
+            ui.textCentered("PWM Beeps", leftColCenterX, row2Y + 52f * scale, UIFonts.body, UITheme.textSecondary)
             renderArrowText(pwmWarningLeftButton, pwmWarningRightButton)
             val pwmColor = if (settingsManager.pwmWarning >= 90) UITheme.danger else UITheme.accent
             ui.textCentered(settingsManager.getPwmWarningName(), leftColCenterX, row2Y, UIFonts.body, pwmColor)
@@ -551,7 +551,7 @@ class SettingsRenderer(private val settingsManager: SettingsManager) : Disposabl
         ui.neonButton(rightButton, UITheme.secondary, UITheme.secondary, 0.25f + rightHover * 0.6f)
 
         // Bigger value box with gradient card style
-        val boxHeight = 52f * scale
+        val boxHeight = 64f * scale
         ui.card(
             centerX - valueBoxWidth / 2,
             y - boxHeight / 2,
