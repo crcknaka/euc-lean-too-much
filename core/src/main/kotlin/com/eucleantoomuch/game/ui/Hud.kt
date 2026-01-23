@@ -797,11 +797,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             }
 
             val alpha = (notification.timer / 1.5f).coerceIn(0f, 1f)
-            val y = baseY - index * 30f * scale - notification.offsetY
+            val y = baseY - index * 36f * scale - notification.offsetY
             val text = "+${notification.amount}V ${notification.reason}"
 
-            UIFonts.caption.color = UITheme.withAlpha(voltsColor, alpha)
-            UIFonts.caption.draw(ui.batch, text, baseX, y)
+            UIFonts.body.color = UITheme.withAlpha(voltsColor, alpha)
+            UIFonts.body.draw(ui.batch, text, baseX, y)
             index++
         }
     }
