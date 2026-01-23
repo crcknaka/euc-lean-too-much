@@ -158,9 +158,23 @@ class VoltsManager {
 
     /**
      * Finalize session - add session volts to persistent total.
+     * Write is deferred; call flushDeferred() on a later frame to persist.
      */
     fun finalizeSession() {
-        totalVolts += sessionVolts
+        prefs.putInteger(KEY_TOTAL_VOLTS, totalVolts + sessionVolts)
+        hasDeferredFlush = true
+    }
+
+    private var hasDeferredFlush = false
+
+    /**
+     * Flush any deferred writes to disk. Call this on a non-critical frame.
+     */
+    fun flushDeferred() {
+        if (hasDeferredFlush) {
+            prefs.flush()
+            hasDeferredFlush = false
+        }
     }
 
     /**

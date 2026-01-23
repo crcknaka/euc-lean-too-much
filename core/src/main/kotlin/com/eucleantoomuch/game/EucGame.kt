@@ -1325,8 +1325,6 @@ class EucGame(
 
                 // Play car hit sound
                 platformServices.playGenericHitSound(0.8f)
-
-                Gdx.app.log("EucGame", "Car hit ragdoll! Speed: ${carComponent.speed}")
             }
         }
     }
@@ -1381,9 +1379,9 @@ class EucGame(
                     forwardLean = eucComponent.forwardLean
                 )
 
-                // Reset collider tracking and add initial colliders
+                // Defer heavy collider setup to first frame of Falling state
                 resetColliderTracking()
-                addWorldCollidersForRagdoll(playerTransform.position)
+                pendingRagdollColliderSetup = true
             }
 
             // Startle nearby pigeons when player crashes
@@ -1423,6 +1421,18 @@ class EucGame(
 
         // Always update ragdoll physics (for pedestrians even if player ragdoll is inactive)
         ragdollPhysics?.update(delta)
+
+        // Deferred ragdoll collider setup (moved from handlePlayerFall to avoid collision-frame lag)
+        if (pendingRagdollColliderSetup) {
+            val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
+            if (playerTransform != null) {
+                addWorldCollidersForRagdoll(playerTransform.position)
+            }
+            pendingRagdollColliderSetup = false
+            // Also flush deferred disk writes here (non-critical frame)
+            highScoreManager.flushDeferred()
+            voltsManager.flushDeferred()
+        }
 
         // Check if ragdoll bodies knock down standing pedestrians
         checkRagdollPedestrianCollisions()
@@ -1655,8 +1665,6 @@ class EucGame(
         val searchRadius = 30f
         val searchRadiusSq = searchRadius * searchRadius
 
-        var colliderCount = 0
-
         // Add colliders for ALL collidable objects (includes obstacles, buildings, cars, etc.)
         // Use index-based loop to avoid nested iterator issue with GDX Array
         val collidables = engine.getEntitiesFor(Families.collidable)
@@ -1706,12 +1714,10 @@ class EucGame(
                     collider.halfExtents.y * 2f,
                     colliderType
                 )
-                Gdx.app.log("EucGame", "Added STREET_LIGHT cylinder collider at ${tempColliderPos.x}, ${tempColliderPos.z}")
             } else {
                 // Default: box collider
                 physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, colliderType)
             }
-            colliderCount++
         }
 
         // Also add colliders for moving cars (they may not have ColliderComponent in collidable family)
@@ -1741,11 +1747,11 @@ class EucGame(
                 tempHalfExtents.set(1.0f, 0.7f, 2.2f)
                 physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
             }
-            colliderCount++
         }
-
-        Gdx.app.log("EucGame", "Added $colliderCount world colliders for ragdoll physics")
     }
+
+    // Deferred ragdoll collider setup - done on first frame of Falling state to avoid collision-frame lag
+    private var pendingRagdollColliderSetup = false
 
     // Track entities that already have colliders added (to avoid duplicates)
     private val addedColliderEntities = mutableSetOf<com.badlogic.ashley.core.Entity>()
@@ -1765,8 +1771,6 @@ class EucGame(
         // Search radius for nearby objects - increased to reach buildings
         val searchRadius = 35f
         val searchRadiusSq = searchRadius * searchRadius
-
-        var newColliderCount = 0
 
         // Check all collidable objects
         val collidables = engine.getEntitiesFor(Families.collidable)
@@ -1818,7 +1822,6 @@ class EucGame(
             }
 
             addedColliderEntities.add(entity)
-            newColliderCount++
         }
 
         // Also check cars
@@ -1843,11 +1846,6 @@ class EucGame(
             physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
 
             addedColliderEntities.add(entity)
-            newColliderCount++
-        }
-
-        if (newColliderCount > 0) {
-            Gdx.app.log("EucGame", "Added $newColliderCount new colliders during ragdoll flight")
         }
     }
 

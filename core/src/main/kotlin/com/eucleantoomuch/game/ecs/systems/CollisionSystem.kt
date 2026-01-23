@@ -33,6 +33,9 @@ class CollisionSystem : EntitySystem(5) {
     private val nearMissThresholdPedestrian = 1.2f  // Distance in meters for pedestrian near miss
     private val nearMissThresholdCar = 2.8f  // Distance in meters for car near miss (wider, cars are big)
 
+    // Reusable list for powerup removal (avoids per-frame allocation)
+    private val entitiesToRemove = mutableListOf<Entity>()
+
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)
         obstacleEntities = engine.getEntitiesFor(Families.obstacles)
@@ -122,7 +125,7 @@ class CollisionSystem : EntitySystem(5) {
     ) {
         val playerZ = playerTransform.position.z
         val playerX = playerTransform.position.x
-        val entitiesToRemove = mutableListOf<Entity>()
+        entitiesToRemove.clear()
 
         for (powerupEntity in powerupEntities) {
             val powerupTransform = transformMapper.get(powerupEntity) ?: continue

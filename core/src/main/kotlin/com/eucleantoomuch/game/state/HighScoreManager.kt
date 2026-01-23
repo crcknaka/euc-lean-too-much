@@ -47,14 +47,30 @@ class HighScoreManager {
             }
         }
 
+    private var hasDeferredFlush = false
+
     fun recordGame(session: GameSession): Boolean {
         val isNewHighScore = session.score > highScore
-        highScore = session.score
-        maxDistance = session.distanceTraveled
-        maxNearMisses = session.nearMisses
+        // Batch all writes - defer flush to avoid collision-frame lag
+        if (session.score > prefs.getInteger(KEY_HIGH_SCORE, 0)) {
+            prefs.putInteger(KEY_HIGH_SCORE, session.score)
+        }
+        if (session.distanceTraveled > prefs.getFloat(KEY_MAX_DISTANCE, 0f)) {
+            prefs.putFloat(KEY_MAX_DISTANCE, session.distanceTraveled)
+        }
+        if (session.nearMisses > prefs.getInteger(KEY_MAX_NEAR_MISSES, 0)) {
+            prefs.putInteger(KEY_MAX_NEAR_MISSES, session.nearMisses)
+        }
         prefs.putInteger(KEY_GAMES_PLAYED, gamesPlayed + 1)
-        prefs.flush()
+        hasDeferredFlush = true
         return isNewHighScore
+    }
+
+    fun flushDeferred() {
+        if (hasDeferredFlush) {
+            prefs.flush()
+            hasDeferredFlush = false
+        }
     }
 
     fun saveCalibration(x: Float, y: Float) {

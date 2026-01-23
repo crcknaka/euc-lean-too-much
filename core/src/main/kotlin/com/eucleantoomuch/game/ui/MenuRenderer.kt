@@ -216,19 +216,19 @@ class MenuRenderer : Disposable {
         ui.textCentered(highScore.toString(), cardTextCenterX, scoreCardY + cardHeight / 2 + cardValueOffset,
             UIFonts.heading, UITheme.accent)
 
-        // Near Misses
-        ui.textCentered("NEAR MISSES", cardTextCenterX, nearMissCardY + cardHeight - cardLabelOffset,
-            UIFonts.caption, UITheme.textSecondary)
-        val nearMissColor = if (maxNearMisses > 0) UITheme.cyan else UITheme.textPrimary
-        ui.textCentered(maxNearMisses.toString(), cardTextCenterX, nearMissCardY + cardHeight / 2 + cardValueOffset,
-            UIFonts.heading, nearMissColor)
-
         // Best Distance
-        ui.textCentered("BEST DISTANCE", cardTextCenterX, distCardY + cardHeight - cardLabelOffset,
+        ui.textCentered("BEST DISTANCE", cardTextCenterX, nearMissCardY + cardHeight - cardLabelOffset,
             UIFonts.caption, UITheme.textSecondary)
         val distColor = if (maxDistance > 100) UITheme.primary else UITheme.textPrimary
-        ui.textCentered("${maxDistance.toInt()}m", cardTextCenterX, distCardY + cardHeight / 2 + cardValueOffset,
+        ui.textCentered("${maxDistance.toInt()}m", cardTextCenterX, nearMissCardY + cardHeight / 2 + cardValueOffset,
             UIFonts.heading, distColor)
+
+        // Near Misses
+        ui.textCentered("NEAR MISSES", cardTextCenterX, distCardY + cardHeight - cardLabelOffset,
+            UIFonts.caption, UITheme.textSecondary)
+        val nearMissColor = if (maxNearMisses > 0) UITheme.cyan else UITheme.textPrimary
+        ui.textCentered(maxNearMisses.toString(), cardTextCenterX, distCardY + cardHeight / 2 + cardValueOffset,
+            UIFonts.heading, nearMissColor)
 
         // Volts
         val voltsTextColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)

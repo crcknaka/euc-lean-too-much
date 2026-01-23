@@ -160,6 +160,8 @@ class RagdollPhysics : Disposable {
     // Temp vectors for calculations
     private val tempMatrix = Matrix4()
     private val tempMatrix2 = Matrix4()
+    private val tempInertia = Vector3()
+    private val tempShapeHalfExtents = Vector3()
 
     init {
         ensureInitialized()
@@ -216,7 +218,6 @@ class RagdollPhysics : Disposable {
         createRagdoll(eucPosition, eucYaw, playerVelocity, sideLean, forwardLean, yawRad)
 
         isActive = true
-        Gdx.app.log("RagdollPhysics", "Ragdoll fall started: vel=$playerVelocity, sideLean=$sideLean, forwardLean=$forwardLean")
     }
 
     private fun createEucWheel(
@@ -231,11 +232,12 @@ class RagdollPhysics : Disposable {
         val wheelWidth = 0.15f
         val wheelHeight = 0.5f
         val wheelDepth = 0.35f
-        eucShape = btBoxShape(Vector3(wheelWidth / 2f, wheelHeight / 2f, wheelDepth / 2f))
+        tempShapeHalfExtents.set(wheelWidth / 2f, wheelHeight / 2f, wheelDepth / 2f)
+        eucShape = btBoxShape(tempShapeHalfExtents)
 
         val eucMass = 20f
-        val eucInertia = Vector3()
-        eucShape!!.calculateLocalInertia(eucMass, eucInertia)
+        tempInertia.setZero()
+        eucShape!!.calculateLocalInertia(eucMass, tempInertia)
 
         // Determine fall direction
         val fallDirection = if (kotlin.math.abs(sideLean) > 0.1f) {
@@ -250,7 +252,7 @@ class RagdollPhysics : Disposable {
         tempMatrix.rotate(Vector3.Y, eucYaw)
 
         eucMotionState = btDefaultMotionState(tempMatrix)
-        val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, eucInertia)
+        val eucInfo = btRigidBody.btRigidBodyConstructionInfo(eucMass, eucMotionState, eucShape, tempInertia)
         eucBody = btRigidBody(eucInfo)
         eucBody!!.friction = 0.8f
         eucBody!!.restitution = 0.1f
@@ -316,10 +318,11 @@ class RagdollPhysics : Disposable {
         // Torso depth for box shape
         val torsoDepth = 0.11f * riderScale  // Half of 0.22f
 
-        // Create body parts with positions
+        // Create body parts with positions (reuse tempShapeHalfExtents to avoid Vector3 allocations)
         // Torso (center of mass at chest level) - use box shape
+        tempShapeHalfExtents.set(torsoWidth, torsoHeight / 2, torsoDepth)
         createBodyPart(
-            torso, btBoxShape(Vector3(torsoWidth, torsoHeight / 2, torsoDepth)), torsoMass,
+            torso, btBoxShape(tempShapeHalfExtents), torsoMass,
             baseX, baseY + torsoHeight / 2, baseZ, eucYaw
         )
 
@@ -334,22 +337,26 @@ class RagdollPhysics : Disposable {
         val shoulderOffset = torsoWidth + 0.02f * riderScale
 
         // Left arm - vertical orientation (hanging down)
+        tempShapeHalfExtents.set(upperArmRadius, upperArmLength / 2, upperArmRadius)
         createBodyPart(
-            leftUpperArm, btBoxShape(Vector3(upperArmRadius, upperArmLength / 2, upperArmRadius)), upperArmMass,
+            leftUpperArm, btBoxShape(tempShapeHalfExtents), upperArmMass,
             baseX - shoulderOffset, shoulderY - upperArmLength / 2, baseZ, eucYaw
         )
+        tempShapeHalfExtents.set(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)
         createBodyPart(
-            leftLowerArm, btBoxShape(Vector3(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)), lowerArmMass,
+            leftLowerArm, btBoxShape(tempShapeHalfExtents), lowerArmMass,
             baseX - shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, baseZ, eucYaw
         )
 
         // Right arm
+        tempShapeHalfExtents.set(upperArmRadius, upperArmLength / 2, upperArmRadius)
         createBodyPart(
-            rightUpperArm, btBoxShape(Vector3(upperArmRadius, upperArmLength / 2, upperArmRadius)), upperArmMass,
+            rightUpperArm, btBoxShape(tempShapeHalfExtents), upperArmMass,
             baseX + shoulderOffset, shoulderY - upperArmLength / 2, baseZ, eucYaw
         )
+        tempShapeHalfExtents.set(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)
         createBodyPart(
-            rightLowerArm, btBoxShape(Vector3(lowerArmRadius, lowerArmLength / 2, lowerArmRadius)), lowerArmMass,
+            rightLowerArm, btBoxShape(tempShapeHalfExtents), lowerArmMass,
             baseX + shoulderOffset, shoulderY - upperArmLength - lowerArmLength / 2, baseZ, eucYaw
         )
 
@@ -357,22 +364,26 @@ class RagdollPhysics : Disposable {
         val hipOffset = 0.1f * riderScale
 
         // Left leg
+        tempShapeHalfExtents.set(upperLegRadius, upperLegLength / 2, upperLegRadius)
         createBodyPart(
-            leftUpperLeg, btBoxShape(Vector3(upperLegRadius, upperLegLength / 2, upperLegRadius)), upperLegMass,
+            leftUpperLeg, btBoxShape(tempShapeHalfExtents), upperLegMass,
             baseX - hipOffset, baseY - upperLegLength / 2, baseZ, eucYaw
         )
+        tempShapeHalfExtents.set(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)
         createBodyPart(
-            leftLowerLeg, btBoxShape(Vector3(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)), lowerLegMass,
+            leftLowerLeg, btBoxShape(tempShapeHalfExtents), lowerLegMass,
             baseX - hipOffset, baseY - upperLegLength - lowerLegLength / 2, baseZ, eucYaw
         )
 
         // Right leg
+        tempShapeHalfExtents.set(upperLegRadius, upperLegLength / 2, upperLegRadius)
         createBodyPart(
-            rightUpperLeg, btBoxShape(Vector3(upperLegRadius, upperLegLength / 2, upperLegRadius)), upperLegMass,
+            rightUpperLeg, btBoxShape(tempShapeHalfExtents), upperLegMass,
             baseX + hipOffset, baseY - upperLegLength / 2, baseZ, eucYaw
         )
+        tempShapeHalfExtents.set(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)
         createBodyPart(
-            rightLowerLeg, btBoxShape(Vector3(lowerLegRadius, lowerLegLength / 2, lowerLegRadius)), lowerLegMass,
+            rightLowerLeg, btBoxShape(tempShapeHalfExtents), lowerLegMass,
             baseX + hipOffset, baseY - upperLegLength - lowerLegLength / 2, baseZ, eucYaw
         )
 
@@ -392,15 +403,15 @@ class RagdollPhysics : Disposable {
     ) {
         part.shape = shape
 
-        val inertia = Vector3()
-        shape.calculateLocalInertia(mass, inertia)
+        tempInertia.setZero()
+        shape.calculateLocalInertia(mass, tempInertia)
 
         tempMatrix.idt()
         tempMatrix.translate(x, y, z)
         tempMatrix.rotate(Vector3.Y, yaw)
 
         part.motionState = btDefaultMotionState(tempMatrix)
-        val info = btRigidBody.btRigidBodyConstructionInfo(mass, part.motionState, shape, inertia)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, part.motionState, shape, tempInertia)
         part.body = btRigidBody(info)
         part.body!!.friction = 0.6f
         part.body!!.restitution = 0.1f
@@ -645,11 +656,6 @@ class RagdollPhysics : Disposable {
             val collider = worldColliderMap[worldBody]
             val colliderType = collider?.type ?: ColliderType.GENERIC
 
-            // Log if collider not found in map (debugging)
-            if (collider == null) {
-                Gdx.app.log("RagdollPhysics", "WARNING: Collision with object not in worldColliderMap, using GENERIC")
-            }
-
             // Skip ground collisions (handled separately)
             if (colliderType == ColliderType.GROUND) continue
 
@@ -671,7 +677,6 @@ class RagdollPhysics : Disposable {
             if (maxImpulse > 2f) {
                 triggeredColliders.add(worldBody)
                 lastCollisionTime = 0f
-                Gdx.app.log("RagdollPhysics", "Ragdoll collision with $colliderType, impulse: $maxImpulse")
                 onRagdollCollision?.invoke(colliderType)
 
                 // Also trigger ground impact callback for startling pigeons at any collision
@@ -972,9 +977,10 @@ class RagdollPhysics : Disposable {
         val armMass = 3f  // Combined arm mass
         val legMass = 10f  // Combined leg mass
 
-        // Create torso
+        // Create torso (reuse tempShapeHalfExtents to avoid Vector3 allocations)
+        tempShapeHalfExtents.set(torsoWidth, torsoHeight / 2, torsoDepth)
         createPedestrianBodyPart(
-            ragdoll.torso, btBoxShape(Vector3(torsoWidth, torsoHeight / 2, torsoDepth)), torsoMass,
+            ragdoll.torso, btBoxShape(tempShapeHalfExtents), torsoMass,
             baseX, baseY + torsoHeight / 2, baseZ, yaw
         )
 
@@ -989,14 +995,16 @@ class RagdollPhysics : Disposable {
         val shoulderOffset = torsoWidth + 0.02f * scale
 
         // Left arm (single piece)
+        tempShapeHalfExtents.set(armRadius, armLength / 2, armRadius)
         createPedestrianBodyPart(
-            ragdoll.leftArm, btBoxShape(Vector3(armRadius, armLength / 2, armRadius)), armMass,
+            ragdoll.leftArm, btBoxShape(tempShapeHalfExtents), armMass,
             baseX - shoulderOffset, shoulderY - armLength / 2, baseZ, yaw
         )
 
         // Right arm (single piece)
+        tempShapeHalfExtents.set(armRadius, armLength / 2, armRadius)
         createPedestrianBodyPart(
-            ragdoll.rightArm, btBoxShape(Vector3(armRadius, armLength / 2, armRadius)), armMass,
+            ragdoll.rightArm, btBoxShape(tempShapeHalfExtents), armMass,
             baseX + shoulderOffset, shoulderY - armLength / 2, baseZ, yaw
         )
 
@@ -1004,14 +1012,16 @@ class RagdollPhysics : Disposable {
         val hipOffset = 0.08f * scale
 
         // Left leg (single piece)
+        tempShapeHalfExtents.set(legRadius, legLength / 2, legRadius)
         createPedestrianBodyPart(
-            ragdoll.leftLeg, btBoxShape(Vector3(legRadius, legLength / 2, legRadius)), legMass,
+            ragdoll.leftLeg, btBoxShape(tempShapeHalfExtents), legMass,
             baseX - hipOffset, baseY - legLength / 2, baseZ, yaw
         )
 
         // Right leg (single piece)
+        tempShapeHalfExtents.set(legRadius, legLength / 2, legRadius)
         createPedestrianBodyPart(
-            ragdoll.rightLeg, btBoxShape(Vector3(legRadius, legLength / 2, legRadius)), legMass,
+            ragdoll.rightLeg, btBoxShape(tempShapeHalfExtents), legMass,
             baseX + hipOffset, baseY - legLength / 2, baseZ, yaw
         )
 
@@ -1049,18 +1059,19 @@ class RagdollPhysics : Disposable {
         val halfHeight = height / 2
 
         // Use cylinder shape for trash can
-        obj.shape = btCylinderShape(Vector3(radius, halfHeight, radius))
+        tempShapeHalfExtents.set(radius, halfHeight, radius)
+        obj.shape = btCylinderShape(tempShapeHalfExtents)
 
         val mass = 12f  // Light enough to tip over easily
-        val inertia = Vector3()
-        obj.shape!!.calculateLocalInertia(mass, inertia)
+        tempInertia.setZero()
+        obj.shape!!.calculateLocalInertia(mass, tempInertia)
 
         // Start upright at ground level
         tempMatrix.idt()
         tempMatrix.translate(position.x, halfHeight, position.z)
 
         obj.motionState = btDefaultMotionState(tempMatrix)
-        val info = btRigidBody.btRigidBodyConstructionInfo(mass, obj.motionState, obj.shape, inertia)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, obj.motionState, obj.shape, tempInertia)
         obj.body = btRigidBody(info)
         obj.body!!.friction = 0.5f
         obj.body!!.restitution = 0.2f
@@ -1124,15 +1135,15 @@ class RagdollPhysics : Disposable {
     ) {
         part.shape = shape
 
-        val inertia = Vector3()
-        shape.calculateLocalInertia(mass, inertia)
+        tempInertia.setZero()
+        shape.calculateLocalInertia(mass, tempInertia)
 
         tempMatrix.idt()
         tempMatrix.translate(x, y, z)
         tempMatrix.rotate(Vector3.Y, yaw)
 
         part.motionState = btDefaultMotionState(tempMatrix)
-        val info = btRigidBody.btRigidBodyConstructionInfo(mass, part.motionState, shape, inertia)
+        val info = btRigidBody.btRigidBodyConstructionInfo(mass, part.motionState, shape, tempInertia)
         part.body = btRigidBody(info)
         part.body!!.friction = 0.6f
         part.body!!.restitution = 0.1f
