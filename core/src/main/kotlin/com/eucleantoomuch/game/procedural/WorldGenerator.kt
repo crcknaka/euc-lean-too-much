@@ -110,6 +110,15 @@ class WorldGenerator(
     // Track powerup placement to avoid clustering
     private var lastPowerupChunk = -10  // Start with no recent powerup
 
+    // Volts pickup model (procedural diamond, or GLB if available)
+    private var voltsGlbAsset: SceneAsset? = null
+    private var voltsGlbScale = 1f
+    private var voltsProceduralModel: ModelInstance
+    private var useVoltsGlb = false
+
+    // Track volts pickup placement
+    private var lastVoltsChunk = -5  // Start with no recent volts pickup
+
     init {
         // Initialize shadow models eagerly to avoid first-frame hitches
         pedestrianShadowModel = models.createBlobShadowModel(0.5f, 0.4f)
@@ -279,6 +288,22 @@ class WorldGenerator(
             Gdx.app.log("WorldGenerator", "powerup.glb not loaded: ${e.message}")
             powerupGlbAsset = null
         }
+
+        // Initialize Volts pickup model - try GLB first, fall back to procedural diamond
+        voltsProceduralModel = ModelInstance(models.createVoltsPickupModel())
+        try {
+            val voltsFile = Gdx.files.internal("volts.glb")
+            if (voltsFile.exists()) {
+                voltsGlbAsset = GLBLoader().load(voltsFile)
+                val boundingBox = voltsGlbAsset!!.scene.model.calculateBoundingBox(com.badlogic.gdx.math.collision.BoundingBox())
+                voltsGlbScale = 1.0f / maxOf(boundingBox.height, 0.01f)
+                useVoltsGlb = true
+                Gdx.app.log("WorldGenerator", "Volts GLB loaded, scale: $voltsGlbScale")
+            }
+        } catch (e: Exception) {
+            Gdx.app.log("WorldGenerator", "volts.glb not available, using procedural model")
+            useVoltsGlb = false
+        }
     }
 
     fun setRenderDistance(distance: Float) {
@@ -363,6 +388,11 @@ class WorldGenerator(
         // Generate powerups (battery pickups) - start after chunk 2
         if (chunkIndex > 2) {
             entities.addAll(generatePowerups(chunkIndex, chunkStartZ))
+        }
+
+        // Generate Volts pickups - start after chunk 1
+        if (chunkIndex > 1) {
+            entities.addAll(generateVoltsPickups(chunkIndex, chunkStartZ))
         }
 
         activeChunks[chunkIndex] = entities
@@ -1737,6 +1767,8 @@ class WorldGenerator(
         lastCraneChunk = -20
         // Reset powerup tracking
         lastPowerupChunk = -10
+        // Reset volts pickup tracking
+        lastVoltsChunk = -5
     }
 
     /**
@@ -1800,10 +1832,74 @@ class WorldGenerator(
         return entity
     }
 
+    /**
+     * Generate Volts pickups in this chunk.
+     * Volts appear more frequently than battery pickups but give currency instead of charge.
+     */
+    private fun generateVoltsPickups(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        // Volts appear every 2-4 chunks
+        val chunksSinceLastVolts = chunkIndex - lastVoltsChunk
+        if (chunksSinceLastVolts < 2) return entities
+
+        // 50% chance if enough chunks have passed
+        if (MathUtils.random() < 0.5f) {
+            lastVoltsChunk = chunkIndex
+
+            // Random position on road
+            val x = MathUtils.random(-Constants.ROAD_WIDTH / 2 + 1f, Constants.ROAD_WIDTH / 2 - 1f)
+            val z = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+
+            entities.add(createVoltsEntity(x, z, chunkIndex))
+        }
+
+        return entities
+    }
+
+    private fun createVoltsEntity(x: Float, z: Float, chunkIndex: Int): Entity {
+        val entity = engine.createEntity()
+
+        val modelScale = if (useVoltsGlb) voltsGlbScale else 1.2f
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0.7f, z)  // Float above ground (slightly higher than battery)
+            scale.set(modelScale, modelScale, modelScale)
+        })
+
+        entity.add(ModelComponent().apply {
+            if (useVoltsGlb && voltsGlbAsset != null) {
+                scene = Scene(voltsGlbAsset!!.scene)
+                modelInstance = scene!!.modelInstance
+                isPbr = true
+            } else {
+                modelInstance = ModelInstance(voltsProceduralModel.model)
+            }
+        })
+
+        entity.add(PowerupComponent().apply {
+            type = PowerupType.VOLTS
+        })
+
+        entity.add(ColliderComponent().apply {
+            setSize(1.2f, 1.5f, 1.2f)  // Slightly larger pickup hitbox than battery
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        engine.addEntity(entity)
+        return entity
+    }
+
     fun dispose() {
         carGlbAsset?.dispose()
         taxiGlbAsset?.dispose()
         sportscarGlbAsset?.dispose()
         powerupGlbAsset?.dispose()
+        voltsGlbAsset?.dispose()
     }
 }

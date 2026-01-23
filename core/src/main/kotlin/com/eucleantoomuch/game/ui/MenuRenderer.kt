@@ -56,7 +56,7 @@ class MenuRenderer : Disposable {
         NONE, PLAY, CALIBRATE, SETTINGS, CREDITS, EXIT
     }
 
-    fun render(highScore: Int, maxDistance: Float, maxNearMisses: Int): ButtonClicked {
+    fun render(highScore: Int, maxDistance: Float, maxNearMisses: Int, totalVolts: Int = 0): ButtonClicked {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
 
@@ -149,9 +149,9 @@ class MenuRenderer : Disposable {
 
         // === RIGHT SIDE: Stats Cards ===
         val cardWidth = 280f * scale
-        val cardHeight = 120f * scale
-        val cardGap = 25f * scale
-        val cardsStartY = sh * 0.56f
+        val cardHeight = 95f * scale
+        val cardGap = 18f * scale
+        val cardsStartY = sh * 0.58f
         val cardsOffsetX = 30f * scale  // Shift cards to the right
 
         // High Score card
@@ -171,6 +171,13 @@ class MenuRenderer : Disposable {
         ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, distCardY, cardWidth, cardHeight,
             glowColor = if (maxDistance > 100) UITheme.primary else null,
             glowIntensity = if (maxDistance > 100) 0.25f else 0f)
+
+        // Volts card
+        val voltsCardColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)
+        val voltsCardY = distCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
+        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, voltsCardY, cardWidth, cardHeight,
+            glowColor = if (totalVolts > 0) voltsCardColor else null,
+            glowIntensity = if (totalVolts > 0) 0.3f else 0f)
 
         // Separator line between sections
         ui.separator(leftSectionWidth - 20f * scale, margin, sh - margin * 2, UITheme.surfaceBorder)
@@ -222,6 +229,14 @@ class MenuRenderer : Disposable {
         val distColor = if (maxDistance > 100) UITheme.primary else UITheme.textPrimary
         ui.textCentered("${maxDistance.toInt()}m", cardTextCenterX, distCardY + cardHeight / 2 + cardValueOffset,
             UIFonts.heading, distColor)
+
+        // Volts
+        val voltsTextColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)
+        ui.textCentered("VOLTS", cardTextCenterX, voltsCardY + cardHeight - cardLabelOffset,
+            UIFonts.caption, UITheme.textSecondary)
+        val voltsValueColor = if (totalVolts > 0) voltsTextColor else UITheme.textPrimary
+        ui.textCentered("${totalVolts}", cardTextCenterX, voltsCardY + cardHeight / 2 + cardValueOffset,
+            UIFonts.heading, voltsValueColor)
 
         // Bottom hint
         ui.textCentered("Tilt to steer  ~  Lean forward to accelerate", centerX, hintHeight / 2,

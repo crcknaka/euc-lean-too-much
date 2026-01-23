@@ -41,6 +41,19 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     private var wobbleShakeY = 0f
     private var wobbleShakePhase = 0f
 
+    // Volts display state
+    private var displayedVolts = 0
+    private var voltsPopScale = 1f
+    private var voltsNotifications = mutableListOf<VoltsNotification>()
+
+    // Volts popup notification
+    private data class VoltsNotification(
+        val amount: Int,
+        val reason: String,
+        var timer: Float = 1.5f,   // Display duration
+        var offsetY: Float = 0f     // Animated Y offset
+    )
+
     // Speed line data class - radial lines from edges toward center (tunnel effect)
     private data class SpeedLine(
         val edgeX: Float,    // Position on screen edge (0-1 normalized)
@@ -160,6 +173,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.glassPanel(scoreBadgeX, scoreBadgeY, scoreBadgeWidth, scoreBadgeHeight,
             radius = 16f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
 
+        // === Volts Badge (top right) ===
+        drawVoltsPanel()
+
         // === Speed Panel (bottom left) ===
         drawSpeedPanel(euc)
 
@@ -217,6 +233,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val nearMissColor = UITheme.withAlpha(UITheme.accent, alpha * pulse)
             drawWarningBadge("NEAR MISS!", nearMissColor, warningBaseY + 210f * scale)
         }
+
+        // Volts earned notifications (floating up from bottom-right)
+        drawVoltsNotifications()
 
         // Wobbling warning - show when wobbling is active (at top position where DANGER was)
         if (euc.isWobbling) {
@@ -714,6 +733,99 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         }
     }
 
+    private fun drawVoltsPanel() {
+        val scale = UITheme.Dimensions.scale()
+        val panelWidth = 140f * scale
+        val panelHeight = 55f * scale
+        val panelX = ui.screenWidth - panelWidth - 25f * scale
+        val panelY = ui.screenHeight - panelHeight - 20f * scale
+
+        // Volts pop animation
+        if (voltsPopScale > 1.01f) {
+            voltsPopScale = UITheme.Anim.ease(voltsPopScale, 1f, 8f)
+        }
+
+        // Glow when volts change
+        val voltsColor = Color(1f, 0.85f, 0.1f, 1f)  // Electric yellow
+        if (voltsPopScale > 1.01f) {
+            ui.neonGlow(panelX, panelY, panelWidth, panelHeight,
+                12f * scale, voltsColor, (voltsPopScale - 1f) * 4f, 2)
+        }
+
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
+            radius = 12f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
+
+        // Volts text
+        ui.endShapes()
+        ui.beginBatch()
+
+        val voltsCenterX = panelX + panelWidth / 2
+        val voltsCenterY = panelY + panelHeight / 2
+
+        val originalScale = UIFonts.body.data.scaleX
+        UIFonts.body.data.setScale(originalScale * voltsPopScale)
+        UIFonts.body.color = voltsColor
+        ui.textCentered("$displayedVolts", voltsCenterX - 10f * scale, voltsCenterY, UIFonts.body, voltsColor)
+        UIFonts.body.data.setScale(originalScale)
+
+        // Lightning bolt icon
+        UIFonts.caption.color = voltsColor
+        ui.layout.setText(UIFonts.body, "$displayedVolts")
+        val textEndX = voltsCenterX - 10f * scale + ui.layout.width / 2 + 6f * scale
+        UIFonts.caption.draw(ui.batch, "V", textEndX, voltsCenterY + 6f * scale)
+
+        ui.endBatch()
+        ui.beginShapes()
+    }
+
+    private fun drawVoltsNotifications() {
+        val scale = UITheme.Dimensions.scale()
+        val baseX = ui.screenWidth - 165f * scale
+        val baseY = ui.screenHeight - 90f * scale
+        val voltsColor = Color(1f, 0.85f, 0.1f, 1f)
+
+        val iterator = voltsNotifications.iterator()
+        var index = 0
+        while (iterator.hasNext()) {
+            val notification = iterator.next()
+            notification.timer -= Gdx.graphics.deltaTime
+            notification.offsetY += Gdx.graphics.deltaTime * 40f * scale  // Float upward
+
+            if (notification.timer <= 0f) {
+                iterator.remove()
+                continue
+            }
+
+            val alpha = (notification.timer / 1.5f).coerceIn(0f, 1f)
+            val y = baseY - index * 30f * scale - notification.offsetY
+            val text = "+${notification.amount}V ${notification.reason}"
+
+            UIFonts.caption.color = UITheme.withAlpha(voltsColor, alpha)
+            UIFonts.caption.draw(ui.batch, text, baseX, y)
+            index++
+        }
+    }
+
+    /**
+     * Trigger a Volts earned notification popup.
+     */
+    fun triggerVoltsEarned(amount: Int, reason: String) {
+        displayedVolts += amount
+        voltsPopScale = 1.3f
+        voltsNotifications.add(VoltsNotification(amount = amount, reason = reason))
+        // Limit notifications to 5 visible at once
+        while (voltsNotifications.size > 5) {
+            voltsNotifications.removeAt(0)
+        }
+    }
+
+    /**
+     * Set the displayed volts count (for syncing with VoltsManager).
+     */
+    fun setDisplayedVolts(volts: Int) {
+        displayedVolts = volts
+    }
+
     fun reset() {
         scorePopScale = 1f
         lastScore = 0
@@ -731,6 +843,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         batteryLowFlash = 0f
         wobbleShakeY = 0f
         wobbleShakePhase = 0f
+        displayedVolts = 0
+        voltsPopScale = 1f
+        voltsNotifications.clear()
     }
 
     /**

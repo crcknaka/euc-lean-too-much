@@ -997,6 +997,33 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
+    /**
+     * Create a Volts pickup model - diamond/crystal shape in electric yellow.
+     * Can be replaced with a GLB model later.
+     */
+    fun createVoltsPickupModel(): Model {
+        modelBuilder.begin()
+
+        val voltColor = Color(1f, 0.85f, 0.1f, 1f)  // Electric yellow
+        val voltMaterial = Material(ColorAttribute.createDiffuse(voltColor))
+
+        // Upper cone (pointing up) - top half of diamond
+        val topPart = modelBuilder.part("top", GL20.GL_TRIANGLES, attributes, voltMaterial)
+        topPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.3f, 0f))
+        topPart.cone(0.5f, 0.5f, 0.5f, 6)
+
+        // Lower cone (pointing down, inverted) - bottom half of diamond
+        val bottomPart = modelBuilder.part("bottom", GL20.GL_TRIANGLES, attributes, voltMaterial)
+        bottomPart.setVertexTransform(
+            com.badlogic.gdx.math.Matrix4()
+                .translate(0f, 0.3f, 0f)
+                .rotate(1f, 0f, 0f, 180f)
+        )
+        bottomPart.cone(0.5f, 0.7f, 0.5f, 6)
+
+        return modelBuilder.end().also { models.add(it) }
+    }
+
     fun createBushModel(): Model {
         modelBuilder.begin()
 

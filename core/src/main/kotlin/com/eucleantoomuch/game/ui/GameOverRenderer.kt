@@ -58,7 +58,7 @@ class GameOverRenderer : Disposable {
         NONE, RETRY, MENU
     }
 
-    fun render(session: GameSession, isNewHighScore: Boolean): ButtonClicked {
+    fun render(session: GameSession, isNewHighScore: Boolean, sessionVolts: Int = 0, totalVolts: Int = 0): ButtonClicked {
         UITheme.Anim.update(Gdx.graphics.deltaTime)
         UIFonts.initialize()
 
@@ -218,6 +218,17 @@ class GameOverRenderer : Disposable {
             val nearMissColor = if (session.nearMisses > 0) UITheme.warning else UITheme.textPrimary
             ui.textCentered(session.nearMisses.toString(), missCardX + cardWidth / 2, speedCardY + cardHeight / 2 + valueOffset,
                 UIFonts.heading, UITheme.withAlpha(nearMissColor, statsAlpha))
+
+            // Volts earned display (below stats cards)
+            if (sessionVolts > 0) {
+                val voltsY = speedCardY - 75f * scale
+                val voltsColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)  // Electric yellow
+                val voltsPulse = UITheme.Anim.pulse(2f, 0.85f, 1f)
+                ui.textCentered("+${sessionVolts}V", leftCenterX - 60f * scale, voltsY,
+                    UIFonts.heading, UITheme.withAlpha(voltsColor, statsAlpha * voltsPulse))
+                ui.textCentered("Total: ${totalVolts}V", leftCenterX + 80f * scale, voltsY,
+                    UIFonts.caption, UITheme.withAlpha(UITheme.textMuted, statsAlpha))
+            }
 
             // Button labels
             ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2,

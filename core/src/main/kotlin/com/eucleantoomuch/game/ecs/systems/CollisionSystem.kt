@@ -24,7 +24,7 @@ class CollisionSystem : EntitySystem(5) {
     private val powerupMapper = ComponentMapper.getFor(PowerupComponent::class.java)
 
     var onCollision: ((ObstacleType, Boolean) -> Unit)? = null  // Type, causesGameOver
-    var onNearMiss: (() -> Unit)? = null  // Called when player passes close to pedestrian
+    var onNearMiss: ((ObstacleType) -> Unit)? = null  // Called when player passes close to pedestrian/car, passes type
     var onPedestrianHit: ((Entity) -> Unit)? = null  // Called when player hits a pedestrian
     var onKnockableHit: ((Entity) -> Unit)? = null  // Called when player hits a knockable object (trash can)
     var onPowerupCollected: ((PowerupComponent) -> Unit)? = null  // Called when player collects a powerup
@@ -105,7 +105,7 @@ class CollisionSystem : EntitySystem(5) {
                         val xDist = abs(playerTransform.position.x - obstacleTransform.position.x)
                         if (xDist < nearMissThreshold) {
                             obstacleComponent.nearMissTriggered = true
-                            onNearMiss?.invoke()
+                            onNearMiss?.invoke(obstacleComponent.type)
                         }
                     }
                 }

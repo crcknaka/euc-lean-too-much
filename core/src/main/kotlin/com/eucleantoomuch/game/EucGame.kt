@@ -15,6 +15,7 @@ import com.eucleantoomuch.game.ecs.components.HeadComponent
 import com.eucleantoomuch.game.ecs.components.ModelComponent
 import com.eucleantoomuch.game.ecs.components.ObstacleType
 import com.eucleantoomuch.game.ecs.components.PlayerComponent
+import com.eucleantoomuch.game.ecs.components.PowerupType
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import com.eucleantoomuch.game.ecs.systems.*
 import com.eucleantoomuch.game.feedback.FallAnimationController
@@ -34,6 +35,7 @@ import com.eucleantoomuch.game.state.GameState
 import com.eucleantoomuch.game.state.GameStateManager
 import com.eucleantoomuch.game.state.HighScoreManager
 import com.eucleantoomuch.game.state.SettingsManager
+import com.eucleantoomuch.game.state.VoltsManager
 import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.CreditsRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
@@ -62,6 +64,7 @@ class EucGame(
     private lateinit var stateManager: GameStateManager
     private lateinit var highScoreManager: HighScoreManager
     private lateinit var settingsManager: SettingsManager
+    private lateinit var voltsManager: VoltsManager
 
     // UI Renderers
     private lateinit var hud: Hud
@@ -134,6 +137,7 @@ class EucGame(
         stateManager = GameStateManager()
         highScoreManager = HighScoreManager()
         settingsManager = SettingsManager()
+        voltsManager = VoltsManager()
 
         // Initialize input based on platform
         accelerometerInput = AccelerometerInput()
@@ -178,7 +182,10 @@ class EucGame(
         collisionSystem.onCollision = { obstacleType, causesGameOver ->
             // Play obstacle-specific impact sounds
             when (obstacleType) {
-                ObstacleType.MANHOLE -> platformServices.playManholeSound()
+                ObstacleType.MANHOLE -> {
+                    platformServices.playManholeSound()
+                    voltsManager.onManholeHit()
+                }
                 ObstacleType.PUDDLE -> platformServices.playWaterSplashSound()
                 ObstacleType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
                 ObstacleType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
@@ -191,11 +198,17 @@ class EucGame(
                 handlePlayerFall()
             }
         }
-        collisionSystem.onNearMiss = {
+        collisionSystem.onNearMiss = { obstacleType ->
             // Trigger near miss feedback (visual + sound + haptic)
             hud.triggerNearMiss()
             UIFeedback.nearMiss()
             session.nearMisses++
+
+            // Award Volts for near miss
+            val isCar = obstacleType == ObstacleType.CAR
+            val voltsEarned = voltsManager.awardNearMiss(isCar)
+            val reason = if (isCar) "car" else "ped"
+            hud.triggerVoltsEarned(voltsEarned, reason)
         }
         collisionSystem.onPedestrianHit = { pedestrianEntity ->
             // Start ragdoll physics for the hit pedestrian
@@ -206,12 +219,26 @@ class EucGame(
             startTrashCanRagdoll(obstacleEntity)
         }
         collisionSystem.onPowerupCollected = { powerupComponent ->
-            // Restore battery and play sound
-            session.restoreBattery(powerupComponent.batteryRestoreAmount)
-            platformServices.playPowerupSound()
+            when (powerupComponent.type) {
+                PowerupType.BATTERY -> {
+                    // Restore battery and play sound
+                    session.restoreBattery(powerupComponent.batteryRestoreAmount)
+                    platformServices.playPowerupSound()
+                }
+                PowerupType.VOLTS -> {
+                    // Award Volts currency
+                    val voltsEarned = voltsManager.awardPickup()
+                    hud.triggerVoltsEarned(voltsEarned, "pickup")
+                    platformServices.playPowerupSound()
+                }
+            }
         }
 
         pigeonSystem = PigeonSystem(models, platformServices)
+        pigeonSystem.onFlockStartled = {
+            val voltsEarned = voltsManager.awardPigeonStartle()
+            hud.triggerVoltsEarned(voltsEarned, "Pigeons")
+        }
         cullingSystem = CullingSystem()
         pedestrianAISystem = PedestrianAISystem()
         carAISystem = CarAISystem()
@@ -493,7 +520,7 @@ class EucGame(
         musicManager.playMenuMusic()
         musicManager.update(Gdx.graphics.deltaTime)
 
-        when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance, highScoreManager.maxNearMisses)) {
+        when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance, highScoreManager.maxNearMisses, voltsManager.totalVolts)) {
             MenuRenderer.ButtonClicked.PLAY -> {
                 // Go to wheel selection first
                 stateManager.transition(GameState.WheelSelection)
@@ -698,6 +725,23 @@ class EucGame(
         if (playerTransform != null && eucComponent != null) {
             session.update(delta, eucComponent.speed)
 
+            // Update Volts system
+            voltsManager.update(delta)
+
+            // PWM risk reward (holding >90% for 5 seconds)
+            val pwmReward = voltsManager.updatePwmRisk(eucComponent.pwm, delta)
+            if (pwmReward > 0) {
+                hud.triggerVoltsEarned(pwmReward, "risk!")
+            }
+
+            // Manhole survival reward (wobble ended without dying)
+            if (!eucComponent.isWobbling && eucComponent.wobbleIntensity <= 0.01f) {
+                val manholeReward = voltsManager.awardManholeSurvival()
+                if (manholeReward > 0) {
+                    hud.triggerVoltsEarned(manholeReward, "manhole")
+                }
+            }
+
             // Check for battery death - causes fall
             if (session.isBatteryDead) {
                 platformServices.playGenericHitSound()
@@ -856,7 +900,7 @@ class EucGame(
         renderer.render()
 
         // Render game over UI
-        when (gameOverRenderer.render(state.session, isNewHighScore)) {
+        when (gameOverRenderer.render(state.session, isNewHighScore, voltsManager.sessionVolts, voltsManager.totalVolts)) {
             GameOverRenderer.ButtonClicked.RETRY -> {
                 resetGame()
                 startGame()
@@ -908,6 +952,7 @@ class EucGame(
         session.reset()
         session.setBatteryCapacity(wheelType.batteryCapacity)  // Set battery from wheel type
         hud.reset()
+        voltsManager.resetSession()
         isNewHighScore = false
         stateManager.transition(GameState.Countdown(3))
     }
@@ -1300,6 +1345,14 @@ class EucGame(
 
         // Record score
         isNewHighScore = highScoreManager.recordGame(session)
+
+        // Award Volts for beating high score
+        if (isNewHighScore) {
+            voltsManager.awardHighScoreBeaten()
+        }
+
+        // Finalize Volts session (persist to storage)
+        voltsManager.finalizeSession()
 
         // Start fall animation
         val eucComponent = playerEntity?.getComponent(EucComponent::class.java)

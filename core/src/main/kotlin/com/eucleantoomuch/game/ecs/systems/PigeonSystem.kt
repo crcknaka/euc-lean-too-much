@@ -43,6 +43,10 @@ class PigeonSystem(
     private val startleSources = mutableListOf<Vector3>()
     private val startleRadius = 6f  // Radius for startle from external sources (increased for ragdoll impacts)
 
+    // Callback when player startles a flock
+    var onFlockStartled: (() -> Unit)? = null
+    private val startledFlockIds = mutableSetOf<Int>()  // Track which flocks already triggered callback
+
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
         walkingModel = ModelInstance(models.createPigeonModel(isFlying = false))
@@ -202,6 +206,12 @@ class PigeonSystem(
         pigeon.isStartled = true
         pigeon.state = PigeonComponent.State.STARTLED
         pigeon.stateTimer = 0f
+
+        // Fire callback once per flock
+        if (pigeon.flockId !in startledFlockIds) {
+            startledFlockIds.add(pigeon.flockId)
+            onFlockStartled?.invoke()
+        }
 
         // Calculate flight direction - away from player with some randomness
         val dx = transform.position.x - playerX

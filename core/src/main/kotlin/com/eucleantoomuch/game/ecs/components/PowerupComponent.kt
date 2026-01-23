@@ -4,7 +4,8 @@ import com.badlogic.ashley.core.Component
 import com.badlogic.gdx.utils.Pool
 
 enum class PowerupType {
-    BATTERY  // Restores battery charge
+    BATTERY,  // Restores battery charge
+    VOLTS     // Awards Volts currency
 }
 
 class PowerupComponent : Component, Pool.Poolable {
