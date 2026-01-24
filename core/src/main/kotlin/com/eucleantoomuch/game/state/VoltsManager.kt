@@ -23,7 +23,7 @@ class VoltsManager {
         const val PWM_RISK_5SEC = 8
         const val BEAT_HIGH_SCORE = 10
         const val VOLTS_PICKUP = 15
-        const val STARTLE_PIGEONS = 10
+        const val STARTLE_PIGEONS = 5
 
         // Streak multiplier
         const val STREAK_THRESHOLD = 3  // Near misses needed for x2

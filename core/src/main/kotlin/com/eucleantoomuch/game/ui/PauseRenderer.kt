@@ -15,6 +15,7 @@ class PauseRenderer : Disposable {
 
     private val resumeButton = Rectangle()
     private val restartButton = Rectangle()
+    private val calibrateButton = Rectangle()
     private val settingsButton = Rectangle()
     private val menuButton = Rectangle()
 
@@ -23,11 +24,12 @@ class PauseRenderer : Disposable {
     private var panelScale = 0f
     private var resumeHover = 0f
     private var restartHover = 0f
+    private var calibrateHover = 0f
     private var settingsHover = 0f
     private var menuHover = 0f
 
     enum class ButtonClicked {
-        NONE, RESUME, RESTART, SETTINGS, MENU
+        NONE, RESUME, RESTART, CALIBRATE, SETTINGS, MENU
     }
 
     fun render(): ButtonClicked {
@@ -49,6 +51,7 @@ class PauseRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         resumeHover = UITheme.Anim.ease(resumeHover, if (resumeButton.contains(touchX, touchY)) 1f else 0f, 10f)
         restartHover = UITheme.Anim.ease(restartHover, if (restartButton.contains(touchX, touchY)) 1f else 0f, 10f)
+        calibrateHover = UITheme.Anim.ease(calibrateHover, if (calibrateButton.contains(touchX, touchY)) 1f else 0f, 10f)
         settingsHover = UITheme.Anim.ease(settingsHover, if (settingsButton.contains(touchX, touchY)) 1f else 0f, 10f)
         menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 10f)
 
@@ -93,19 +96,22 @@ class PauseRenderer : Disposable {
         resumeButton.set(resumeX, resumeY, resumeWidth, resumeHeight)
         ui.neonButton(resumeButton, UITheme.accent, UITheme.accent, 0.3f + resumeHover * 0.7f)
 
-        // Second row: 3 buttons side by side
-        val smallButtonWidth = (resumeWidth - buttonGap * 2) / 3
+        // Second row: 4 buttons side by side
+        val smallButtonWidth = (resumeWidth - buttonGap * 3) / 4
         val smallButtonHeight = 80f * scale
         val smallButtonsY = resumeY - resumeHeight - 30f * scale
 
         restartButton.set(resumeX, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(restartButton, UITheme.secondary, UITheme.secondary, restartHover * 0.6f)
+        ui.neonButton(restartButton, UITheme.danger, UITheme.danger, restartHover * 0.6f)
 
-        settingsButton.set(resumeX + smallButtonWidth + buttonGap, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        calibrateButton.set(resumeX + (smallButtonWidth + buttonGap), smallButtonsY, smallButtonWidth, smallButtonHeight)
+        ui.neonButton(calibrateButton, UITheme.secondary, UITheme.secondary, calibrateHover * 0.6f)
+
+        settingsButton.set(resumeX + (smallButtonWidth + buttonGap) * 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
         ui.neonButton(settingsButton, UITheme.surfaceLight, UITheme.textSecondary, settingsHover * 0.4f)
 
-        menuButton.set(resumeX + (smallButtonWidth + buttonGap) * 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.danger, menuHover * 0.5f)
+        menuButton.set(resumeX + (smallButtonWidth + buttonGap) * 3, smallButtonsY, smallButtonWidth, smallButtonHeight)
+        ui.neonButton(menuButton, UITheme.danger, UITheme.danger, menuHover * 0.6f)
 
         ui.endShapes()
 
@@ -122,13 +128,16 @@ class PauseRenderer : Disposable {
                 resumeButton.y + resumeButton.height / 2, UIFonts.button, UITheme.textPrimary)
 
             ui.textCentered("RESTART", restartButton.x + restartButton.width / 2,
-                restartButton.y + restartButton.height / 2, UIFonts.body, UITheme.textPrimary)
+                restartButton.y + restartButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+
+            ui.textCentered("CALIBRATE", calibrateButton.x + calibrateButton.width / 2,
+                calibrateButton.y + calibrateButton.height / 2, UIFonts.caption, UITheme.textPrimary)
 
             ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2,
-                settingsButton.y + settingsButton.height / 2, UIFonts.body, UITheme.textPrimary)
+                settingsButton.y + settingsButton.height / 2, UIFonts.caption, UITheme.textPrimary)
 
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2,
-                menuButton.y + menuButton.height / 2, UIFonts.body, UITheme.textPrimary)
+                menuButton.y + menuButton.height / 2, UIFonts.caption, UITheme.textPrimary)
         }
 
         ui.endBatch()
@@ -142,6 +151,10 @@ class PauseRenderer : Disposable {
             if (restartButton.contains(touchX, touchY)) {
                 UIFeedback.clickHeavy()
                 return ButtonClicked.RESTART
+            }
+            if (calibrateButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.CALIBRATE
             }
             if (settingsButton.contains(touchX, touchY)) {
                 UIFeedback.click()

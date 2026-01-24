@@ -526,7 +526,7 @@ class EucGame(
                 stateManager.transition(GameState.WheelSelection)
             }
             MenuRenderer.ButtonClicked.CALIBRATE -> {
-                stateManager.transition(GameState.Calibrating)
+                stateManager.transition(GameState.Calibrating())
             }
             MenuRenderer.ButtonClicked.SETTINGS -> {
                 stateManager.transition(GameState.Settings(returnTo = GameState.Menu))
@@ -557,7 +557,7 @@ class EucGame(
                 if (gameInput.isCalibrated()) {
                     startGame()
                 } else {
-                    stateManager.transition(GameState.Calibrating)
+                    stateManager.transition(GameState.Calibrating())
                 }
             }
             WheelSelectionRenderer.Action.BACK -> {
@@ -613,6 +613,8 @@ class EucGame(
         // Continue menu music during calibration
         musicManager.update(Gdx.graphics.deltaTime)
 
+        val calibratingState = stateManager.current() as GameState.Calibrating
+
         when (calibrationRenderer.render(rawX, rawY)) {
             CalibrationRenderer.Action.CALIBRATE -> {
                 accelerometerInput.calibrate()
@@ -620,14 +622,22 @@ class EucGame(
                     accelerometerInput.getCalibrationX(),
                     accelerometerInput.getCalibrationY()
                 )
-                startGame()
+                if (calibratingState.returnTo != null) {
+                    stateManager.transition(calibratingState.returnTo)
+                } else {
+                    startGame()
+                }
             }
             CalibrationRenderer.Action.SKIP -> {
                 // Use default calibration (current position)
                 if (!accelerometerInput.isCalibrated()) {
                     accelerometerInput.calibrate()
                 }
-                startGame()
+                if (calibratingState.returnTo != null) {
+                    stateManager.transition(calibratingState.returnTo)
+                } else {
+                    startGame()
+                }
             }
             CalibrationRenderer.Action.NONE -> {}
         }
@@ -871,6 +881,10 @@ class EucGame(
             PauseRenderer.ButtonClicked.RESTART -> {
                 resetGame()
                 startGame()
+            }
+            PauseRenderer.ButtonClicked.CALIBRATE -> {
+                val pausedState = stateManager.current() as GameState.Paused
+                stateManager.transition(GameState.Calibrating(returnTo = pausedState))
             }
             PauseRenderer.ButtonClicked.SETTINGS -> {
                 val pausedState = stateManager.current() as GameState.Paused
