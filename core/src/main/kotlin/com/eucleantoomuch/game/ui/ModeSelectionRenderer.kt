@@ -105,6 +105,30 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         backButton.set(centerX - backWidth / 2, panelY + 40f * scale, backWidth, backHeight)
         ui.neonButton(backButton, UITheme.surfaceLight, UITheme.textSecondary, backHover * 0.4f)
 
+        // Draw trophy icons for high scores
+        val trophySize = 32f * scale
+        val trophyColor = com.badlogic.gdx.graphics.Color(0.85f, 0.65f, 0.1f, 1f)  // Gold color
+        val trophyY = buttonsY + 60f * scale
+
+        if (highScoreManager.highScore > 0) {
+            val endlessCenterX = endlessButton.x + endlessButton.width / 2
+            ui.trophy(endlessCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+        }
+        if (highScoreManager.hardcoreHighScore > 0) {
+            val hardcoreCenterX = hardcoreButton.x + hardcoreButton.width / 2
+            ui.trophy(hardcoreCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+        }
+        if (highScoreManager.nightHardcoreHighScore > 0) {
+            val nightHardcoreCenterX = nightHardcoreButton.x + nightHardcoreButton.width / 2
+            ui.trophy(nightHardcoreCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+        }
+
+        // Time Trial card - stopwatch icon
+        val timeTrialCenterXShape = timeTrialButton.x + timeTrialButton.width / 2
+        val stopwatchSize = 100f * scale
+        val stopwatchY = timeTrialButton.y + timeTrialButton.height / 2 - 110f * scale
+        ui.stopwatch(timeTrialCenterXShape, stopwatchY, stopwatchSize, UITheme.secondary)
+
         ui.endShapes()
 
         // Draw text
@@ -124,7 +148,7 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         val endlessHighScore = highScoreManager.highScore
         val blackColor = com.badlogic.gdx.graphics.Color.BLACK
         if (endlessHighScore > 0) {
-            ui.textCentered("BEST: $endlessHighScore", endlessCenterX,
+            ui.textCentered("$endlessHighScore", endlessCenterX + 15f * scale,
                 endlessButton.y + 60f * scale, UIFonts.body, blackColor)
         }
 
@@ -150,7 +174,7 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         // Hardcore high score
         val hardcoreHighScore = highScoreManager.hardcoreHighScore
         if (hardcoreHighScore > 0) {
-            ui.textCentered("BEST: $hardcoreHighScore", hardcoreCenterX,
+            ui.textCentered("$hardcoreHighScore", hardcoreCenterX + 15f * scale,
                 hardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
         }
 
@@ -170,7 +194,7 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         // Night Hardcore high score
         val nightHardcoreHighScore = highScoreManager.nightHardcoreHighScore
         if (nightHardcoreHighScore > 0) {
-            ui.textCentered("BEST: $nightHardcoreHighScore", nightHardcoreCenterX,
+            ui.textCentered("$nightHardcoreHighScore", nightHardcoreCenterX + 15f * scale,
                 nightHardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
         }
 

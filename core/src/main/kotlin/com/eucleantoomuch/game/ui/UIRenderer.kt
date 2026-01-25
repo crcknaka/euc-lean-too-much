@@ -555,6 +555,123 @@ class UIRenderer : Disposable {
         }
     }
 
+    /** Draw a stopwatch/timer icon ⏱️ */
+    fun stopwatch(cx: Float, cy: Float, size: Float, color: Color) {
+        shapes.color = color
+        val s = size * 0.45f
+
+        // Clock face - filled circle
+        shapes.circle(cx, cy, s)
+
+        // Top button
+        val buttonW = s * 0.2f
+        val buttonH = s * 0.3f
+        shapes.rect(cx - buttonW / 2, cy + s, buttonW, buttonH)
+
+        // Side button (start/stop)
+        shapes.triangle(
+            cx + s * 0.85f, cy + s * 0.6f,
+            cx + s * 1.1f, cy + s * 0.8f,
+            cx + s * 1.1f, cy + s * 0.4f
+        )
+
+        // Inner circle (clock face detail) - darker
+        shapes.color = UITheme.darken(color, 0.3f)
+        shapes.circle(cx, cy, s * 0.75f)
+
+        // Clock hands
+        shapes.color = color
+        // Minute hand (pointing up-right)
+        shapes.rect(cx - s * 0.04f, cy, s * 0.08f, s * 0.55f)
+        // Second hand (pointing right)
+        shapes.triangle(
+            cx, cy + s * 0.05f,
+            cx, cy - s * 0.05f,
+            cx + s * 0.5f, cy
+        )
+    }
+
+    /** Draw a modern lightning bolt icon ⚡ */
+    fun lightning(cx: Float, cy: Float, size: Float, color: Color) {
+        shapes.color = color
+        val s = size * 0.5f
+
+        // Modern sharp lightning bolt - single polygon shape
+        // Points: top -> middle-right -> center -> bottom
+        shapes.triangle(
+            cx + s * 0.3f, cy + s,          // top right
+            cx - s * 0.4f, cy + s,          // top left
+            cx + s * 0.1f, cy + s * 0.05f   // middle
+        )
+        shapes.triangle(
+            cx - s * 0.4f, cy + s,
+            cx - s * 0.15f, cy + s * 0.05f,
+            cx + s * 0.1f, cy + s * 0.05f
+        )
+        shapes.triangle(
+            cx + s * 0.4f, cy - s * 0.05f,  // arrow point right
+            cx - s * 0.15f, cy - s * 0.05f,
+            cx - s * 0.3f, cy - s           // bottom point
+        )
+        shapes.triangle(
+            cx + s * 0.4f, cy - s * 0.05f,
+            cx - s * 0.3f, cy - s,
+            cx + s * 0.15f, cy - s * 0.05f
+        )
+    }
+
+    /** Draw a modern trophy cup icon 🏆 */
+    fun trophy(cx: Float, cy: Float, size: Float, color: Color) {
+        shapes.color = color
+        val s = size * 0.5f
+
+        // Cup bowl - trapezoid shape using triangles
+        val bowlTopY = cy + s * 0.9f
+        val bowlBottomY = cy + s * 0.1f
+        val bowlTopHalfW = s * 0.7f
+        val bowlBottomHalfW = s * 0.4f
+
+        // Bowl left side
+        shapes.triangle(
+            cx - bowlTopHalfW, bowlTopY,
+            cx - bowlBottomHalfW, bowlBottomY,
+            cx, bowlBottomY
+        )
+        shapes.triangle(
+            cx - bowlTopHalfW, bowlTopY,
+            cx, bowlBottomY,
+            cx, bowlTopY
+        )
+        // Bowl right side
+        shapes.triangle(
+            cx + bowlTopHalfW, bowlTopY,
+            cx, bowlTopY,
+            cx, bowlBottomY
+        )
+        shapes.triangle(
+            cx + bowlTopHalfW, bowlTopY,
+            cx, bowlBottomY,
+            cx + bowlBottomHalfW, bowlBottomY
+        )
+
+        // Stem
+        val stemW = s * 0.15f
+        val stemTop = bowlBottomY
+        val stemBottom = cy - s * 0.3f
+        shapes.rect(cx - stemW, stemBottom, stemW * 2, stemTop - stemBottom)
+
+        // Base
+        val baseW = s * 0.5f
+        val baseH = s * 0.15f
+        shapes.rect(cx - baseW, cy - s * 0.5f, baseW * 2, baseH)
+
+        // Handles - simple circles on sides
+        val handleY = cy + s * 0.5f
+        val handleR = s * 0.18f
+        shapes.circle(cx - bowlTopHalfW - handleR * 0.5f, handleY, handleR)
+        shapes.circle(cx + bowlTopHalfW + handleR * 0.5f, handleY, handleR)
+    }
+
     /** Draw a separator line with gradient fade */
     fun separator(x: Float, y: Float, width: Float, color: Color = UITheme.surfaceBorder) {
         val scale = UITheme.Dimensions.scale()
