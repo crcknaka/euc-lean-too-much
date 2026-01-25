@@ -49,6 +49,20 @@ class WheelSelectionRenderer(
     private var currentIndex = 0  // Default to Standard (first in list)
     private val wheels = WheelType.ALL
 
+    // Touch camera controls
+    private val previewBounds = Rectangle()
+    private var cameraAngle = 0f           // Horizontal rotation of model (unlimited)
+    private val cameraPitch = 20f          // Fixed vertical angle (no vertical control)
+    private var cameraDistance = 1.0f      // Distance from model (zoom)
+    private var lastTouchX = 0f
+    private var isDragging = false
+    private var lastPinchDistance = 0f
+    private var isPinching = false
+
+    // Double-tap to pause rotation
+    private var lastTapTime = 0L
+    private var isRotationPaused = false
+
     // 3D preview with PBR rendering
     private lateinit var previewCamera: PerspectiveCamera
     private lateinit var sceneManager: SceneManager
@@ -159,7 +173,10 @@ class WheelSelectionRenderer(
 
         // Update animations
         enterAnimProgress = UITheme.Anim.ease(enterAnimProgress, 1f, 4f)
-        wheelRotation += delta * 25f  // Slow rotation
+        // Auto-rotate wheel only when not manually controlling and not paused
+        if (!isDragging && !isPinching && !isRotationPaused) {
+            wheelRotation += delta * 25f
+        }
 
         val currentWheel = wheels[currentIndex]
 
@@ -217,6 +234,14 @@ class WheelSelectionRenderer(
             previewSize + 20f * scale,
             previewSize + 20f * scale,
             16f * scale, UITheme.surfaceLight
+        )
+
+        // Store preview bounds for touch detection
+        previewBounds.set(
+            previewX - previewSize / 2,
+            previewY,
+            previewSize,
+            previewSize
         )
 
         // Arrow buttons on sides of preview
@@ -382,6 +407,15 @@ class WheelSelectionRenderer(
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
 
+        // Fixed camera position (only zoom affects distance, no orbit)
+        // Slight top-down angle for better view
+        val pitchRad = Math.toRadians(cameraPitch.toDouble()).toFloat()
+        previewCamera.position.set(
+            0f,
+            kotlin.math.sin(pitchRad) * cameraDistance + 0.4f,
+            -kotlin.math.cos(pitchRad) * cameraDistance
+        )
+        previewCamera.lookAt(0f, 0.4f, 0f)
         previewCamera.viewportWidth = size
         previewCamera.viewportHeight = size
         previewCamera.update()
@@ -394,9 +428,10 @@ class WheelSelectionRenderer(
             return
         }
 
-        // Update rotation
+        // Rotate model: cameraAngle (from touch drag) + wheelRotation (auto-spin)
+        // This keeps the spin axis constant relative to the viewer
         scene.modelInstance.transform.setToScaling(0.175f, 0.175f, 0.175f)
-        scene.modelInstance.transform.rotate(0f, 1f, 0f, wheelRotation)
+        scene.modelInstance.transform.rotate(0f, 1f, 0f, cameraAngle + wheelRotation)
 
         // Render with SceneManager
         sceneManager.getRenderableProviders().clear()
@@ -411,24 +446,32 @@ class WheelSelectionRenderer(
     }
 
     private fun handleInput(touchX: Float, touchY: Float): Action {
+        // Handle preview touch controls (drag to rotate, pinch to zoom)
+        handlePreviewTouch(touchX, touchY)
+
         if (Gdx.input.justTouched()) {
-            when {
-                leftButton.contains(touchX, touchY) -> {
-                    UIFeedback.swipe()
-                    currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
-                }
-                rightButton.contains(touchX, touchY) -> {
-                    UIFeedback.swipe()
-                    currentIndex = (currentIndex + 1) % wheels.size
-                }
-                startButton.contains(touchX, touchY) -> {
-                    UIFeedback.clickHeavy()
-                    settingsManager.selectedWheelId = wheels[currentIndex].id
-                    return Action.START
-                }
-                backButton.contains(touchX, touchY) -> {
-                    UIFeedback.click()
-                    return Action.BACK
+            // Don't process button clicks if touch started in preview area
+            if (!previewBounds.contains(touchX, touchY)) {
+                when {
+                    leftButton.contains(touchX, touchY) -> {
+                        UIFeedback.swipe()
+                        currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
+                        resetCameraView()
+                    }
+                    rightButton.contains(touchX, touchY) -> {
+                        UIFeedback.swipe()
+                        currentIndex = (currentIndex + 1) % wheels.size
+                        resetCameraView()
+                    }
+                    startButton.contains(touchX, touchY) -> {
+                        UIFeedback.clickHeavy()
+                        settingsManager.selectedWheelId = wheels[currentIndex].id
+                        return Action.START
+                    }
+                    backButton.contains(touchX, touchY) -> {
+                        UIFeedback.click()
+                        return Action.BACK
+                    }
                 }
             }
         }
@@ -438,10 +481,12 @@ class WheelSelectionRenderer(
             Gdx.input.isKeyJustPressed(Input.Keys.LEFT) || Gdx.input.isKeyJustPressed(Input.Keys.A) -> {
                 UIFeedback.swipe()
                 currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
+                resetCameraView()
             }
             Gdx.input.isKeyJustPressed(Input.Keys.RIGHT) || Gdx.input.isKeyJustPressed(Input.Keys.D) -> {
                 UIFeedback.swipe()
                 currentIndex = (currentIndex + 1) % wheels.size
+                resetCameraView()
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE) -> {
                 UIFeedback.clickHeavy()
@@ -455,6 +500,70 @@ class WheelSelectionRenderer(
         }
 
         return Action.NONE
+    }
+
+    private fun resetCameraView() {
+        cameraAngle = 0f
+        cameraDistance = 1.0f
+        isRotationPaused = false
+    }
+
+    private fun handlePreviewTouch(touchX: Float, touchY: Float) {
+        val sh = ui.screenHeight
+
+        // Count active touches
+        var touchCount = 0
+        for (i in 0..4) {
+            if (Gdx.input.isTouched(i)) touchCount++
+        }
+
+        // Handle pinch to zoom (two fingers)
+        if (touchCount >= 2) {
+            val x0 = Gdx.input.getX(0).toFloat()
+            val y0 = sh - Gdx.input.getY(0).toFloat()
+            val x1 = Gdx.input.getX(1).toFloat()
+            val y1 = sh - Gdx.input.getY(1).toFloat()
+
+            val currentDistance = kotlin.math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0))
+
+            if (isPinching) {
+                val delta = currentDistance - lastPinchDistance
+                // Zoom: closer pinch = zoom out, spread = zoom in
+                cameraDistance = (cameraDistance - delta * 0.003f).coerceIn(0.5f, 2.5f)
+            }
+
+            lastPinchDistance = currentDistance
+            isPinching = true
+            isDragging = false
+            return
+        }
+
+        isPinching = false
+
+        // Handle single finger drag to rotate (horizontal only)
+        if (Gdx.input.isTouched) {
+            if (Gdx.input.justTouched() && previewBounds.contains(touchX, touchY)) {
+                // Check for double-tap to toggle rotation pause
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastTapTime < 300) {
+                    // Double-tap detected - toggle rotation pause
+                    isRotationPaused = !isRotationPaused
+                    UIFeedback.click()
+                }
+                lastTapTime = currentTime
+
+                // Start drag
+                isDragging = true
+                lastTouchX = touchX
+            } else if (isDragging) {
+                // Continue drag - rotate model left/right
+                val deltaX = touchX - lastTouchX
+                cameraAngle -= deltaX * 0.5f
+                lastTouchX = touchX
+            }
+        } else {
+            isDragging = false
+        }
     }
 
     fun resize(width: Int, height: Int) {
