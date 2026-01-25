@@ -74,10 +74,15 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         // Title Y position
         val titleY = panelY + panelHeight - 60f * scale
 
-        // 4 buttons in 1 row - wider and taller cards
-        val buttonWidth = 300f * scale
-        val buttonHeight = 400f * scale
-        val buttonGap = 28f * scale
+        // 4 buttons in 1 row - adaptive sizing for different screen aspects
+        val aspectRatio = sw / sh
+        val isNarrowScreen = aspectRatio < 1.5f
+
+        // Scale down cards on narrow/square screens
+        val cardScale = if (isNarrowScreen) 0.7f else 1f
+        val buttonWidth = 300f * scale * cardScale
+        val buttonHeight = 400f * scale * cardScale
+        val buttonGap = 28f * scale * cardScale
         val totalWidth = buttonWidth * 4 + buttonGap * 3
         val buttonsStartX = centerX - totalWidth / 2
         val buttonsY = panelY + (panelHeight - buttonHeight) / 2 - 10f * scale
@@ -106,27 +111,27 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         ui.neonButton(backButton, UITheme.surfaceLight, UITheme.textSecondary, backHover * 0.4f)
 
         // Draw trophy icons for high scores
-        val trophySize = 32f * scale
+        val trophySize = 32f * scale * cardScale
         val trophyColor = com.badlogic.gdx.graphics.Color(0.85f, 0.65f, 0.1f, 1f)  // Gold color
-        val trophyY = buttonsY + 60f * scale
+        val trophyY = buttonsY + 60f * scale * cardScale
 
         if (highScoreManager.highScore > 0) {
             val endlessCenterX = endlessButton.x + endlessButton.width / 2
-            ui.trophy(endlessCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+            ui.trophy(endlessCenterX - 70f * scale * cardScale, trophyY, trophySize, trophyColor)
         }
         if (highScoreManager.hardcoreHighScore > 0) {
             val hardcoreCenterX = hardcoreButton.x + hardcoreButton.width / 2
-            ui.trophy(hardcoreCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+            ui.trophy(hardcoreCenterX - 70f * scale * cardScale, trophyY, trophySize, trophyColor)
         }
         if (highScoreManager.nightHardcoreHighScore > 0) {
             val nightHardcoreCenterX = nightHardcoreButton.x + nightHardcoreButton.width / 2
-            ui.trophy(nightHardcoreCenterX - 70f * scale, trophyY, trophySize, trophyColor)
+            ui.trophy(nightHardcoreCenterX - 70f * scale * cardScale, trophyY, trophySize, trophyColor)
         }
 
         // Time Trial card - stopwatch icon
         val timeTrialCenterXShape = timeTrialButton.x + timeTrialButton.width / 2
-        val stopwatchSize = 100f * scale
-        val stopwatchY = timeTrialButton.y + timeTrialButton.height / 2 - 110f * scale
+        val stopwatchSize = 100f * scale * cardScale
+        val stopwatchY = timeTrialButton.y + timeTrialButton.height / 2 - 110f * scale * cardScale
         ui.stopwatch(timeTrialCenterXShape, stopwatchY, stopwatchSize, UITheme.secondary)
 
         ui.endShapes()
@@ -136,66 +141,70 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
 
         ui.textCentered("SELECT MODE", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
+        // Use smaller font for narrow screens
+        val headingFont = if (isNarrowScreen) UIFonts.body else UIFonts.heading
+        val bodyFont = if (isNarrowScreen) UIFonts.caption else UIFonts.body
+
         // Endless button text
         val endlessCenterX = endlessButton.x + endlessButton.width / 2
         ui.textCentered("ENDLESS", endlessCenterX,
-            endlessButton.y + endlessButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+            endlessButton.y + endlessButton.height - 60f * scale * cardScale, headingFont, UITheme.textPrimary)
         ui.textCentered("Ride until", endlessCenterX,
-            endlessButton.y + endlessButton.height / 2 + 20f * scale, UIFonts.caption, UITheme.textSecondary)
+            endlessButton.y + endlessButton.height / 2 + 20f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         ui.textCentered("you crash", endlessCenterX,
-            endlessButton.y + endlessButton.height / 2 - 10f * scale, UIFonts.caption, UITheme.textSecondary)
+            endlessButton.y + endlessButton.height / 2 - 10f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         // Endless high score
         val endlessHighScore = highScoreManager.highScore
         val blackColor = com.badlogic.gdx.graphics.Color.BLACK
         if (endlessHighScore > 0) {
-            ui.textCentered("$endlessHighScore", endlessCenterX + 15f * scale,
-                endlessButton.y + 60f * scale, UIFonts.body, blackColor)
+            ui.textCentered("$endlessHighScore", endlessCenterX + 15f * scale * cardScale,
+                endlessButton.y + 60f * scale * cardScale, bodyFont, blackColor)
         }
 
         // Time Trial button text
         val timeTrialCenterX = timeTrialButton.x + timeTrialButton.width / 2
         ui.textCentered("TIME", timeTrialCenterX,
-            timeTrialButton.y + timeTrialButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+            timeTrialButton.y + timeTrialButton.height - 60f * scale * cardScale, headingFont, UITheme.textPrimary)
         ui.textCentered("TRIAL", timeTrialCenterX,
-            timeTrialButton.y + timeTrialButton.height - 105f * scale, UIFonts.heading, UITheme.textPrimary)
+            timeTrialButton.y + timeTrialButton.height - 105f * scale * cardScale, headingFont, UITheme.textPrimary)
         ui.textCentered("Beat the clock", timeTrialCenterX,
-            timeTrialButton.y + timeTrialButton.height / 2 - 5f * scale, UIFonts.caption, UITheme.textSecondary)
+            timeTrialButton.y + timeTrialButton.height / 2 - 5f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
 
         // Hardcore button text
         val hardcoreCenterX = hardcoreButton.x + hardcoreButton.width / 2
         ui.textCentered("HARDCORE", hardcoreCenterX,
-            hardcoreButton.y + hardcoreButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+            hardcoreButton.y + hardcoreButton.height - 60f * scale * cardScale, headingFont, UITheme.textPrimary)
         ui.textCentered("Survive", hardcoreCenterX,
-            hardcoreButton.y + hardcoreButton.height / 2 + 30f * scale, UIFonts.caption, UITheme.textSecondary)
+            hardcoreButton.y + hardcoreButton.height / 2 + 30f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         ui.textCentered("the chaos", hardcoreCenterX,
-            hardcoreButton.y + hardcoreButton.height / 2 + 5f * scale, UIFonts.caption, UITheme.textSecondary)
+            hardcoreButton.y + hardcoreButton.height / 2 + 5f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         ui.textCentered("2x VOLTS!", hardcoreCenterX,
-            hardcoreButton.y + hardcoreButton.height / 2 - 35f * scale, UIFonts.body, UITheme.warning)
+            hardcoreButton.y + hardcoreButton.height / 2 - 35f * scale * cardScale, bodyFont, UITheme.warning)
         // Hardcore high score
         val hardcoreHighScore = highScoreManager.hardcoreHighScore
         if (hardcoreHighScore > 0) {
-            ui.textCentered("$hardcoreHighScore", hardcoreCenterX + 15f * scale,
-                hardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
+            ui.textCentered("$hardcoreHighScore", hardcoreCenterX + 15f * scale * cardScale,
+                hardcoreButton.y + 60f * scale * cardScale, bodyFont, blackColor)
         }
 
         // Night Hardcore button text
         val nightPurpleText = com.badlogic.gdx.graphics.Color(0.7f, 0.5f, 1f, 1f)
         val nightHardcoreCenterX = nightHardcoreButton.x + nightHardcoreButton.width / 2
         ui.textCentered("NIGHT", nightHardcoreCenterX,
-            nightHardcoreButton.y + nightHardcoreButton.height - 60f * scale, UIFonts.heading, nightPurpleText)
+            nightHardcoreButton.y + nightHardcoreButton.height - 60f * scale * cardScale, headingFont, nightPurpleText)
         ui.textCentered("HARDCORE", nightHardcoreCenterX,
-            nightHardcoreButton.y + nightHardcoreButton.height - 105f * scale, UIFonts.heading, UITheme.textPrimary)
+            nightHardcoreButton.y + nightHardcoreButton.height - 105f * scale * cardScale, headingFont, UITheme.textPrimary)
         ui.textCentered("Flickering lights", nightHardcoreCenterX,
-            nightHardcoreButton.y + nightHardcoreButton.height / 2 + 20f * scale, UIFonts.caption, UITheme.textSecondary)
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 + 20f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         ui.textCentered("pure darkness", nightHardcoreCenterX,
-            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 5f * scale, UIFonts.caption, UITheme.textSecondary)
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 5f * scale * cardScale, UIFonts.caption, UITheme.textSecondary)
         ui.textCentered("2.5x VOLTS!", nightHardcoreCenterX,
-            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 45f * scale, UIFonts.body, UITheme.warning)
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 45f * scale * cardScale, bodyFont, UITheme.warning)
         // Night Hardcore high score
         val nightHardcoreHighScore = highScoreManager.nightHardcoreHighScore
         if (nightHardcoreHighScore > 0) {
-            ui.textCentered("$nightHardcoreHighScore", nightHardcoreCenterX + 15f * scale,
-                nightHardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
+            ui.textCentered("$nightHardcoreHighScore", nightHardcoreCenterX + 15f * scale * cardScale,
+                nightHardcoreButton.y + 60f * scale * cardScale, bodyFont, blackColor)
         }
 
         // Back button text

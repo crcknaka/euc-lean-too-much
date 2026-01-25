@@ -69,11 +69,18 @@ class TimeTrialLevelRenderer(
 
         val titleY = panelY + panelHeight - 50f * scale
 
+        // Adaptive sizing for different screen aspects
+        val aspectRatio = sw / sh
+        val isNarrowScreen = aspectRatio < 1.5f
+
+        // Scale down cards on narrow/square screens
+        val cardScale = if (isNarrowScreen) 0.65f else 1f
+
         // Level cards - 2 rows of 5
-        val cardWidth = 260f * scale
-        val cardHeight = 300f * scale
-        val cardGap = 20f * scale
-        val rowGap = 20f * scale
+        val cardWidth = 260f * scale * cardScale
+        val cardHeight = 300f * scale * cardScale
+        val cardGap = 20f * scale * cardScale
+        val rowGap = 20f * scale * cardScale
         val totalCardsWidth = cardWidth * 5 + cardGap * 4
         val cardsStartX = centerX - totalCardsWidth / 2
         val totalHeight = cardHeight * 2 + rowGap
@@ -123,6 +130,10 @@ class TimeTrialLevelRenderer(
 
         ui.textCentered("TIME TRIAL", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
+        // Use smaller font for narrow screens
+        val headingFont = if (isNarrowScreen) UIFonts.body else UIFonts.heading
+        val bodyFont = if (isNarrowScreen) UIFonts.caption else UIFonts.body
+
         for (i in levels.indices) {
             val level = levels[i]
             val row = i / 5
@@ -137,42 +148,42 @@ class TimeTrialLevelRenderer(
             val textColor = if (isUnlocked) UITheme.textPrimary else UITheme.textMuted
 
             // Level number
-            ui.textCentered("LEVEL ${i + 1}", cardCenterX, cardsY + cardHeight - 30f * scale,
-                UIFonts.body, textColor)
+            ui.textCentered("LEVEL ${i + 1}", cardCenterX, cardsY + cardHeight - 30f * scale * cardScale,
+                bodyFont, textColor)
 
             // Level name
-            ui.textCentered(level.displayName, cardCenterX, cardsY + cardHeight - 60f * scale,
+            ui.textCentered(level.displayName, cardCenterX, cardsY + cardHeight - 60f * scale * cardScale,
                 UIFonts.caption, textColor)
 
             if (isUnlocked) {
                 // Distance requirement
                 ui.textCentered("${level.targetDistance.toInt()}m", cardCenterX,
-                    cardsY + cardHeight / 2 + 20f * scale, UIFonts.heading, UITheme.accent)
+                    cardsY + cardHeight / 2 + 20f * scale * cardScale, headingFont, UITheme.accent)
 
                 // Time limit
                 ui.textCentered("${level.timeLimit.toInt()}s", cardCenterX,
-                    cardsY + cardHeight / 2 - 20f * scale, UIFonts.body, UITheme.textSecondary)
+                    cardsY + cardHeight / 2 - 20f * scale * cardScale, bodyFont, UITheme.textSecondary)
 
                 // Best time or "Not completed"
                 if (isCompleted && bestTime != null) {
                     val timeStr = formatTime(bestTime)
-                    ui.textCentered("BEST: $timeStr", cardCenterX, cardsY + 65f * scale,
+                    ui.textCentered("BEST: $timeStr", cardCenterX, cardsY + 65f * scale * cardScale,
                         UIFonts.caption, UITheme.surface)
                 } else {
-                    ui.textCentered("--:--", cardCenterX, cardsY + 65f * scale,
+                    ui.textCentered("--:--", cardCenterX, cardsY + 65f * scale * cardScale,
                         UIFonts.caption, UITheme.textMuted)
                 }
 
                 // Volt reward
-                ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale,
+                ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale * cardScale,
                     UIFonts.caption, UITheme.warning)
             } else {
                 // Locked indicator
                 ui.textCentered("LOCKED", cardCenterX, cardsY + cardHeight / 2,
-                    UIFonts.body, UITheme.textMuted)
+                    bodyFont, UITheme.textMuted)
 
                 // Volt reward (show even for locked levels)
-                ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale,
+                ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale * cardScale,
                     UIFonts.caption, UITheme.textMuted)
             }
         }
