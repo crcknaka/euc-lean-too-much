@@ -11,6 +11,7 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.model.WheelType
 import com.eucleantoomuch.game.state.SettingsManager
+import com.eucleantoomuch.game.state.VoltsManager
 import com.badlogic.gdx.graphics.Cubemap
 import com.badlogic.gdx.graphics.Texture
 import net.mgsx.gltf.loaders.glb.GLBLoader
@@ -27,7 +28,8 @@ import net.mgsx.gltf.scene3d.utils.IBLBuilder
  * Shown after pressing PLAY, before calibration/game start.
  */
 class WheelSelectionRenderer(
-    private val settingsManager: SettingsManager
+    private val settingsManager: SettingsManager,
+    private val voltsManager: VoltsManager
 ) : Disposable {
     private val ui = UIRenderer()
 
@@ -76,6 +78,20 @@ class WheelSelectionRenderer(
 
     enum class Action {
         NONE, START, BACK
+    }
+
+    /** Check if a wheel is unlocked based on total volts collected */
+    private fun isWheelUnlocked(wheel: WheelType): Boolean {
+        return voltsManager.totalVolts >= wheel.unlockVoltsRequired
+    }
+
+    /** Format volts with K suffix for thousands */
+    private fun formatVolts(volts: Int): String {
+        return when {
+            volts >= 1_000_000 -> "${volts / 1_000_000}.${(volts % 1_000_000) / 100_000}M"
+            volts >= 1_000 -> "${volts / 1_000}.${(volts % 1_000) / 100}K"
+            else -> "$volts"
+        }
     }
 
     init {
@@ -332,13 +348,47 @@ class WheelSelectionRenderer(
         ui.neonButton(backButton, UITheme.surfaceLight)
 
         // Start button (large, right side) - same style as PLAY
+        // Gray out if wheel is locked
+        val isCurrentWheelUnlocked = isWheelUnlocked(currentWheel)
         startButton.set(buttonsStartX + backButtonWidth + buttonGap, buttonsY, startButtonWidth, startButtonHeight)
-        ui.neonButton(startButton, UITheme.accent)
+        ui.neonButton(startButton, if (isCurrentWheelUnlocked) UITheme.accent else UITheme.surfaceLight)
 
         ui.endShapes()
 
         // === Render 3D Preview ===
-        render3DPreview(previewX, previewY, previewSize, currentWheel)
+        render3DPreview(previewX, previewY, previewSize, currentWheel, isCurrentWheelUnlocked)
+
+        // === Draw lock overlay for locked wheels ===
+        if (!isCurrentWheelUnlocked) {
+            ui.beginShapes()
+            // Dark overlay to dim the preview
+            ui.shapes.color = com.badlogic.gdx.graphics.Color(0f, 0f, 0f, 0.5f)
+            ui.shapes.rect(
+                previewX - previewSize / 2 - 10f * scale,
+                previewY - 10f * scale,
+                previewSize + 20f * scale,
+                previewSize + 20f * scale
+            )
+
+            // Redraw arrow buttons on top of overlay
+            ui.neonButton(leftButton, UITheme.secondary)
+            ui.neonButton(rightButton, UITheme.secondary)
+
+            // Large lock icon in center of preview
+            val lockSize = 120f * scale
+            val lockColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.2f, 1f)  // Bright gold
+            ui.lock(previewX, previewY + previewSize / 2, lockSize, lockColor)
+
+            // Lock icon on START button (left side)
+            val buttonLockSize = 40f * scale
+            ui.lock(
+                startButton.x + 55f * scale,
+                startButton.y + startButton.height / 2,
+                buttonLockSize,
+                com.badlogic.gdx.graphics.Color(0.7f, 0.6f, 0.3f, 1f)  // Bronze/gold
+            )
+            ui.endShapes()
+        }
 
         // === Draw Text ===
         ui.beginBatch()
@@ -357,9 +407,20 @@ class WheelSelectionRenderer(
             UIFonts.heading, UITheme.textPrimary)
 
         // Wheel info on right side
-        ui.textCentered(currentWheel.displayName, rightCenterX, nameY, UIFonts.heading, UITheme.accent)
+        val nameColor = if (isCurrentWheelUnlocked) UITheme.accent else UITheme.textMuted
+        ui.textCentered(currentWheel.displayName, rightCenterX, nameY, UIFonts.heading, nameColor)
         ui.textCentered("${currentWheel.wheelSizeInches}\" wheel", rightCenterX, sizeY, UIFonts.body, UITheme.textSecondary)
-        ui.textCentered(currentWheel.description, rightCenterX, descY, UIFonts.caption, UITheme.textMuted)
+
+        // Show unlock progress for locked wheels, or description for unlocked
+        if (isCurrentWheelUnlocked) {
+            ui.textCentered(currentWheel.description, rightCenterX, descY, UIFonts.caption, UITheme.textMuted)
+        } else {
+            // Show unlock progress: "12,500 / 100,000 V"
+            val current = voltsManager.totalVolts
+            val required = currentWheel.unlockVoltsRequired
+            val progressText = "${formatVolts(current)} / ${formatVolts(required)} V"
+            ui.textCentered(progressText, rightCenterX, descY, UIFonts.caption, UITheme.warning)
+        }
 
         // Stats labels
         val labelX = statsX + 20f * scale
@@ -372,24 +433,46 @@ class WheelSelectionRenderer(
         // Button labels
         ui.textCentered("BACK", backButton.x + backButton.width / 2,
             backButton.y + backButton.height / 2, UIFonts.body, UITheme.textSecondary)
-        // START uses title font like PLAY in main menu
-        ui.textCentered("START", startButton.x + startButton.width / 2,
-            startButton.y + startButton.height / 2, UIFonts.title, UITheme.textPrimary)
+
+        // START button - show unlock requirement if locked
+        if (isCurrentWheelUnlocked) {
+            ui.textCentered("START", startButton.x + startButton.width / 2,
+                startButton.y + startButton.height / 2, UIFonts.title, UITheme.textPrimary)
+        } else {
+            // Show volts required (lock icon is drawn separately in shapes)
+            // Shift text right to leave space for lock icon
+            val voltsNeeded = currentWheel.unlockVoltsRequired
+            ui.textCentered("${formatVolts(voltsNeeded)}V", startButton.x + startButton.width / 2 + 25f * scale,
+                startButton.y + startButton.height / 2, UIFonts.heading, UITheme.textMuted)
+        }
 
         ui.endBatch()
 
-        // Wheel indicator dots below preview
+        // Wheel indicator dots below preview (with lock icons for locked wheels)
         val dotY = previewY - 30f * scale
-        val dotSpacing = 20f * scale
+        val dotSpacing = 24f * scale
         val dotRadius = 6f * scale
 
         ui.beginShapes()
         val totalDotsWidth = (wheels.size - 1) * dotSpacing
         for (i in wheels.indices) {
+            val wheel = wheels[i]
             val dotX = previewX - totalDotsWidth / 2 + i * dotSpacing
-            val dotColor = if (i == currentIndex) UITheme.accent else UITheme.surfaceBorder
-            ui.shapes.color = dotColor
-            ui.shapes.circle(dotX, dotY, dotRadius)
+            val isUnlocked = isWheelUnlocked(wheel)
+
+            if (isUnlocked) {
+                // Regular dot
+                val dotColor = if (i == currentIndex) UITheme.accent else UITheme.surfaceBorder
+                ui.shapes.color = dotColor
+                ui.shapes.circle(dotX, dotY, dotRadius)
+            } else {
+                // Lock icon for locked wheels
+                val lockColor = if (i == currentIndex)
+                    com.badlogic.gdx.graphics.Color(0.9f, 0.75f, 0.2f, 1f)  // Gold
+                else
+                    UITheme.surfaceBorder
+                ui.lock(dotX, dotY, 16f * scale, lockColor)
+            }
         }
         ui.endShapes()
 
@@ -397,7 +480,7 @@ class WheelSelectionRenderer(
         return handleInput(touchX, touchY)
     }
 
-    private fun render3DPreview(centerX: Float, y: Float, size: Float, wheel: WheelType) {
+    private fun render3DPreview(centerX: Float, y: Float, size: Float, wheel: WheelType, isUnlocked: Boolean = true) {
         // Set viewport for 3D preview area
         val viewportX = (centerX - size / 2).toInt()
         val viewportY = y.toInt()
@@ -406,6 +489,13 @@ class WheelSelectionRenderer(
         Gdx.gl.glViewport(viewportX, viewportY, viewportSize, viewportSize)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
+
+        // Darken ambient light for locked wheels
+        if (!isUnlocked) {
+            sceneManager.setAmbientLight(0.15f)  // Much darker for locked
+        } else {
+            sceneManager.setAmbientLight(1f)     // Normal
+        }
 
         // Fixed camera position (only zoom affects distance, no orbit)
         // Slight top-down angle for better view
@@ -464,9 +554,15 @@ class WheelSelectionRenderer(
                         resetCameraView()
                     }
                     startButton.contains(touchX, touchY) -> {
-                        UIFeedback.clickHeavy()
-                        settingsManager.selectedWheelId = wheels[currentIndex].id
-                        return Action.START
+                        val currentWheel = wheels[currentIndex]
+                        if (isWheelUnlocked(currentWheel)) {
+                            UIFeedback.clickHeavy()
+                            settingsManager.selectedWheelId = currentWheel.id
+                            return Action.START
+                        } else {
+                            // Locked wheel - play error feedback
+                            UIFeedback.click()
+                        }
                     }
                     backButton.contains(touchX, touchY) -> {
                         UIFeedback.click()
@@ -489,9 +585,14 @@ class WheelSelectionRenderer(
                 resetCameraView()
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ENTER) || Gdx.input.isKeyJustPressed(Input.Keys.SPACE) -> {
-                UIFeedback.clickHeavy()
-                settingsManager.selectedWheelId = wheels[currentIndex].id
-                return Action.START
+                val currentWheel = wheels[currentIndex]
+                if (isWheelUnlocked(currentWheel)) {
+                    UIFeedback.clickHeavy()
+                    settingsManager.selectedWheelId = currentWheel.id
+                    return Action.START
+                } else {
+                    UIFeedback.click()
+                }
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK) -> {
                 UIFeedback.click()

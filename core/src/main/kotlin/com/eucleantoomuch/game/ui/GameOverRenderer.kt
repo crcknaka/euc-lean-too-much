@@ -296,9 +296,9 @@ class GameOverRenderer : Disposable {
                 val voltsY = speedCardY - 75f * scale
                 val voltsColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)  // Electric yellow
                 val voltsPulse = UITheme.Anim.pulse(2f, 0.85f, 1f)
-                ui.textCentered("+${sessionVolts}V", leftCenterX - 60f * scale, voltsY,
+                ui.textCentered("+${sessionVolts}V", leftCenterX - 100f * scale, voltsY,
                     UIFonts.heading, UITheme.withAlpha(voltsColor, statsAlpha * voltsPulse))
-                ui.textCentered("Total: ${totalVolts}V", leftCenterX + 80f * scale, voltsY,
+                ui.textCentered("Total: ${totalVolts}V", leftCenterX + 120f * scale, voltsY,
                     UIFonts.caption, UITheme.withAlpha(UITheme.textMuted, statsAlpha))
             }
 

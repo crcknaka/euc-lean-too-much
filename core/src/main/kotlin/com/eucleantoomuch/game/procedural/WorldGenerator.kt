@@ -376,6 +376,21 @@ class WorldGenerator(
         isLampFlickeringEnabled = enabled
     }
 
+    /**
+     * Set Time Trial mode for difficulty calculations.
+     */
+    fun setTimeTrialMode(enabled: Boolean) {
+        difficultyScaler.setTimeTrialMode(enabled)
+    }
+
+    /**
+     * Get the current probability that sidewalk pedestrians will cross the road.
+     * Depends on game mode and distance traveled.
+     */
+    fun getPedestrianCrossingProbability(distance: Float): Float {
+        return difficultyScaler.getPedestrianCrossingProbability(distance)
+    }
+
     fun update(playerZ: Float, totalDistance: Float) {
         val behindDistance = 50f
         val startChunk = ((playerZ - behindDistance) / Constants.CHUNK_LENGTH).toInt()

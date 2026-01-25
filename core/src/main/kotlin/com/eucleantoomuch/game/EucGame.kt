@@ -274,7 +274,7 @@ class EucGame(
         calibrationRenderer = CalibrationRenderer()
         settingsRenderer = SettingsRenderer(settingsManager)
         creditsRenderer = CreditsRenderer()
-        wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
+        wheelSelectionRenderer = WheelSelectionRenderer(settingsManager, voltsManager)
         modeSelectionRenderer = ModeSelectionRenderer(highScoreManager)
         timeTrialLevelRenderer = TimeTrialLevelRenderer(timeTrialManager)
 
@@ -874,6 +874,9 @@ class EucGame(
             // Update world generation
             worldGenerator.update(playerTransform.position.z, session.distanceTraveled)
 
+            // Update pedestrian road crossing probability based on distance/mode
+            pedestrianAISystem.crossingProbability = worldGenerator.getPedestrianCrossingProbability(session.distanceTraveled)
+
             // Update camera with speed for FOV effect
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta, eucComponent.speed)
 
@@ -1071,6 +1074,7 @@ class EucGame(
         // Configure world generator for hardcore mode (night hardcore uses same mechanics)
         val isAnyHardcore = pendingHardcoreMode || pendingNightHardcoreMode
         worldGenerator.setHardcoreMode(isAnyHardcore, 0f)
+        worldGenerator.setTimeTrialMode(session.isTimeTrial)
         voltsManager.setHardcoreMode(isAnyHardcore, pendingNightHardcoreMode)
 
         // Configure night mode - night hardcore always uses night mode
@@ -1139,7 +1143,11 @@ class EucGame(
 
         // Reset hardcore mode and lamp flickering
         worldGenerator.setHardcoreMode(false, 0f)
+        worldGenerator.setTimeTrialMode(false)
         worldGenerator.setLampFlickeringEnabled(false)
+
+        // Reset pedestrian crossing probability
+        pedestrianAISystem.crossingProbability = 0f
     }
 
     // Temp vector for pedestrian ragdoll
@@ -1620,6 +1628,7 @@ class EucGame(
         val playerTransformForWorld = playerEntity?.getComponent(TransformComponent::class.java)
         if (playerTransformForWorld != null) {
             worldGenerator.update(playerTransformForWorld.position.z, state.session.distanceTraveled)
+            pedestrianAISystem.crossingProbability = worldGenerator.getPedestrianCrossingProbability(state.session.distanceTraveled)
         }
 
         // Always update ragdoll physics (for pedestrians even if player ragdoll is inactive)

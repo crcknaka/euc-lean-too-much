@@ -6,6 +6,7 @@ class DifficultyScaler {
     // Hardcore mode multipliers - more intense than normal mode
     private var isHardcoreMode = false
     private var hardcoreDifficulty = 0f  // 0-1 based on time played
+    private var isTimeTrialMode = false
 
     /**
      * Set hardcore mode and its time-based difficulty (0-1)
@@ -13,6 +14,13 @@ class DifficultyScaler {
     fun setHardcoreMode(enabled: Boolean, difficulty: Float = 0f) {
         isHardcoreMode = enabled
         hardcoreDifficulty = difficulty.coerceIn(0f, 1f)
+    }
+
+    /**
+     * Set time trial mode
+     */
+    fun setTimeTrialMode(enabled: Boolean) {
+        isTimeTrialMode = enabled
     }
 
     /**
@@ -120,6 +128,30 @@ class DifficultyScaler {
         if (!isHardcoreMode) return 0f
         val difficulty = getDifficulty(distance)
         return lerp(0.4f, 0.8f, difficulty)  // 40-80% chance in hardcore (high!)
+    }
+
+    /**
+     * Get probability that sidewalk pedestrians will cross the road.
+     * - Endless: starts at 0%, gradually increases with distance
+     * - Time Trial: very rare (3% max)
+     * - Hardcore/Night Hardcore: can cross from the start (10-20%)
+     */
+    fun getPedestrianCrossingProbability(distance: Float): Float {
+        val difficulty = getDifficulty(distance)
+        return when {
+            isHardcoreMode -> {
+                // Hardcore/Night Hardcore: 10% at start, up to 20% at max difficulty
+                lerp(0.10f, 0.20f, difficulty)
+            }
+            isTimeTrialMode -> {
+                // Time Trial: very rare, 0-3%
+                lerp(0f, 0.03f, difficulty)
+            }
+            else -> {
+                // Endless: 0% until 20% difficulty, then up to 12%
+                if (difficulty < 0.2f) 0f else lerp(0f, 0.12f, (difficulty - 0.2f) / 0.8f)
+            }
+        }
     }
 
     /**

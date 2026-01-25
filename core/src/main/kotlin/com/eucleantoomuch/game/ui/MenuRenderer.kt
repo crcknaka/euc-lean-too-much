@@ -232,7 +232,7 @@ class MenuRenderer : Disposable {
 
         // Volts
         val voltsTextColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)
-        ui.textCentered("VOLTS", cardTextCenterX + 25f * scale, voltsCardY + cardHeight - cardLabelOffset,
+        ui.textCentered("VOLTS", cardTextCenterX, voltsCardY + cardHeight - cardLabelOffset,
             UIFonts.caption, UITheme.textSecondary)
         val voltsValueColor = if (totalVolts > 0) voltsTextColor else UITheme.textPrimary
         ui.textCentered("${totalVolts}", cardTextCenterX, voltsCardY + cardHeight / 2 + cardValueOffset,

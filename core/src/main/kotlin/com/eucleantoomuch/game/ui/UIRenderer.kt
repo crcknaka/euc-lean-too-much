@@ -672,6 +672,45 @@ class UIRenderer : Disposable {
         shapes.circle(cx + bowlTopHalfW + handleR * 0.5f, handleY, handleR)
     }
 
+    /** Draw a lock icon 🔒 */
+    fun lock(cx: Float, cy: Float, size: Float, color: Color) {
+        shapes.color = color
+        val s = size * 0.5f
+
+        // Lock body (rounded rectangle)
+        val bodyW = s * 1.2f
+        val bodyH = s * 0.9f
+        val bodyY = cy - s * 0.5f
+        shapes.rect(cx - bodyW / 2, bodyY, bodyW, bodyH)
+
+        // Lock shackle (arc at top) - using circles and rectangles
+        val shackleW = s * 0.7f
+        val shackleH = s * 0.6f
+        val shackleY = bodyY + bodyH
+
+        // Shackle outer arc (thick arc made with circles)
+        val shackleThickness = s * 0.2f
+        shapes.circle(cx - shackleW / 2 + shackleThickness / 2, shackleY, shackleThickness / 2)
+        shapes.circle(cx + shackleW / 2 - shackleThickness / 2, shackleY, shackleThickness / 2)
+        shapes.rect(cx - shackleW / 2, shackleY, shackleThickness, shackleH)
+        shapes.rect(cx + shackleW / 2 - shackleThickness, shackleY, shackleThickness, shackleH)
+        shapes.circle(cx, shackleY + shackleH, shackleW / 2)
+
+        // Inner cutout for shackle (darker)
+        shapes.color = UITheme.darken(color, 0.4f)
+        shapes.circle(cx, shackleY + shackleH, shackleW / 2 - shackleThickness)
+
+        // Keyhole on body
+        shapes.color = UITheme.darken(color, 0.3f)
+        val keyholeY = bodyY + bodyH * 0.5f
+        shapes.circle(cx, keyholeY, s * 0.15f)
+        shapes.triangle(
+            cx - s * 0.08f, keyholeY,
+            cx + s * 0.08f, keyholeY,
+            cx, bodyY + s * 0.1f
+        )
+    }
+
     /** Draw a separator line with gradient fade */
     fun separator(x: Float, y: Float, width: Float, color: Color = UITheme.surfaceBorder) {
         val scale = UITheme.Dimensions.scale()

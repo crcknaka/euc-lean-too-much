@@ -26,7 +26,10 @@ sealed class WheelType(
     // Visual parameters
     val wheelRadius: Float,        // meters
     val bodyColor: Color,          // Main body color
-    val accentColor: Color         // Accent/trim color
+    val accentColor: Color,        // Accent/trim color
+
+    // Unlock requirement (0 = free/unlocked by default)
+    val unlockVoltsRequired: Int = 0
 ) {
     // Simple wheel - 16" - slow, beginner friendly, very agile
     object Simple : WheelType(
@@ -43,7 +46,8 @@ sealed class WheelType(
         batteryCapacity = 1800,     // mAh - shortest range
         wheelRadius = 0.18f,
         bodyColor = Color(0.2f, 0.3f, 0.35f, 1f),  // Blue-gray
-        accentColor = Color(0.3f, 0.5f, 0.6f, 1f)  // Teal accent
+        accentColor = Color(0.3f, 0.5f, 0.6f, 1f), // Teal accent
+        unlockVoltsRequired = 0     // Free - starter wheel
     )
 
     // Standard wheel - 18" - balanced, maneuverable
@@ -61,7 +65,8 @@ sealed class WheelType(
         batteryCapacity = 2400,     // mAh - medium range
         wheelRadius = 0.2f,
         bodyColor = Color(0.25f, 0.25f, 0.25f, 1f),  // Dark gray
-        accentColor = Color(0.4f, 0.4f, 0.4f, 1f)    // Gray
+        accentColor = Color(0.4f, 0.4f, 0.4f, 1f),   // Gray
+        unlockVoltsRequired = 10_000  // Requires 10,000 volts
     )
 
     // Performance wheel - 22" - fast, stable
@@ -79,7 +84,8 @@ sealed class WheelType(
         batteryCapacity = 4000,     // mAh - longest range
         wheelRadius = 0.25f,
         bodyColor = Color(0.6f, 0.15f, 0.15f, 1f),  // Dark red
-        accentColor = Color(1f, 0.3f, 0.1f, 1f)     // Orange accent
+        accentColor = Color(1f, 0.3f, 0.1f, 1f),    // Orange accent
+        unlockVoltsRequired = 100_000  // Requires 100,000 volts
     )
 
     companion object {

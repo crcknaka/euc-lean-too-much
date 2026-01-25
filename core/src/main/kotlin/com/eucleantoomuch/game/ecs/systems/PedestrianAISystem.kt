@@ -19,6 +19,10 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
     /** Debug flag to freeze all AI movement */
     var frozen = false
 
+    /** Probability (0-1) that sidewalk pedestrians will decide to cross the road.
+     *  Updated based on distance traveled / difficulty. */
+    var crossingProbability = 0f
+
     override fun processEntity(entity: Entity, deltaTime: Float) {
         if (frozen) return  // Skip AI processing when frozen
         val transform = transformMapper.get(entity)
@@ -144,20 +148,28 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
                 if (pedestrian.stateTimer > pedestrian.nextStateChange) {
                     val roll = MathUtils.random()
                     when {
-                        // 15% chance to stop and stand
-                        roll < 0.15f -> {
+                        // Chance to cross the road - based on difficulty/mode
+                        roll < crossingProbability -> {
+                            pedestrian.isSidewalkPedestrian = false
+                            pedestrian.state = PedestrianState.CROSSING
+                            pedestrian.stateTimer = 0f
+                            // Determine crossing direction based on current X position
+                            pedestrian.crossingDirectionX = if (transform.position.x > 0) -1f else 1f
+                        }
+                        // 12% chance to stop and stand
+                        roll < crossingProbability + 0.12f -> {
                             pedestrian.state = PedestrianState.STANDING
                             pedestrian.standDuration = MathUtils.random(2f, 6f)
                             pedestrian.stateTimer = 0f
                         }
                         // 10% chance to turn around
-                        roll < 0.25f -> {
+                        roll < crossingProbability + 0.22f -> {
                             pedestrian.walkDirectionZ *= -1f
                             pedestrian.stateTimer = 0f
                             pedestrian.nextStateChange = MathUtils.random(4f, 10f)
                         }
                         // 8% chance to change speed
-                        roll < 0.33f -> {
+                        roll < crossingProbability + 0.30f -> {
                             pedestrian.walkSpeed = MathUtils.random(0.8f, 2.2f)
                             pedestrian.stateTimer = 0f
                             pedestrian.nextStateChange = MathUtils.random(3f, 8f)
@@ -207,8 +219,8 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
             }
 
             PedestrianState.CROSSING, PedestrianState.WALKING_TO_CROSSING -> {
-                // Sidewalk pedestrians don't cross, treat as walking
-                pedestrian.state = PedestrianState.WALKING
+                // Delegate to crossing logic
+                processCrossingPedestrian(transform, velocity, pedestrian)
             }
 
             PedestrianState.FALLING -> {
