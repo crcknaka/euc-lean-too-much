@@ -95,6 +95,10 @@ class EucPhysicsSystem(
 
         // Calculate speed based on forward lean (using wheel-specific maxSpeed)
         val targetSpeed = EucPhysics.calculateTargetSpeed(euc.forwardLean, euc.maxSpeed)
+
+        // Store previous speed for brake light detection
+        euc.previousSpeed = euc.speed
+
         euc.speed = EucPhysics.updateSpeed(
             euc.speed,
             targetSpeed,

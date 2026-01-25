@@ -1040,6 +1040,10 @@ class EucGame(
         // Set time trial level if selected
         session.timeTrialLevel = timeTrialManager.selectedLevel
 
+        // Configure night mode based on level
+        renderer.setNightMode(session.isNightMode)
+        worldGenerator.setNightMode(session.isNightMode)
+
         hud.reset()
         voltsManager.resetSession()
         isNewHighScore = false
@@ -1091,6 +1095,10 @@ class EucGame(
 
         // Reset collider tracking to prevent memory leak
         resetColliderTracking()
+
+        // Reset night mode to day
+        renderer.setNightMode(false)
+        worldGenerator.setNightMode(false)
     }
 
     // Temp vector for pedestrian ragdoll

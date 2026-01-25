@@ -32,8 +32,10 @@ import com.badlogic.gdx.graphics.Texture
 import net.mgsx.gltf.scene3d.attributes.PBRCubemapAttribute
 import net.mgsx.gltf.scene3d.attributes.PBRTextureAttribute
 import net.mgsx.gltf.scene3d.lights.DirectionalLightEx
+import net.mgsx.gltf.scene3d.lights.PointLightEx
 import net.mgsx.gltf.scene3d.scene.SceneManager
 import net.mgsx.gltf.scene3d.utils.IBLBuilder
+import com.badlogic.gdx.math.Vector3
 
 class GameRenderer(
     private val engine: Engine,
@@ -92,10 +94,27 @@ class GameRenderer(
     // Articulated pedestrian renderer with walking animation
     val pedestrianRenderer: PedestrianRenderer
 
-    // Sky color
-    private val skyR = 0.5f
-    private val skyG = 0.7f
-    private val skyB = 0.9f
+    // Sky color (dynamic for night mode)
+    private var skyR = 0.5f
+    private var skyG = 0.7f
+    private var skyB = 0.9f
+
+    // Night mode
+    var isNightMode = false
+        private set
+    private val starFieldRenderer = StarFieldRenderer()
+    private val headlightRenderer = HeadlightRenderer()
+
+    // PBR point light for illuminating cars at night (gdx-gltf lighting system)
+    private val headlightPbrLight = PointLightEx().apply {
+        color.set(1f, 0.95f, 0.8f, 1f)  // Warm white
+        intensity = 100f
+        range = 20f
+    }
+    private val headlightPosition = Vector3()
+
+
+
 
     // LOD distance threshold - buildings further than this use simple model
     private val lodDistance = 80f
@@ -157,6 +176,82 @@ class GameRenderer(
         sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
         sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
         sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
+
+        // Initialize night mode renderers
+        starFieldRenderer.initialize()
+        headlightRenderer.initialize()
+    }
+
+    /**
+     * Enable or disable night mode.
+     * Changes sky color, lighting, fog, and IBL for night atmosphere.
+     */
+    fun setNightMode(enabled: Boolean) {
+        if (isNightMode == enabled) return
+        isNightMode = enabled
+
+        if (enabled) {
+            // Night sky - deep navy blue
+            skyR = 0.02f
+            skyG = 0.02f
+            skyB = 0.08f
+
+            // Update fog to match night sky
+            fogColor.set(0.03f, 0.03f, 0.1f, 1f)
+            environment.set(ColorAttribute(ColorAttribute.Fog, fogColor))
+
+            // Ambient light for night - bright enough to see objects
+            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.25f, 0.25f, 0.3f, 1f))
+
+            // Change to moonlight (dimmer, bluish tint)
+            pbrLight.direction.set(0.3f, -0.8f, 0.5f).nor()
+            pbrLight.color.set(0.6f, 0.65f, 0.8f, 1f)
+            pbrLight.intensity = 0.6f
+
+            // Rebuild IBL for night
+            rebuildIBL()
+            sceneManager.setAmbientLight(0.2f)
+
+            // Add PBR point light for illuminating cars
+            sceneManager.environment.add(headlightPbrLight)
+        } else {
+            // Day sky - light blue
+            skyR = 0.5f
+            skyG = 0.7f
+            skyB = 0.9f
+
+            // Restore day fog
+            fogColor.set(0.5f, 0.7f, 0.9f, 1f)
+            environment.set(ColorAttribute(ColorAttribute.Fog, fogColor))
+
+            // Restore ambient light
+            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
+
+            // Restore sunlight
+            pbrLight.direction.set(-0.5f, -1f, -0.3f).nor()
+            pbrLight.color.set(1.0f, 1.0f, 1.0f, 1f)
+            pbrLight.intensity = 3.0f
+
+            // Rebuild IBL for day
+            rebuildIBL()
+            sceneManager.setAmbientLight(1f)
+
+            // Remove headlight
+            sceneManager.environment.remove(headlightPbrLight)
+        }
+    }
+
+    private fun rebuildIBL() {
+        diffuseCubemap?.dispose()
+        specularCubemap?.dispose()
+
+        val iblBuilder = IBLBuilder.createOutdoor(pbrLight)
+        diffuseCubemap = iblBuilder.buildIrradianceMap(64)
+        specularCubemap = iblBuilder.buildRadianceMap(6)
+        iblBuilder.dispose()
+
+        sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
+        sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
     }
 
     fun setCameraFar(distance: Float) {
@@ -165,6 +260,26 @@ class GameRenderer(
     }
 
     fun render() {
+        // Update PBR headlight position for night mode
+        if (isNightMode) {
+            for (entity in engine.getEntitiesFor(Families.player)) {
+                val transform = transformMapper.get(entity) ?: continue
+
+                val yawRad = Math.toRadians(transform.yaw.toDouble()).toFloat()
+                val sinYaw = kotlin.math.sin(yawRad)
+                val cosYaw = kotlin.math.cos(yawRad)
+
+                // Position headlight ahead of player (same as drawn spot)
+                headlightPosition.set(
+                    transform.position.x - sinYaw * 8f,
+                    1.0f,
+                    transform.position.z + cosYaw * 8f
+                )
+                headlightPbrLight.position.set(headlightPosition)
+                break
+            }
+        }
+
         // Begin post-processing (render to framebuffer)
         postProcessing.begin()
 
@@ -174,6 +289,18 @@ class GameRenderer(
 
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
+
+        // Render stars before other geometry (at night)
+        if (isNightMode) {
+            Gdx.gl.glEnable(GL20.GL_BLEND)
+            Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
+            Gdx.gl.glDepthMask(false)
+            modelBatch.begin(camera)
+            starFieldRenderer.render(modelBatch, camera)
+            modelBatch.end()
+            Gdx.gl.glDepthMask(true)
+            Gdx.gl.glDisable(GL20.GL_BLEND)
+        }
 
         modelBatch.begin(camera)
 
@@ -277,6 +404,12 @@ class GameRenderer(
                 val euc = eucMapper.get(entity)
                 val isPlayer = playerMapper.get(entity) != null
 
+                // Brake lights: on when decelerating, off otherwise
+                if (euc != null && isPlayer) {
+                    val isDecelerating = euc.speed < euc.previousSpeed
+                    model.updateBrakeLights(isDecelerating, Gdx.graphics.deltaTime)
+                }
+
                 if (euc != null && isPlayer) {
                     // For EUC model: apply yaw (turn left/right), then model fix rotation, then lean
                     // Negate yaw to match visual direction with input direction
@@ -367,6 +500,20 @@ class GameRenderer(
             if (pedCount > 0) {
                 Gdx.gl.glDisable(GL20.GL_BLEND)
                 pedestrianRagdollRenderer!!.renderPedestrians(modelBatch, pedestrianRagdollPhysics!!, environment)
+            }
+        }
+
+        // Render headlight ground spot at night (visual light on road surface)
+        if (isNightMode) {
+            for (entity in engine.getEntitiesFor(Families.player)) {
+                val transform = transformMapper.get(entity) ?: continue
+                val euc = eucMapper.get(entity)
+
+                Gdx.gl.glEnable(GL20.GL_BLEND)
+                Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
+                headlightRenderer.render(modelBatch, transform.position, transform.yaw, euc?.visualForwardLean ?: 0f)
+                Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA)
+                break
             }
         }
 
@@ -509,6 +656,8 @@ class GameRenderer(
         sceneManager.dispose()
         postProcessing.dispose()
         pedestrianRenderer.dispose()
+        starFieldRenderer.dispose()
+        headlightRenderer.dispose()
         diffuseCubemap?.dispose()
         specularCubemap?.dispose()
         brdfLUT?.dispose()

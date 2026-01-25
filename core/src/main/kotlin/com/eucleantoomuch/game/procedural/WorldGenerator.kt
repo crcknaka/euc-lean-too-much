@@ -19,6 +19,10 @@ class WorldGenerator(
     private val engine: Engine,
     private val models: ProceduralModels
 ) {
+    // Night mode affects lamp post lighting
+    var isNightMode = false
+        private set
+
     private val difficultyScaler = DifficultyScaler()
     private val activeChunks = mutableMapOf<Int, MutableList<Entity>>()
 
@@ -308,6 +312,17 @@ class WorldGenerator(
 
     fun setRenderDistance(distance: Float) {
         renderDistance = distance
+    }
+
+    /**
+     * Set night mode - affects lamp post lighting.
+     * Recreates lamp post model with appropriate lighting.
+     */
+    fun setNightMode(enabled: Boolean) {
+        if (isNightMode == enabled) return
+        isNightMode = enabled
+        // Recreate lamp post model with new lighting state
+        lampPostModel = ModelInstance(models.createLampPostModel(isNightMode))
     }
 
     fun update(playerZ: Float, totalDistance: Float) {

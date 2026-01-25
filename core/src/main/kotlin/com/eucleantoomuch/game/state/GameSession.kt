@@ -30,6 +30,9 @@ class GameSession {
     val distanceProgress: Float
         get() = timeTrialLevel?.let { (distanceTraveled / it.targetDistance).coerceIn(0f, 1f) } ?: 0f
 
+    val isNightMode: Boolean
+        get() = timeTrialLevel?.isNight == true
+
     // Battery system
     var batteryCapacity: Int = 2400  // mAh (set from WheelType)
         private set

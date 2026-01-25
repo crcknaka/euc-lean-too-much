@@ -26,7 +26,11 @@
       "Bash(C:/Projects/euc-lean-too-much/gradlew.bat -p C:/Projects/euc-lean-too-much android:assembleDebug)",
       "Bash(git checkout:*)",
       "Bash(gradlew.bat :core:compileKotlin:*)",
-      "Bash(cmd /c \"gradlew.bat compileKotlin --quiet\")"
+      "Bash(cmd /c \"gradlew.bat compileKotlin --quiet\")",
+      "Bash(type:*)",
+      "Bash(dir /s /b *.log)",
+      "Bash(cmd /c \"gradlew.bat lwjgl3:run\")",
+      "Bash(python3:*)"
     ]
   }
 }

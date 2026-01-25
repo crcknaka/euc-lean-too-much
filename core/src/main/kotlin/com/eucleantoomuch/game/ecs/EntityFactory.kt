@@ -67,6 +67,8 @@ class EntityFactory(
                 modelInstance = eucModelInstance
                 isPbr = false
             }
+            // Find brake light material for dynamic lighting
+            findBrakeLightMaterial()
         })
 
         // Player marker

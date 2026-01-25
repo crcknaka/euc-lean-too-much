@@ -8,6 +8,7 @@ import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.VertexAttributes
 import com.badlogic.gdx.graphics.g3d.Material
 import com.badlogic.gdx.graphics.g3d.Model
+import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
 import com.badlogic.gdx.math.MathUtils
@@ -129,7 +130,7 @@ class ProceduralModels : Disposable {
                 // External model loaded - apply scale and rotation
                 eucModelScale = 0.35f  // Slightly bigger
                 eucModelRotationX = 0f  // No vertical flip
-                eucModelRotationY = 0f    // No horizontal flip
+                eucModelRotationY = 0f  // No horizontal flip
 
                 // Create new loader to avoid caching issues
                 val loader = GLBLoader()
@@ -423,7 +424,10 @@ class ProceduralModels : Disposable {
         val depth = Constants.BUILDING_DEPTH
         val wallMaterial = Material(ColorAttribute.createDiffuse(color))
         val windowMat = Material(ColorAttribute.createDiffuse(windowColor))
-        val windowLitMat = Material(ColorAttribute.createDiffuse(windowLitColor))
+        val windowLitMat = Material(
+            ColorAttribute.createDiffuse(windowLitColor),
+            ColorAttribute.createEmissive(windowLitColor)
+        )
         val doorMat = Material(ColorAttribute.createDiffuse(doorColor))
         val roofMat = Material(ColorAttribute.createDiffuse(roofColor))
         val trimMat = Material(ColorAttribute.createDiffuse(trimColor))
@@ -919,7 +923,7 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createLampPostModel(): Model {
+    fun createLampPostModel(isNightMode: Boolean = false): Model {
         modelBuilder.begin()
 
         val postMaterial = Material(ColorAttribute.createDiffuse(lampPostColor))
@@ -942,6 +946,33 @@ class ProceduralModels : Disposable {
         val lampPart = modelBuilder.part("lamp", GL20.GL_TRIANGLES, attributes, postMaterial)
         lampPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, postHeight - 0.3f * scale, 0.7f * scale))
         lampPart.box(0.2f * scale, 0.25f * scale, 0.3f * scale)
+
+        // Lamp bulb - emissive only at night
+        val bulbColor = Color(1f, 0.9f, 0.6f, 1f)  // Warm yellow
+        val bulbMaterial = if (isNightMode) {
+            Material(
+                ColorAttribute.createDiffuse(bulbColor),
+                ColorAttribute.createEmissive(bulbColor)
+            )
+        } else {
+            // Day mode: just a gray/off bulb
+            Material(ColorAttribute.createDiffuse(Color(0.7f, 0.7f, 0.65f, 1f)))
+        }
+        val bulbPart = modelBuilder.part("bulb", GL20.GL_TRIANGLES, attributes, bulbMaterial)
+        bulbPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, postHeight - 0.45f * scale, 0.7f * scale))
+        bulbPart.sphere(0.15f * scale, 0.15f * scale, 0.15f * scale, 8, 8)
+
+        // Light pool on ground - only at night
+        if (isNightMode) {
+            val poolColor = Color(1f, 0.95f, 0.7f, 0.12f)  // Warm light, subtle
+            val poolMaterial = Material(
+                ColorAttribute.createDiffuse(poolColor),
+                BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
+            )
+            val poolPart = modelBuilder.part("lightPool", GL20.GL_TRIANGLES, attributes, poolMaterial)
+            poolPart.setVertexTransform(com.badlogic.gdx.math.Matrix4().translate(0f, 0.18f, 0.7f * scale))  // Above sidewalk (curb 0.15f)
+            poolPart.ellipse(4f, 5f, 16, 0f, 0f, 0f, 0f, 1f, 0f)
+        }
 
         return modelBuilder.end().also { models.add(it) }
     }
