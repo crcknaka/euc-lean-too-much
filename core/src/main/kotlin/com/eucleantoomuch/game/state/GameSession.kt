@@ -33,6 +33,32 @@ class GameSession {
     val isNightMode: Boolean
         get() = timeTrialLevel?.isNight == true
 
+    // Hardcore mode - difficulty increases every 10 seconds
+    var isHardcoreMode: Boolean = false
+
+    // Night Hardcore mode - hardcore + night + flickering lights + extra difficulty
+    var isNightHardcoreMode: Boolean = false
+
+    // Night mode is true for night time trial levels OR night hardcore mode
+    val isEffectiveNightMode: Boolean
+        get() = isNightHardcoreMode || (timeTrialLevel?.isNight == true)
+
+    // Current difficulty level in hardcore mode (increases every 10 seconds)
+    // Night hardcore has faster difficulty scaling (every 8 seconds)
+    val hardcoreDifficultyLevel: Int
+        get() = when {
+            isNightHardcoreMode -> (playTimeSeconds / 8f).toInt()  // Faster scaling
+            isHardcoreMode -> (playTimeSeconds / 10f).toInt()
+            else -> 0
+        }
+
+    // Hardcore difficulty as 0-1 value (caps at level 10)
+    val hardcoreDifficulty: Float
+        get() = when {
+            isNightHardcoreMode || isHardcoreMode -> (hardcoreDifficultyLevel / 10f).coerceIn(0f, 1f)
+            else -> 0f
+        }
+
     // Battery system
     var batteryCapacity: Int = 2400  // mAh (set from WheelType)
         private set
@@ -122,5 +148,7 @@ class GameSession {
         isBatteryLow = false
         isBatteryDead = false
         timeTrialLevel = null
+        isHardcoreMode = false
+        isNightHardcoreMode = false
     }
 }

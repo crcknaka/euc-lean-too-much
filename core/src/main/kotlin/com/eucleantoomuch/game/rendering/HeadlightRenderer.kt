@@ -10,6 +10,7 @@ import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.attributes.BlendingAttribute
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.utils.ModelBuilder
+import com.badlogic.gdx.graphics.g3d.utils.shapebuilders.EllipseShapeBuilder
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.math.Vector3
 import com.badlogic.gdx.utils.Disposable
@@ -37,7 +38,7 @@ class HeadlightRenderer : Disposable {
             BlendingAttribute(GL20.GL_SRC_ALPHA, GL20.GL_ONE)
         )
         val spotPart = modelBuilder.part("spot", GL20.GL_TRIANGLES, attributes, spotMaterial)
-        spotPart.ellipse(8f, 12f, 16, 0f, 0f, 0f, 0f, 1f, 0f)
+        EllipseShapeBuilder.build(spotPart, 8f, 12f, 16, 0f, 0f, 0f, 0f, 1f, 0f)
         groundSpotModel = modelBuilder.end()
         groundSpotInstance = ModelInstance(groundSpotModel!!)
     }

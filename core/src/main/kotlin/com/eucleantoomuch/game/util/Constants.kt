@@ -40,6 +40,10 @@ object Constants {
     const val SIDEWALK_LEFT_X = ROAD_LEFT - SIDEWALK_WIDTH / 2
     const val SIDEWALK_RIGHT_X = ROAD_RIGHT + SIDEWALK_WIDTH / 2
 
+    // Hardcore mode - narrower road and sidewalk for increased difficulty
+    const val HARDCORE_ROAD_WIDTH = 6f
+    const val HARDCORE_SIDEWALK_WIDTH = 2f
+
     // Difficulty
     const val EASY_DISTANCE = 100f          // First 100m is easy
     const val HARD_DISTANCE = 1000f         // Full difficulty at 1km

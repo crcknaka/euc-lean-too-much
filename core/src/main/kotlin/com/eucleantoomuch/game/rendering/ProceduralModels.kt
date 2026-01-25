@@ -283,7 +283,11 @@ class ProceduralModels : Disposable {
         return modelBuilder.end().also { models.add(it) }
     }
 
-    fun createGroundChunkModel(chunkLength: Float): Model {
+    fun createGroundChunkModel(
+        chunkLength: Float,
+        roadWidth: Float = Constants.ROAD_WIDTH,
+        sidewalkWidth: Float = Constants.SIDEWALK_WIDTH
+    ): Model {
         modelBuilder.begin()
 
         val roadMaterial = Material(ColorAttribute.createDiffuse(roadColor))
@@ -296,10 +300,10 @@ class ProceduralModels : Disposable {
         // Road surface
         val roadPart = modelBuilder.part("road", GL20.GL_TRIANGLES, attributes, roadMaterial)
         roadPart.rect(
-            -Constants.ROAD_WIDTH / 2, 0f, 0f,
-            -Constants.ROAD_WIDTH / 2, 0f, chunkLength,
-            Constants.ROAD_WIDTH / 2, 0f, chunkLength,
-            Constants.ROAD_WIDTH / 2, 0f, 0f,
+            -roadWidth / 2, 0f, 0f,
+            -roadWidth / 2, 0f, chunkLength,
+            roadWidth / 2, 0f, chunkLength,
+            roadWidth / 2, 0f, 0f,
             0f, 1f, 0f
         )
 
@@ -316,20 +320,20 @@ class ProceduralModels : Disposable {
         // Left sidewalk
         val leftSidewalk = modelBuilder.part("sidewalk_left", GL20.GL_TRIANGLES, attributes, sidewalkMaterial)
         leftSidewalk.rect(
-            -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH, 0.1f, 0f,
-            -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH, 0.1f, chunkLength,
-            -Constants.ROAD_WIDTH / 2, 0.1f, chunkLength,
-            -Constants.ROAD_WIDTH / 2, 0.1f, 0f,
+            -roadWidth / 2 - sidewalkWidth, 0.1f, 0f,
+            -roadWidth / 2 - sidewalkWidth, 0.1f, chunkLength,
+            -roadWidth / 2, 0.1f, chunkLength,
+            -roadWidth / 2, 0.1f, 0f,
             0f, 1f, 0f
         )
 
         // Right sidewalk
         val rightSidewalk = modelBuilder.part("sidewalk_right", GL20.GL_TRIANGLES, attributes, sidewalkMaterial)
         rightSidewalk.rect(
-            Constants.ROAD_WIDTH / 2, 0.1f, 0f,
-            Constants.ROAD_WIDTH / 2, 0.1f, chunkLength,
-            Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH, 0.1f, chunkLength,
-            Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH, 0.1f, 0f,
+            roadWidth / 2, 0.1f, 0f,
+            roadWidth / 2, 0.1f, chunkLength,
+            roadWidth / 2 + sidewalkWidth, 0.1f, chunkLength,
+            roadWidth / 2 + sidewalkWidth, 0.1f, 0f,
             0f, 1f, 0f
         )
 
@@ -337,28 +341,28 @@ class ProceduralModels : Disposable {
         val curbMaterial = Material(ColorAttribute.createDiffuse(curbColor))
         val curbHeight = 0.1f
 
-        // Left curb - vertical face (at x = -ROAD_WIDTH/2, facing right towards road center)
+        // Left curb - vertical face (at x = -roadWidth/2, facing right towards road center)
         val leftCurb = modelBuilder.part("curb_left", GL20.GL_TRIANGLES, attributes, curbMaterial)
         leftCurb.rect(
-            -Constants.ROAD_WIDTH / 2, curbHeight, 0f,
-            -Constants.ROAD_WIDTH / 2, curbHeight, chunkLength,
-            -Constants.ROAD_WIDTH / 2, 0f, chunkLength,
-            -Constants.ROAD_WIDTH / 2, 0f, 0f,
+            -roadWidth / 2, curbHeight, 0f,
+            -roadWidth / 2, curbHeight, chunkLength,
+            -roadWidth / 2, 0f, chunkLength,
+            -roadWidth / 2, 0f, 0f,
             1f, 0f, 0f  // Normal pointing right (towards road center)
         )
 
-        // Right curb - vertical face (at x = +ROAD_WIDTH/2, facing left towards road center)
+        // Right curb - vertical face (at x = +roadWidth/2, facing left towards road center)
         val rightCurb = modelBuilder.part("curb_right", GL20.GL_TRIANGLES, attributes, curbMaterial)
         rightCurb.rect(
-            Constants.ROAD_WIDTH / 2, 0f, 0f,
-            Constants.ROAD_WIDTH / 2, 0f, chunkLength,
-            Constants.ROAD_WIDTH / 2, curbHeight, chunkLength,
-            Constants.ROAD_WIDTH / 2, curbHeight, 0f,
+            roadWidth / 2, 0f, 0f,
+            roadWidth / 2, 0f, chunkLength,
+            roadWidth / 2, curbHeight, chunkLength,
+            roadWidth / 2, curbHeight, 0f,
             -1f, 0f, 0f  // Normal pointing left (towards road center)
         )
 
         // Grass areas (between sidewalk and buildings)
-        val sidewalkEdge = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH  // 7f
+        val sidewalkEdge = roadWidth / 2 + sidewalkWidth
         val grassWidth = Constants.BUILDING_OFFSET_X - sidewalkEdge + 5f  // Extend past buildings
 
         // Left grass - main area
@@ -800,7 +804,11 @@ class ProceduralModels : Disposable {
 
     // ============ Environment Models ============
 
-    fun createGrassAreaModel(chunkLength: Float): Model {
+    fun createGrassAreaModel(
+        chunkLength: Float,
+        roadWidth: Float = Constants.ROAD_WIDTH,
+        sidewalkWidth: Float = Constants.SIDEWALK_WIDTH
+    ): Model {
         modelBuilder.begin()
 
         val grassMaterial = Material(ColorAttribute.createDiffuse(grassColor))
@@ -808,8 +816,8 @@ class ProceduralModels : Disposable {
 
         // Left grass area (beyond sidewalk) - extends far for background buildings
         val leftGrass = modelBuilder.part("grass_left", GL20.GL_TRIANGLES, attributes, grassMaterial)
-        val leftStart = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH - grassWidth
-        val leftEnd = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH
+        val leftStart = -roadWidth / 2 - sidewalkWidth - grassWidth
+        val leftEnd = -roadWidth / 2 - sidewalkWidth
         leftGrass.rect(
             leftStart, 0.02f, 0f,
             leftStart, 0.02f, chunkLength,
@@ -820,8 +828,8 @@ class ProceduralModels : Disposable {
 
         // Right grass area (beyond sidewalk) - extends far for background buildings
         val rightGrass = modelBuilder.part("grass_right", GL20.GL_TRIANGLES, attributes, grassMaterial)
-        val rightStart = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH
-        val rightEnd = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + grassWidth
+        val rightStart = roadWidth / 2 + sidewalkWidth
+        val rightEnd = roadWidth / 2 + sidewalkWidth + grassWidth
         rightGrass.rect(
             rightStart, 0.02f, 0f,
             rightStart, 0.02f, chunkLength,

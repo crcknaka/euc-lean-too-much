@@ -10,6 +10,8 @@ class HighScoreManager {
 
     companion object {
         private const val KEY_HIGH_SCORE = "highScore"
+        private const val KEY_HIGH_SCORE_HARDCORE = "highScoreHardcore"
+        private const val KEY_HIGH_SCORE_NIGHT_HARDCORE = "highScoreNightHardcore"
         private const val KEY_MAX_DISTANCE = "maxDistance"
         private const val KEY_GAMES_PLAYED = "gamesPlayed"
         private const val KEY_MAX_NEAR_MISSES = "maxNearMisses"
@@ -17,11 +19,32 @@ class HighScoreManager {
         private const val KEY_CALIBRATION_Y = "calibrationY"
     }
 
+    // Endless mode high score
     var highScore: Int
         get() = prefs.getInteger(KEY_HIGH_SCORE, 0)
         set(value) {
             if (value > highScore) {
                 prefs.putInteger(KEY_HIGH_SCORE, value)
+                prefs.flush()
+            }
+        }
+
+    // Hardcore mode high score
+    var hardcoreHighScore: Int
+        get() = prefs.getInteger(KEY_HIGH_SCORE_HARDCORE, 0)
+        set(value) {
+            if (value > hardcoreHighScore) {
+                prefs.putInteger(KEY_HIGH_SCORE_HARDCORE, value)
+                prefs.flush()
+            }
+        }
+
+    // Night Hardcore mode high score
+    var nightHardcoreHighScore: Int
+        get() = prefs.getInteger(KEY_HIGH_SCORE_NIGHT_HARDCORE, 0)
+        set(value) {
+            if (value > nightHardcoreHighScore) {
+                prefs.putInteger(KEY_HIGH_SCORE_NIGHT_HARDCORE, value)
                 prefs.flush()
             }
         }
@@ -50,11 +73,34 @@ class HighScoreManager {
     private var hasDeferredFlush = false
 
     fun recordGame(session: GameSession): Boolean {
-        val isNewHighScore = session.score > highScore
-        // Batch all writes - defer flush to avoid collision-frame lag
-        if (session.score > prefs.getInteger(KEY_HIGH_SCORE, 0)) {
-            prefs.putInteger(KEY_HIGH_SCORE, session.score)
+        // Determine which high score to compare against based on game mode
+        val currentHighScore = when {
+            session.isNightHardcoreMode -> prefs.getInteger(KEY_HIGH_SCORE_NIGHT_HARDCORE, 0)
+            session.isHardcoreMode -> prefs.getInteger(KEY_HIGH_SCORE_HARDCORE, 0)
+            else -> prefs.getInteger(KEY_HIGH_SCORE, 0)
         }
+        val isNewHighScore = session.score > currentHighScore
+
+        // Batch all writes - defer flush to avoid collision-frame lag
+        // Save to the appropriate high score based on mode
+        when {
+            session.isNightHardcoreMode -> {
+                if (session.score > prefs.getInteger(KEY_HIGH_SCORE_NIGHT_HARDCORE, 0)) {
+                    prefs.putInteger(KEY_HIGH_SCORE_NIGHT_HARDCORE, session.score)
+                }
+            }
+            session.isHardcoreMode -> {
+                if (session.score > prefs.getInteger(KEY_HIGH_SCORE_HARDCORE, 0)) {
+                    prefs.putInteger(KEY_HIGH_SCORE_HARDCORE, session.score)
+                }
+            }
+            else -> {
+                if (session.score > prefs.getInteger(KEY_HIGH_SCORE, 0)) {
+                    prefs.putInteger(KEY_HIGH_SCORE, session.score)
+                }
+            }
+        }
+
         if (session.distanceTraveled > prefs.getFloat(KEY_MAX_DISTANCE, 0f)) {
             prefs.putFloat(KEY_MAX_DISTANCE, session.distanceTraveled)
         }

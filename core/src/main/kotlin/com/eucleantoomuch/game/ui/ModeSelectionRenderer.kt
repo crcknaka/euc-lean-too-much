@@ -4,25 +4,30 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
+import com.eucleantoomuch.game.state.HighScoreManager
 
 /**
  * Game mode selection screen.
- * Allows player to choose between Endless and Time Trial modes.
+ * Allows player to choose between Endless, Time Trial, Hardcore, and Night Hardcore modes.
  */
-class ModeSelectionRenderer : Disposable {
+class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Disposable {
     private val ui = UIRenderer()
 
     private val endlessButton = Rectangle()
     private val timeTrialButton = Rectangle()
+    private val hardcoreButton = Rectangle()
+    private val nightHardcoreButton = Rectangle()
     private val backButton = Rectangle()
 
     private var endlessHover = 0f
     private var timeTrialHover = 0f
+    private var hardcoreHover = 0f
+    private var nightHardcoreHover = 0f
     private var backHover = 0f
     private var enterAnimProgress = 0f
 
     enum class Action {
-        NONE, ENDLESS, TIME_TRIAL, BACK
+        NONE, ENDLESS, TIME_TRIAL, HARDCORE, NIGHT_HARDCORE, BACK
     }
 
     fun render(): Action {
@@ -41,10 +46,14 @@ class ModeSelectionRenderer : Disposable {
 
         val endlessHovered = endlessButton.contains(touchX, touchY)
         val timeTrialHovered = timeTrialButton.contains(touchX, touchY)
+        val hardcoreHovered = hardcoreButton.contains(touchX, touchY)
+        val nightHardcoreHovered = nightHardcoreButton.contains(touchX, touchY)
         val backHovered = backButton.contains(touchX, touchY)
 
         endlessHover = UITheme.Anim.ease(endlessHover, if (endlessHovered) 1f else 0f, 10f)
         timeTrialHover = UITheme.Anim.ease(timeTrialHover, if (timeTrialHovered) 1f else 0f, 10f)
+        hardcoreHover = UITheme.Anim.ease(hardcoreHover, if (hardcoreHovered) 1f else 0f, 10f)
+        nightHardcoreHover = UITheme.Anim.ease(nightHardcoreHover, if (nightHardcoreHovered) 1f else 0f, 10f)
         backHover = UITheme.Anim.ease(backHover, if (backHovered) 1f else 0f, 10f)
 
         // Draw background
@@ -52,7 +61,7 @@ class ModeSelectionRenderer : Disposable {
         ui.gradientBackground()
 
         // Panel
-        val panelMargin = 60f * scale
+        val panelMargin = 40f * scale
         val panelWidth = (sw - panelMargin * 2) * enterAnimProgress
         val panelHeight = (sh - panelMargin * 2) * enterAnimProgress
         val panelX = centerX - panelWidth / 2
@@ -65,21 +74,30 @@ class ModeSelectionRenderer : Disposable {
         // Title Y position
         val titleY = panelY + panelHeight - 60f * scale
 
-        // Two large buttons side by side
-        val buttonWidth = 320f * scale
-        val buttonHeight = 200f * scale
-        val buttonGap = 40f * scale
-        val totalWidth = buttonWidth * 2 + buttonGap
+        // 4 buttons in 1 row - wider and taller cards
+        val buttonWidth = 300f * scale
+        val buttonHeight = 400f * scale
+        val buttonGap = 28f * scale
+        val totalWidth = buttonWidth * 4 + buttonGap * 3
         val buttonsStartX = centerX - totalWidth / 2
-        val buttonsY = panelY + panelHeight / 2 - buttonHeight / 2
+        val buttonsY = panelY + (panelHeight - buttonHeight) / 2 - 10f * scale
 
-        // ENDLESS button (left)
+        // ENDLESS button
         endlessButton.set(buttonsStartX, buttonsY, buttonWidth, buttonHeight)
         ui.neonButton(endlessButton, UITheme.accent, UITheme.accent, 0.3f + endlessHover * 0.5f)
 
-        // TIME TRIAL button (right)
+        // TIME TRIAL button
         timeTrialButton.set(buttonsStartX + buttonWidth + buttonGap, buttonsY, buttonWidth, buttonHeight)
         ui.neonButton(timeTrialButton, UITheme.secondary, UITheme.secondary, 0.3f + timeTrialHover * 0.5f)
+
+        // HARDCORE button
+        hardcoreButton.set(buttonsStartX + (buttonWidth + buttonGap) * 2, buttonsY, buttonWidth, buttonHeight)
+        ui.neonButton(hardcoreButton, UITheme.danger, UITheme.danger, 0.3f + hardcoreHover * 0.5f)
+
+        // NIGHT HARDCORE button - dark purple color for night theme
+        val nightPurple = com.badlogic.gdx.graphics.Color(0.4f, 0.1f, 0.6f, 1f)
+        nightHardcoreButton.set(buttonsStartX + (buttonWidth + buttonGap) * 3, buttonsY, buttonWidth, buttonHeight)
+        ui.neonButton(nightHardcoreButton, nightPurple, nightPurple, 0.3f + nightHardcoreHover * 0.5f)
 
         // Back button at bottom
         val backWidth = 140f * scale
@@ -95,16 +113,66 @@ class ModeSelectionRenderer : Disposable {
         ui.textCentered("SELECT MODE", centerX, titleY, UIFonts.title, UITheme.textPrimary)
 
         // Endless button text
-        ui.textCentered("ENDLESS", endlessButton.x + endlessButton.width / 2,
-            endlessButton.y + endlessButton.height / 2 + 20f * scale, UIFonts.heading, UITheme.textPrimary)
-        ui.textCentered("Ride until you crash", endlessButton.x + endlessButton.width / 2,
-            endlessButton.y + endlessButton.height / 2 - 25f * scale, UIFonts.caption, UITheme.textSecondary)
+        val endlessCenterX = endlessButton.x + endlessButton.width / 2
+        ui.textCentered("ENDLESS", endlessCenterX,
+            endlessButton.y + endlessButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+        ui.textCentered("Ride until", endlessCenterX,
+            endlessButton.y + endlessButton.height / 2 + 20f * scale, UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered("you crash", endlessCenterX,
+            endlessButton.y + endlessButton.height / 2 - 10f * scale, UIFonts.caption, UITheme.textSecondary)
+        // Endless high score
+        val endlessHighScore = highScoreManager.highScore
+        val blackColor = com.badlogic.gdx.graphics.Color.BLACK
+        if (endlessHighScore > 0) {
+            ui.textCentered("BEST: $endlessHighScore", endlessCenterX,
+                endlessButton.y + 60f * scale, UIFonts.body, blackColor)
+        }
 
         // Time Trial button text
-        ui.textCentered("TIME TRIAL", timeTrialButton.x + timeTrialButton.width / 2,
-            timeTrialButton.y + timeTrialButton.height / 2 + 20f * scale, UIFonts.heading, UITheme.textPrimary)
-        ui.textCentered("Beat the clock", timeTrialButton.x + timeTrialButton.width / 2,
-            timeTrialButton.y + timeTrialButton.height / 2 - 25f * scale, UIFonts.caption, UITheme.textSecondary)
+        val timeTrialCenterX = timeTrialButton.x + timeTrialButton.width / 2
+        ui.textCentered("TIME", timeTrialCenterX,
+            timeTrialButton.y + timeTrialButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+        ui.textCentered("TRIAL", timeTrialCenterX,
+            timeTrialButton.y + timeTrialButton.height - 105f * scale, UIFonts.heading, UITheme.textPrimary)
+        ui.textCentered("Beat the clock", timeTrialCenterX,
+            timeTrialButton.y + timeTrialButton.height / 2 - 5f * scale, UIFonts.caption, UITheme.textSecondary)
+
+        // Hardcore button text
+        val hardcoreCenterX = hardcoreButton.x + hardcoreButton.width / 2
+        ui.textCentered("HARDCORE", hardcoreCenterX,
+            hardcoreButton.y + hardcoreButton.height - 60f * scale, UIFonts.heading, UITheme.textPrimary)
+        ui.textCentered("Survive", hardcoreCenterX,
+            hardcoreButton.y + hardcoreButton.height / 2 + 30f * scale, UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered("the chaos", hardcoreCenterX,
+            hardcoreButton.y + hardcoreButton.height / 2 + 5f * scale, UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered("2x VOLTS!", hardcoreCenterX,
+            hardcoreButton.y + hardcoreButton.height / 2 - 35f * scale, UIFonts.body, UITheme.warning)
+        // Hardcore high score
+        val hardcoreHighScore = highScoreManager.hardcoreHighScore
+        if (hardcoreHighScore > 0) {
+            ui.textCentered("BEST: $hardcoreHighScore", hardcoreCenterX,
+                hardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
+        }
+
+        // Night Hardcore button text
+        val nightPurpleText = com.badlogic.gdx.graphics.Color(0.7f, 0.5f, 1f, 1f)
+        val nightHardcoreCenterX = nightHardcoreButton.x + nightHardcoreButton.width / 2
+        ui.textCentered("NIGHT", nightHardcoreCenterX,
+            nightHardcoreButton.y + nightHardcoreButton.height - 60f * scale, UIFonts.heading, nightPurpleText)
+        ui.textCentered("HARDCORE", nightHardcoreCenterX,
+            nightHardcoreButton.y + nightHardcoreButton.height - 105f * scale, UIFonts.heading, UITheme.textPrimary)
+        ui.textCentered("Flickering lights", nightHardcoreCenterX,
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 + 20f * scale, UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered("pure darkness", nightHardcoreCenterX,
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 5f * scale, UIFonts.caption, UITheme.textSecondary)
+        ui.textCentered("2.5x VOLTS!", nightHardcoreCenterX,
+            nightHardcoreButton.y + nightHardcoreButton.height / 2 - 45f * scale, UIFonts.body, UITheme.warning)
+        // Night Hardcore high score
+        val nightHardcoreHighScore = highScoreManager.nightHardcoreHighScore
+        if (nightHardcoreHighScore > 0) {
+            ui.textCentered("BEST: $nightHardcoreHighScore", nightHardcoreCenterX,
+                nightHardcoreButton.y + 60f * scale, UIFonts.body, blackColor)
+        }
 
         // Back button text
         ui.textCentered("BACK", backButton.x + backButton.width / 2,
@@ -123,6 +191,14 @@ class ModeSelectionRenderer : Disposable {
                     UIFeedback.clickHeavy()
                     return Action.TIME_TRIAL
                 }
+                hardcoreButton.contains(touchX, touchY) -> {
+                    UIFeedback.clickHeavy()
+                    return Action.HARDCORE
+                }
+                nightHardcoreButton.contains(touchX, touchY) -> {
+                    UIFeedback.clickHeavy()
+                    return Action.NIGHT_HARDCORE
+                }
                 backButton.contains(touchX, touchY) -> {
                     UIFeedback.click()
                     return Action.BACK
@@ -139,6 +215,14 @@ class ModeSelectionRenderer : Disposable {
             Gdx.input.isKeyJustPressed(Input.Keys.NUM_2) || Gdx.input.isKeyJustPressed(Input.Keys.T) -> {
                 UIFeedback.clickHeavy()
                 return Action.TIME_TRIAL
+            }
+            Gdx.input.isKeyJustPressed(Input.Keys.NUM_3) || Gdx.input.isKeyJustPressed(Input.Keys.H) -> {
+                UIFeedback.clickHeavy()
+                return Action.HARDCORE
+            }
+            Gdx.input.isKeyJustPressed(Input.Keys.NUM_4) || Gdx.input.isKeyJustPressed(Input.Keys.N) -> {
+                UIFeedback.clickHeavy()
+                return Action.NIGHT_HARDCORE
             }
             Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.BACK) -> {
                 UIFeedback.click()

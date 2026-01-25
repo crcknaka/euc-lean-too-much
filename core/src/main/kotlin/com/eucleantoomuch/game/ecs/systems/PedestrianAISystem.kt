@@ -80,7 +80,8 @@ class PedestrianAISystem : IteratingSystem(Families.pedestrians, 3) {
 
             PedestrianState.CROSSING -> {
                 // Check if pedestrian has reached the other side of the road
-                val sidewalkEdge = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH * 0.5f
+                // Use pedestrian's own bounds which reflect the effective road/sidewalk width
+                val sidewalkEdge = pedestrian.maxX * 0.5f  // Half of total crossing distance
                 val reachedOtherSide = if (pedestrian.crossingDirectionX > 0) {
                     transform.position.x >= sidewalkEdge
                 } else {

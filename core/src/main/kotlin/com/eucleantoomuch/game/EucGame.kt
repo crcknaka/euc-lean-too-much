@@ -97,6 +97,8 @@ class EucGame(
     private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
     private var timeTrialResult: GameOverRenderer.TimeTrialResult? = null
+    private var pendingHardcoreMode = false  // Flag to start hardcore mode after wheel selection
+    private var pendingNightHardcoreMode = false  // Flag to start night hardcore mode after wheel selection
 
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
@@ -260,6 +262,7 @@ class EucGame(
         engine.addSystem(ArmAnimationSystem())
         engine.addSystem(HeadAnimationSystem())
         engine.addSystem(PowerupAnimationSystem())
+        engine.addSystem(LampFlickerSystem())
         engine.addSystem(collisionSystem)
         engine.addSystem(cullingSystem)
 
@@ -272,7 +275,7 @@ class EucGame(
         settingsRenderer = SettingsRenderer(settingsManager)
         creditsRenderer = CreditsRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
-        modeSelectionRenderer = ModeSelectionRenderer()
+        modeSelectionRenderer = ModeSelectionRenderer(highScoreManager)
         timeTrialLevelRenderer = TimeTrialLevelRenderer(timeTrialManager)
 
         // Initialize debug menu (admin tools)
@@ -566,10 +569,26 @@ class EucGame(
         when (modeSelectionRenderer.render()) {
             ModeSelectionRenderer.Action.ENDLESS -> {
                 timeTrialManager.clearSelection()
+                pendingHardcoreMode = false
+                pendingNightHardcoreMode = false
                 stateManager.transition(GameState.WheelSelection)
             }
             ModeSelectionRenderer.Action.TIME_TRIAL -> {
+                pendingHardcoreMode = false
+                pendingNightHardcoreMode = false
                 stateManager.transition(GameState.TimeTrialLevelSelection)
+            }
+            ModeSelectionRenderer.Action.HARDCORE -> {
+                timeTrialManager.clearSelection()
+                pendingHardcoreMode = true
+                pendingNightHardcoreMode = false
+                stateManager.transition(GameState.WheelSelection)
+            }
+            ModeSelectionRenderer.Action.NIGHT_HARDCORE -> {
+                timeTrialManager.clearSelection()
+                pendingHardcoreMode = false
+                pendingNightHardcoreMode = true
+                stateManager.transition(GameState.WheelSelection)
             }
             ModeSelectionRenderer.Action.BACK -> {
                 stateManager.transition(GameState.Menu)
@@ -791,6 +810,11 @@ class EucGame(
 
         if (playerTransform != null && eucComponent != null) {
             session.update(delta, eucComponent.speed)
+
+            // Update hardcore difficulty based on play time
+            if (session.isHardcoreMode) {
+                worldGenerator.setHardcoreMode(true, session.hardcoreDifficulty)
+            }
 
             // Update Volts system
             voltsManager.update(delta)
@@ -1040,9 +1064,22 @@ class EucGame(
         // Set time trial level if selected
         session.timeTrialLevel = timeTrialManager.selectedLevel
 
-        // Configure night mode based on level
-        renderer.setNightMode(session.isNightMode)
-        worldGenerator.setNightMode(session.isNightMode)
+        // Set hardcore/night hardcore mode if selected
+        session.isHardcoreMode = pendingHardcoreMode || pendingNightHardcoreMode
+        session.isNightHardcoreMode = pendingNightHardcoreMode
+
+        // Configure world generator for hardcore mode (night hardcore uses same mechanics)
+        val isAnyHardcore = pendingHardcoreMode || pendingNightHardcoreMode
+        worldGenerator.setHardcoreMode(isAnyHardcore, 0f)
+        voltsManager.setHardcoreMode(isAnyHardcore, pendingNightHardcoreMode)
+
+        // Configure night mode - night hardcore always uses night mode
+        val useNightMode = session.isEffectiveNightMode
+        renderer.setNightMode(useNightMode)
+        worldGenerator.setNightMode(useNightMode)
+
+        // Night hardcore: enable lamp flickering
+        worldGenerator.setLampFlickeringEnabled(pendingNightHardcoreMode)
 
         hud.reset()
         voltsManager.resetSession()
@@ -1099,6 +1136,10 @@ class EucGame(
         // Reset night mode to day
         renderer.setNightMode(false)
         worldGenerator.setNightMode(false)
+
+        // Reset hardcore mode and lamp flickering
+        worldGenerator.setHardcoreMode(false, 0f)
+        worldGenerator.setLampFlickeringEnabled(false)
     }
 
     // Temp vector for pedestrian ragdoll

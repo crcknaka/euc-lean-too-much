@@ -23,6 +23,20 @@ class WorldGenerator(
     var isNightMode = false
         private set
 
+    // Hardcore mode - time-based difficulty
+    var isHardcoreMode = false
+        private set
+
+    // Night hardcore lamp flickering
+    var isLampFlickeringEnabled = false
+        private set
+
+    // Effective road dimensions (narrower in hardcore mode)
+    var effectiveRoadWidth = Constants.ROAD_WIDTH
+        private set
+    var effectiveSidewalkWidth = Constants.SIDEWALK_WIDTH
+        private set
+
     private val difficultyScaler = DifficultyScaler()
     private val activeChunks = mutableMapOf<Int, MutableList<Entity>>()
 
@@ -325,6 +339,43 @@ class WorldGenerator(
         lampPostModel = ModelInstance(models.createLampPostModel(isNightMode))
     }
 
+    /**
+     * Set hardcore mode with time-based difficulty.
+     * Call this each frame with the current play time.
+     * In hardcore mode, road and sidewalk are narrower for increased difficulty.
+     */
+    fun setHardcoreMode(enabled: Boolean, timeDifficulty: Float = 0f) {
+        val wasHardcore = isHardcoreMode
+        isHardcoreMode = enabled
+        difficultyScaler.setHardcoreMode(enabled, timeDifficulty)
+
+        // Update effective dimensions when hardcore mode changes
+        if (wasHardcore != enabled) {
+            effectiveRoadWidth = if (enabled) Constants.HARDCORE_ROAD_WIDTH else Constants.ROAD_WIDTH
+            effectiveSidewalkWidth = if (enabled) Constants.HARDCORE_SIDEWALK_WIDTH else Constants.SIDEWALK_WIDTH
+
+            // Recreate ground models with new dimensions
+            groundModel = models.createGroundChunkModel(
+                Constants.CHUNK_LENGTH,
+                effectiveRoadWidth,
+                effectiveSidewalkWidth
+            )
+            grassModel = models.createGrassAreaModel(
+                Constants.CHUNK_LENGTH,
+                effectiveRoadWidth,
+                effectiveSidewalkWidth
+            )
+        }
+    }
+
+    /**
+     * Enable/disable lamp flickering for night hardcore mode.
+     * When enabled, lamp posts will randomly flicker on/off.
+     */
+    fun setLampFlickeringEnabled(enabled: Boolean) {
+        isLampFlickeringEnabled = enabled
+    }
+
     fun update(playerZ: Float, totalDistance: Float) {
         val behindDistance = 50f
         val startChunk = ((playerZ - behindDistance) / Constants.CHUNK_LENGTH).toInt()
@@ -385,6 +436,12 @@ class WorldGenerator(
         // Sidewalk pedestrians (not crossing, just walking around)
         entities.addAll(generateSidewalkPedestrians(chunkIndex, chunkStartZ))
 
+        // Jaywalking pedestrians (hardcore mode only - pedestrians crossing road randomly)
+        // Start from chunk 1 (after initial safe zone)
+        if (isHardcoreMode && chunkIndex >= 1) {
+            entities.addAll(generateJaywalkingPedestrians(chunkIndex, chunkStartZ, totalDistance))
+        }
+
         // Clouds in the sky
         entities.addAll(generateClouds(chunkIndex, chunkStartZ))
 
@@ -444,9 +501,9 @@ class WorldGenerator(
         val numPedestrians = MathUtils.random(minPedestrians, maxPedestrians)
 
         // Sidewalk center positions
-        val roadHalfWidth = Constants.ROAD_WIDTH / 2
-        val leftSidewalkX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
-        val rightSidewalkX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+        val roadHalfWidth = effectiveRoadWidth / 2
+        val leftSidewalkX = -roadHalfWidth - effectiveSidewalkWidth / 2
+        val rightSidewalkX = roadHalfWidth + effectiveSidewalkWidth / 2
 
         for (i in 0 until numPedestrians) {
             // Choose which side pedestrian starts from
@@ -551,8 +608,8 @@ class WorldGenerator(
             this.crossingDirectionX = crossingDirectionX
             walkSpeed = speed
             // Set bounds
-            minX = -Constants.ROAD_WIDTH / 2 - Constants.SIDEWALK_WIDTH
-            maxX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH
+            minX = -effectiveRoadWidth / 2 - effectiveSidewalkWidth
+            maxX = effectiveRoadWidth / 2 + effectiveSidewalkWidth
         })
 
         entity.add(GroundComponent().apply {
@@ -574,9 +631,9 @@ class WorldGenerator(
         val entities = mutableListOf<Entity>()
 
         // Sidewalk boundaries
-        val roadHalfWidth = Constants.ROAD_WIDTH / 2
-        val sidewalkLeftX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
-        val sidewalkRightX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+        val roadHalfWidth = effectiveRoadWidth / 2
+        val sidewalkLeftX = -roadHalfWidth - effectiveSidewalkWidth / 2
+        val sidewalkRightX = roadHalfWidth + effectiveSidewalkWidth / 2
 
         // 0-2 pedestrians per chunk on each side (reduced)
         val numPedestriansPerSide = MathUtils.random(0, 2)
@@ -713,6 +770,105 @@ class WorldGenerator(
         entities.add(entity2)
 
         return entities
+    }
+
+    /**
+     * Generate jaywalking pedestrians - pedestrians crossing the road at random locations.
+     * Only active in hardcore mode. Creates dangerous situations where pedestrians
+     * suddenly walk onto the road from the sidewalk.
+     */
+    private fun generateJaywalkingPedestrians(chunkIndex: Int, chunkStartZ: Float, totalDistance: Float): List<Entity> {
+        val entities = mutableListOf<Entity>()
+
+        val jaywalkProb = difficultyScaler.getJaywalkingProbability(totalDistance)
+        if (jaywalkProb <= 0f) return entities
+
+        // 2-5 jaywalkers per chunk based on probability (hardcore is dangerous!)
+        val numJaywalkers = if (MathUtils.random() < jaywalkProb) {
+            MathUtils.random(2, 5)
+        } else {
+            0
+        }
+
+        val roadHalfWidth = effectiveRoadWidth / 2
+        val sidewalkLeftX = -roadHalfWidth - effectiveSidewalkWidth / 2
+        val sidewalkRightX = roadHalfWidth + effectiveSidewalkWidth / 2
+
+        for (i in 0 until numJaywalkers) {
+            // Random Z position in chunk
+            val z = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+
+            // Choose which side to start from
+            val fromLeft = MathUtils.randomBoolean()
+            val startX = if (fromLeft) sidewalkLeftX else sidewalkRightX
+            val crossingDirection = if (fromLeft) 1f else -1f
+
+            entities.add(createJaywalkingPedestrianEntity(startX, z, chunkIndex, crossingDirection, totalDistance))
+        }
+
+        return entities
+    }
+
+    private fun createJaywalkingPedestrianEntity(
+        x: Float,
+        z: Float,
+        chunkIndex: Int,
+        crossingDirectionX: Float,
+        totalDistance: Float
+    ): Entity {
+        val entity = engine.createEntity()
+
+        // Face the direction of crossing
+        val initialYaw = if (crossingDirectionX > 0) -90f else 90f
+
+        entity.add(TransformComponent().apply {
+            position.set(x, 0.01f, z)
+            yaw = initialYaw
+            updateRotationFromYaw()
+        })
+
+        entity.add(ModelComponent().apply {
+            modelInstance = ModelInstance(pedestrianModels.random())
+        })
+
+        entity.add(ColliderComponent().apply {
+            setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
+            collisionGroup = CollisionGroups.OBSTACLE
+        })
+
+        entity.add(ObstacleComponent().apply {
+            type = ObstacleType.PEDESTRIAN
+            causesGameOver = true
+        })
+
+        // Jaywalkers are unpredictable - varying speeds
+        val speed = difficultyScaler.getPedestrianSpeed(totalDistance) * MathUtils.random(0.8f, 1.4f)
+        entity.add(VelocityComponent())
+
+        entity.add(PedestrianComponent().apply {
+            isSidewalkPedestrian = false
+            state = PedestrianState.CROSSING  // Immediately crossing, no waiting
+            this.crossingDirectionX = crossingDirectionX
+            walkSpeed = speed
+            // Set bounds to cross entire road
+            minX = -effectiveRoadWidth / 2 - effectiveSidewalkWidth
+            maxX = effectiveRoadWidth / 2 + effectiveSidewalkWidth
+            // Random target Z (they just keep walking across)
+            targetCrossingZ = z
+        })
+
+        entity.add(GroundComponent().apply {
+            type = GroundType.ROAD
+            this.chunkIndex = chunkIndex
+        })
+
+        entity.add(ShadowComponent().apply {
+            shadowInstance = ModelInstance(pedestrianShadowModel)
+            scale = 1f
+        })
+
+        engine.addEntity(entity)
+        return entity
     }
 
     private fun createGroundEntity(chunkIndex: Int, startZ: Float): Entity {
@@ -931,13 +1087,12 @@ class WorldGenerator(
         val entities = mutableListOf<Entity>()
 
         // Grass zone: from sidewalk edge to building edge
-        // Road edge: ROAD_WIDTH/2 = 4f
-        // Sidewalk edge: ROAD_WIDTH/2 + SIDEWALK_WIDTH = 4 + 3 = 7f
+        // Road edge: roadWidth/2
+        // Sidewalk edge: roadWidth/2 + sidewalkWidth
         // Buildings at: BUILDING_OFFSET_X = 14f (but can be offset by -2 to +3)
-        // Minimum building X = 14 - 2 = 12f, near edge = 12 - 3 = 9f
-        // Grass area: from 7.5f to 8.5f (safe zone that never overlaps with buildings)
-        val grassStartX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 0.5f  // 0.5m into grass (at 7.5f)
-        val grassEndX = Constants.ROAD_WIDTH / 2 + Constants.SIDEWALK_WIDTH + 1.5f    // 1.5m into grass (at 8.5f)
+        // Grass area: safe zone that never overlaps with buildings
+        val grassStartX = effectiveRoadWidth / 2 + effectiveSidewalkWidth + 0.5f  // 0.5m into grass
+        val grassEndX = effectiveRoadWidth / 2 + effectiveSidewalkWidth + 1.5f    // 1.5m into grass
 
         var z = chunkStartZ + 2f
         while (z < chunkStartZ + Constants.CHUNK_LENGTH - 2f) {
@@ -968,7 +1123,7 @@ class WorldGenerator(
         if (lampPattern > 0) {
             z = chunkStartZ + 5f
             while (z < chunkStartZ + Constants.CHUNK_LENGTH - 5f) {
-                val lampOffsetX = Constants.ROAD_WIDTH / 2 + 0.5f  // Just 0.5m from road edge, on sidewalk
+                val lampOffsetX = effectiveRoadWidth / 2 + 0.5f  // Just 0.5m from road edge, on sidewalk
 
                 // Left side lamp
                 if (lampPattern == 1 || lampPattern == 3) {
@@ -1095,9 +1250,9 @@ class WorldGenerator(
         if (MathUtils.random() > 0.4f) return entities
 
         // Sidewalk positions
-        val roadHalfWidth = Constants.ROAD_WIDTH / 2
-        val sidewalkLeftX = -roadHalfWidth - Constants.SIDEWALK_WIDTH / 2
-        val sidewalkRightX = roadHalfWidth + Constants.SIDEWALK_WIDTH / 2
+        val roadHalfWidth = effectiveRoadWidth / 2
+        val sidewalkLeftX = -roadHalfWidth - effectiveSidewalkWidth / 2
+        val sidewalkRightX = roadHalfWidth + effectiveSidewalkWidth / 2
 
         // Choose a side for the flock
         val isLeftSide = MathUtils.randomBoolean()
@@ -1487,6 +1642,17 @@ class WorldGenerator(
             scale = 1.2f
         })
 
+        // Add flickering component for night hardcore mode
+        if (isLampFlickeringEnabled) {
+            entity.add(FlickeringLampComponent().apply {
+                // Random initial state - some lamps start flickering, some off
+                isLit = MathUtils.random() > 0.15f  // 15% start off
+                isActivelyFlickering = MathUtils.random() < 0.3f  // 30% actively flicker
+                flickerTimer = MathUtils.random(0.5f, 3f)  // Random time until first change
+                flickerSpeed = MathUtils.random(0.8f, 1.5f)  // Vary flicker speed
+            })
+        }
+
         engine.addEntity(entity)
         return entity
     }
@@ -1549,7 +1715,7 @@ class WorldGenerator(
 
     private fun getRandomLaneX(): Float {
         // Random position on road or sidewalk
-        return MathUtils.random(-Constants.ROAD_WIDTH / 2 + 0.5f, Constants.ROAD_WIDTH / 2 - 0.5f)
+        return MathUtils.random(-effectiveRoadWidth / 2 + 0.5f, effectiveRoadWidth / 2 - 0.5f)
     }
 
     private fun createManholeEntity(x: Float, z: Float): Entity {
@@ -1636,7 +1802,7 @@ class WorldGenerator(
 
         // Place curb at edge of road
         val side = if (MathUtils.randomBoolean()) -1 else 1
-        val x = side * (Constants.ROAD_WIDTH / 2 - 0.1f)
+        val x = side * (effectiveRoadWidth / 2 - 0.1f)
 
         // Center the curb at z position (so it extends forward and backward)
         entity.add(TransformComponent().apply { position.set(x, 0f, z + length / 2f) })
@@ -1659,7 +1825,7 @@ class WorldGenerator(
 
         // Start pedestrian at edge of road, walking across
         val startSide = if (MathUtils.randomBoolean()) -1 else 1
-        val x = startSide * (Constants.ROAD_WIDTH / 2 + 1f)
+        val x = startSide * (effectiveRoadWidth / 2 + 1f)
 
         entity.add(TransformComponent().apply { position.set(x, 0f, z) })
         entity.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
@@ -1675,8 +1841,8 @@ class WorldGenerator(
         entity.add(PedestrianComponent().apply {
             walkSpeed = difficultyScaler.getPedestrianSpeed(totalDistance)
             direction.set(-startSide.toFloat(), 0f, 0f)  // Walk towards opposite side
-            minX = -Constants.ROAD_WIDTH / 2 - 2f
-            maxX = Constants.ROAD_WIDTH / 2 + 2f
+            minX = -effectiveRoadWidth / 2 - 2f
+            maxX = effectiveRoadWidth / 2 + 2f
         })
 
         // Add shadow for pedestrian
@@ -1805,7 +1971,7 @@ class WorldGenerator(
             lastPowerupChunk = chunkIndex
 
             // Random position on road
-            val x = MathUtils.random(-Constants.ROAD_WIDTH / 2 + 1f, Constants.ROAD_WIDTH / 2 - 1f)
+            val x = MathUtils.random(-effectiveRoadWidth / 2 + 1f, effectiveRoadWidth / 2 - 1f)
             val z = chunkStartZ + MathUtils.random(5f, Constants.CHUNK_LENGTH - 5f)
 
             entities.add(createPowerupEntity(x, z, chunkIndex))
@@ -1850,23 +2016,33 @@ class WorldGenerator(
     /**
      * Generate Volts pickups in this chunk.
      * Volts appear more frequently than battery pickups but give currency instead of charge.
+     * In hardcore mode, volts spawn more frequently as reward for extra difficulty.
      */
     private fun generateVoltsPickups(chunkIndex: Int, chunkStartZ: Float): List<Entity> {
         val entities = mutableListOf<Entity>()
 
-        // Volts appear every 2-4 chunks
+        // In hardcore mode, volts appear every 1-2 chunks; normal mode every 2-4 chunks
+        val minChunks = if (isHardcoreMode) 1 else 2
         val chunksSinceLastVolts = chunkIndex - lastVoltsChunk
-        if (chunksSinceLastVolts < 2) return entities
+        if (chunksSinceLastVolts < minChunks) return entities
 
-        // 50% chance if enough chunks have passed
-        if (MathUtils.random() < 0.5f) {
+        // Hardcore: 70% chance, Normal: 50% chance
+        val spawnChance = if (isHardcoreMode) 0.7f else 0.5f
+        if (MathUtils.random() < spawnChance) {
             lastVoltsChunk = chunkIndex
 
             // Random position on road
-            val x = MathUtils.random(-Constants.ROAD_WIDTH / 2 + 1f, Constants.ROAD_WIDTH / 2 - 1f)
+            val x = MathUtils.random(-effectiveRoadWidth / 2 + 1f, effectiveRoadWidth / 2 - 1f)
             val z = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
 
             entities.add(createVoltsEntity(x, z, chunkIndex))
+
+            // In hardcore, sometimes spawn a second volt pickup
+            if (isHardcoreMode && MathUtils.random() < 0.3f) {
+                val x2 = MathUtils.random(-effectiveRoadWidth / 2 + 1f, effectiveRoadWidth / 2 - 1f)
+                val z2 = chunkStartZ + MathUtils.random(10f, Constants.CHUNK_LENGTH - 10f)
+                entities.add(createVoltsEntity(x2, z2, chunkIndex))
+            }
         }
 
         return entities

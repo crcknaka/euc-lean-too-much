@@ -58,9 +58,12 @@ class VoltsManager {
     // Manhole survival tracking (starts true = no pending reward until manhole is hit)
     private var inManholeSurvived: Boolean = true
 
-    // Current multiplier (from streaks)
-    val currentMultiplier: Int
-        get() = if (nearMissStreakCount >= STREAK_THRESHOLD) STREAK_MULTIPLIER else 1
+    // Hardcore mode multiplier (2x in hardcore, 2.5x in night hardcore)
+    var hardcoreMultiplier: Float = 1f
+
+    // Current multiplier (from streaks, combines with hardcore multiplier)
+    val currentMultiplier: Float
+        get() = (if (nearMissStreakCount >= STREAK_THRESHOLD) STREAK_MULTIPLIER.toFloat() else 1f) * hardcoreMultiplier
 
     /**
      * Award volts for a near miss (pedestrian or car).
@@ -73,7 +76,7 @@ class VoltsManager {
         nearMissStreakCount++
         nearMissStreakTimer = nearMissStreakWindow
 
-        val amount = baseAmount * currentMultiplier
+        val amount = (baseAmount * currentMultiplier).toInt()
         addSessionVolts(amount)
         return amount
     }
@@ -84,8 +87,9 @@ class VoltsManager {
     fun awardManholeSurvival(): Int {
         if (!inManholeSurvived) {
             inManholeSurvived = true
-            addSessionVolts(SURVIVE_MANHOLE)
-            return SURVIVE_MANHOLE
+            val amount = (SURVIVE_MANHOLE * hardcoreMultiplier).toInt()
+            addSessionVolts(amount)
+            return amount
         }
         return 0
     }
@@ -106,8 +110,9 @@ class VoltsManager {
             pwmRiskTimer += deltaTime
             if (pwmRiskTimer >= PWM_RISK_DURATION && !pwmRiskRewarded) {
                 pwmRiskRewarded = true
-                addSessionVolts(PWM_RISK_5SEC)
-                return PWM_RISK_5SEC
+                val amount = (PWM_RISK_5SEC * hardcoreMultiplier).toInt()
+                addSessionVolts(amount)
+                return amount
             }
         } else {
             // Reset timer when PWM drops below threshold
@@ -121,23 +126,25 @@ class VoltsManager {
      * Award volts for beating high score.
      */
     fun awardHighScoreBeaten(): Int {
-        addSessionVolts(BEAT_HIGH_SCORE)
-        return BEAT_HIGH_SCORE
+        val amount = (BEAT_HIGH_SCORE * hardcoreMultiplier).toInt()
+        addSessionVolts(amount)
+        return amount
     }
 
     /**
      * Award volts for startling a pigeon flock.
      */
     fun awardPigeonStartle(): Int {
-        addSessionVolts(STARTLE_PIGEONS)
-        return STARTLE_PIGEONS
+        val amount = (STARTLE_PIGEONS * hardcoreMultiplier).toInt()
+        addSessionVolts(amount)
+        return amount
     }
 
     /**
      * Award volts for collecting a Volts pickup in the world.
      */
     fun awardPickup(): Int {
-        val amount = VOLTS_PICKUP * currentMultiplier
+        val amount = (VOLTS_PICKUP * currentMultiplier).toInt()
         addSessionVolts(amount)
         return amount
     }
@@ -187,6 +194,19 @@ class VoltsManager {
         pwmRiskTimer = 0f
         pwmRiskRewarded = false
         inManholeSurvived = true  // No pending reward until manhole is actually hit
+        hardcoreMultiplier = 1f  // Reset hardcore multiplier
+    }
+
+    /**
+     * Set hardcore mode multiplier.
+     * Normal mode: 1x, Hardcore: 2x, Night Hardcore: 2.5x
+     */
+    fun setHardcoreMode(enabled: Boolean, isNightHardcore: Boolean = false) {
+        hardcoreMultiplier = when {
+            isNightHardcore -> 2.5f
+            enabled -> 2f
+            else -> 1f
+        }
     }
 
     private fun addSessionVolts(amount: Int) {

@@ -108,8 +108,8 @@ class GameOverRenderer : Disposable {
         // Left side: Title, safety tip, stats
         // Right side: Buttons
 
-        val panelWidth = (sw * 0.85f).coerceAtMost(1100f * scale) * panelScale
-        val panelHeight = (sh * 0.75f).coerceAtMost(500f * scale) * panelScale
+        val panelWidth = (sw * 0.9f).coerceAtMost(1250f * scale) * panelScale
+        val panelHeight = (sh * 0.8f).coerceAtMost(600f * scale) * panelScale
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2
 

@@ -163,6 +163,9 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         if (session.isTimeTrial) {
             // Time Trial: Show timer and progress
             drawTimeTrialBadge(session)
+        } else if (session.isHardcoreMode) {
+            // Hardcore mode: Show score and difficulty level
+            drawHardcoreBadge(session)
         } else {
             // Endless mode: Show score
             val scoreBadgeWidth = 180f * scale
@@ -201,7 +204,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.beginBatch()
 
         // Score or Time Trial info - centered in badge
-        if (!session.isTimeTrial) {
+        if (!session.isTimeTrial && !session.isHardcoreMode) {
             val scoreBadgeHeight = 70f * scale
             val scoreBadgeY = sh - scoreBadgeHeight - 20f * scale
             val scoreY = scoreBadgeY + scoreBadgeHeight / 2
@@ -211,6 +214,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             UIFonts.heading.data.setScale(originalScale)
         }
         // Time Trial text is handled in drawTimeTrialBadge
+        // Hardcore text is handled in drawHardcoreBadge
 
         // Warnings - positioned lower to not obstruct view
         val warningBaseY = sh * 0.22f  // Lower on screen (22% from bottom)
@@ -884,6 +888,89 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val distText = "${session.distanceTraveled.toInt()}m / ${level.targetDistance.toInt()}m"
             ui.textCentered(distText, sw / 2, badgeY + 35f * scale, UIFonts.caption, UITheme.textSecondary)
         }
+
+        ui.endBatch()
+        ui.beginShapes()
+    }
+
+    /**
+     * Draw the Hardcore mode badge - shows score and difficulty level.
+     * Night hardcore mode shows purple theme and 2.5x multiplier.
+     */
+    private fun drawHardcoreBadge(session: GameSession) {
+        val scale = UITheme.Dimensions.scale()
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+
+        val isNightHardcore = session.isNightHardcoreMode
+        val badgeWidth = if (isNightHardcore) 240f * scale else 220f * scale
+        val badgeHeight = 80f * scale
+        val badgeY = sh - badgeHeight - 15f * scale
+        val badgeX = sw / 2 - badgeWidth / 2
+
+        val difficultyLevel = session.hardcoreDifficultyLevel + 1  // 1-based display
+        val playTime = session.playTimeSeconds
+
+        // Night hardcore uses purple color scheme
+        val nightPurple = Color(0.6f, 0.3f, 0.9f, 1f)
+        val nightPurpleDark = Color(0.4f, 0.1f, 0.6f, 1f)
+
+        // Color based on difficulty - night hardcore uses purple, regular uses red/orange
+        val dangerColor = if (isNightHardcore) {
+            when {
+                difficultyLevel >= 8 -> nightPurple
+                difficultyLevel >= 5 -> Color(0.5f, 0.2f, 0.8f, 1f)
+                else -> nightPurpleDark
+            }
+        } else {
+            when {
+                difficultyLevel >= 8 -> UITheme.danger
+                difficultyLevel >= 5 -> UITheme.warning
+                else -> UITheme.secondary
+            }
+        }
+
+        // Pulsing glow that intensifies with difficulty
+        val glowIntensity = 0.2f + (difficultyLevel / 10f) * 0.5f
+        val pulseIntensity = UITheme.Anim.pulse(4f + difficultyLevel.toFloat(), glowIntensity * 0.5f, glowIntensity)
+
+        ui.neonGlow(badgeX, badgeY, badgeWidth, badgeHeight,
+            16f * scale, dangerColor, pulseIntensity, 3)
+        ui.glassPanel(badgeX, badgeY, badgeWidth, badgeHeight,
+            radius = 16f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.8f))
+
+        // Difficulty progress bar at bottom
+        val barMargin = 14f * scale
+        val barHeight = 6f * scale
+        val barWidth = badgeWidth - barMargin * 2
+        val barX = badgeX + barMargin
+        val barY = badgeY + barMargin
+
+        // Progress within current difficulty level (night hardcore: 8 seconds, regular: 10 seconds)
+        val levelDuration = if (isNightHardcore) 8f else 10f
+        val levelProgress = (playTime % levelDuration) / levelDuration
+        ui.neonBar(barX, barY, barWidth, barHeight, levelProgress,
+            backgroundColor = UITheme.withAlpha(UITheme.surfaceLight, 0.6f),
+            fillColor = dangerColor,
+            glowIntensity = 0.3f)
+
+        // Text content
+        ui.endShapes()
+        ui.beginBatch()
+
+        // Label with level
+        val modeLabel = if (isNightHardcore) "NIGHT LVL $difficultyLevel" else "HARDCORE LVL $difficultyLevel"
+        ui.textCentered(modeLabel, sw / 2, badgeY + badgeHeight - 22f * scale, UIFonts.caption, dangerColor)
+
+        // Score (like endless mode)
+        val originalScale = UIFonts.heading.data.scaleX
+        UIFonts.heading.data.setScale(originalScale * scorePopScale)
+        ui.textCentered(session.score.toString(), sw / 2 - 30f * scale, badgeY + badgeHeight / 2 - 5f * scale, UIFonts.heading, UITheme.accent)
+        UIFonts.heading.data.setScale(originalScale)
+
+        // Volts multiplier indicator - 2.5x for night hardcore, 2x for regular
+        val voltsText = if (isNightHardcore) "2.5x" else "2x"
+        ui.textCentered(voltsText, sw / 2 + 55f * scale, badgeY + badgeHeight / 2 - 5f * scale, UIFonts.body, UITheme.warning)
 
         ui.endBatch()
         ui.beginShapes()
