@@ -67,9 +67,9 @@ class PauseRenderer : Disposable {
             ui.shapes.rect(0f, sh * t, sw, sh / 12f + 1)
         }
 
-        // Glass panel - wider for horizontal layout, taller for more vertical space
-        val panelWidth = 700f * scale * panelScale
-        val panelHeight = 480f * scale * panelScale  // Increased height
+        // Glass panel - sized for 2x2 button grid
+        val panelWidth = 600f * scale * panelScale
+        val panelHeight = 520f * scale * panelScale
         val panelX = centerX - panelWidth / 2
         val panelY = centerY - panelHeight / 2  // Centered
 
@@ -83,35 +83,39 @@ class PauseRenderer : Disposable {
         ui.roundedRect(panelX + 30f * scale, panelY + panelHeight - 8f * scale,
             panelWidth - 60f * scale, 4f * scale, 2f * scale, UITheme.accent)
 
-        // === HORIZONTAL BUTTON LAYOUT ===
-        // Two rows: Resume (big) on top, 3 smaller buttons below
+        // === BUTTON LAYOUT ===
+        // Resume (big) on top, then 2x2 grid below
         val buttonGap = 20f * scale
+        val contentX = panelX + 40f * scale
+        val contentWidth = panelWidth - 80f * scale
 
-        // Resume button - full width, positioned lower in panel
-        val resumeWidth = panelWidth - 80f * scale
+        // Resume button - full width
+        val resumeWidth = contentWidth
         val resumeHeight = 100f * scale
-        val resumeX = panelX + 40f * scale
-        val resumeY = panelY + panelHeight - 280f * scale  // Moved down more
+        val resumeY = panelY + panelHeight - 260f * scale
 
-        resumeButton.set(resumeX, resumeY, resumeWidth, resumeHeight)
+        resumeButton.set(contentX, resumeY, resumeWidth, resumeHeight)
         ui.neonButton(resumeButton, UITheme.accent, UITheme.accent, 0.3f + resumeHover * 0.7f)
 
-        // Second row: 4 buttons side by side
-        val smallButtonWidth = (resumeWidth - buttonGap * 3) / 4
-        val smallButtonHeight = 80f * scale
-        val smallButtonsY = resumeY - resumeHeight - 30f * scale
+        // 2x2 grid for secondary buttons (larger, more clickable)
+        val gridButtonWidth = (contentWidth - buttonGap) / 2
+        val gridButtonHeight = 90f * scale
+        val row1Y = resumeY - gridButtonHeight - buttonGap
+        val row2Y = row1Y - gridButtonHeight - buttonGap
 
-        restartButton.set(resumeX, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(restartButton, UITheme.danger, UITheme.danger, restartHover * 0.6f)
+        // Row 1: Restart, Calibrate
+        restartButton.set(contentX, row1Y, gridButtonWidth, gridButtonHeight)
+        ui.neonButton(restartButton, UITheme.danger, UITheme.danger, 0.2f + restartHover * 0.6f)
 
-        calibrateButton.set(resumeX + (smallButtonWidth + buttonGap), smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(calibrateButton, UITheme.secondary, UITheme.secondary, calibrateHover * 0.6f)
+        calibrateButton.set(contentX + gridButtonWidth + buttonGap, row1Y, gridButtonWidth, gridButtonHeight)
+        ui.neonButton(calibrateButton, UITheme.secondary, UITheme.secondary, 0.2f + calibrateHover * 0.6f)
 
-        settingsButton.set(resumeX + (smallButtonWidth + buttonGap) * 2, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(settingsButton, UITheme.surfaceLight, UITheme.textSecondary, settingsHover * 0.4f)
+        // Row 2: Settings, Menu
+        settingsButton.set(contentX, row2Y, gridButtonWidth, gridButtonHeight)
+        ui.neonButton(settingsButton, UITheme.surfaceLight, UITheme.textSecondary, 0.1f + settingsHover * 0.4f)
 
-        menuButton.set(resumeX + (smallButtonWidth + buttonGap) * 3, smallButtonsY, smallButtonWidth, smallButtonHeight)
-        ui.neonButton(menuButton, UITheme.danger, UITheme.danger, menuHover * 0.6f)
+        menuButton.set(contentX + gridButtonWidth + buttonGap, row2Y, gridButtonWidth, gridButtonHeight)
+        ui.neonButton(menuButton, UITheme.danger, UITheme.danger, 0.2f + menuHover * 0.6f)
 
         ui.endShapes()
 
@@ -128,16 +132,16 @@ class PauseRenderer : Disposable {
                 resumeButton.y + resumeButton.height / 2, UIFonts.button, UITheme.textPrimary)
 
             ui.textCentered("RESTART", restartButton.x + restartButton.width / 2,
-                restartButton.y + restartButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+                restartButton.y + restartButton.height / 2, UIFonts.body, UITheme.textPrimary)
 
             ui.textCentered("CALIBRATE", calibrateButton.x + calibrateButton.width / 2,
-                calibrateButton.y + calibrateButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+                calibrateButton.y + calibrateButton.height / 2, UIFonts.body, UITheme.textPrimary)
 
             ui.textCentered("SETTINGS", settingsButton.x + settingsButton.width / 2,
-                settingsButton.y + settingsButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+                settingsButton.y + settingsButton.height / 2, UIFonts.body, UITheme.textPrimary)
 
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2,
-                menuButton.y + menuButton.height / 2, UIFonts.caption, UITheme.textPrimary)
+                menuButton.y + menuButton.height / 2, UIFonts.body, UITheme.textPrimary)
         }
 
         ui.endBatch()

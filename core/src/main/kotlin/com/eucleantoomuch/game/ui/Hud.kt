@@ -746,8 +746,8 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     private fun drawVoltsPanel() {
         val scale = UITheme.Dimensions.scale()
-        val panelWidth = 140f * scale
-        val panelHeight = 55f * scale
+        val panelWidth = 200f * scale
+        val panelHeight = 80f * scale
         val panelX = ui.screenWidth - panelWidth - 25f * scale
         val panelY = ui.screenHeight - panelHeight - 20f * scale
 
@@ -760,11 +760,11 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val voltsColor = Color(1f, 0.85f, 0.1f, 1f)  // Electric yellow
         if (voltsPopScale > 1.01f) {
             ui.neonGlow(panelX, panelY, panelWidth, panelHeight,
-                12f * scale, voltsColor, (voltsPopScale - 1f) * 4f, 2)
+                14f * scale, voltsColor, (voltsPopScale - 1f) * 4f, 2)
         }
 
         ui.glassPanel(panelX, panelY, panelWidth, panelHeight,
-            radius = 12f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
+            radius = 14f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
 
         // Volts text
         ui.endShapes()
@@ -773,17 +773,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         val voltsCenterX = panelX + panelWidth / 2
         val voltsCenterY = panelY + panelHeight / 2
 
-        val originalScale = UIFonts.body.data.scaleX
-        UIFonts.body.data.setScale(originalScale * voltsPopScale)
-        UIFonts.body.color = voltsColor
-        ui.textCentered("$displayedVolts", voltsCenterX - 10f * scale, voltsCenterY, UIFonts.body, voltsColor)
-        UIFonts.body.data.setScale(originalScale)
+        val originalScale = UIFonts.heading.data.scaleX
+        UIFonts.heading.data.setScale(originalScale * voltsPopScale)
+        UIFonts.heading.color = voltsColor
+        ui.textCentered("$displayedVolts", voltsCenterX - 15f * scale, voltsCenterY, UIFonts.heading, voltsColor)
+        UIFonts.heading.data.setScale(originalScale)
 
-        // Lightning bolt icon
-        UIFonts.caption.color = voltsColor
-        ui.layout.setText(UIFonts.body, "$displayedVolts")
-        val textEndX = voltsCenterX - 10f * scale + ui.layout.width / 2 + 6f * scale
-        UIFonts.caption.draw(ui.batch, "V", textEndX, voltsCenterY + 6f * scale)
+        // Lightning bolt icon - larger
+        UIFonts.body.color = voltsColor
+        ui.layout.setText(UIFonts.heading, "$displayedVolts")
+        val textEndX = voltsCenterX - 15f * scale + ui.layout.width / 2 + 8f * scale
+        UIFonts.body.draw(ui.batch, "V", textEndX, voltsCenterY + 8f * scale)
 
         ui.endBatch()
         ui.beginShapes()
