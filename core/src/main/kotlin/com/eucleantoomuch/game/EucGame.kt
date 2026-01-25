@@ -571,6 +571,7 @@ class EucGame(
                 timeTrialManager.clearSelection()
                 pendingHardcoreMode = false
                 pendingNightHardcoreMode = false
+                wheelSelectionRenderer.onEnter()
                 stateManager.transition(GameState.WheelSelection)
             }
             ModeSelectionRenderer.Action.TIME_TRIAL -> {
@@ -582,12 +583,14 @@ class EucGame(
                 timeTrialManager.clearSelection()
                 pendingHardcoreMode = true
                 pendingNightHardcoreMode = false
+                wheelSelectionRenderer.onEnter()
                 stateManager.transition(GameState.WheelSelection)
             }
             ModeSelectionRenderer.Action.NIGHT_HARDCORE -> {
                 timeTrialManager.clearSelection()
                 pendingHardcoreMode = false
                 pendingNightHardcoreMode = true
+                wheelSelectionRenderer.onEnter()
                 stateManager.transition(GameState.WheelSelection)
             }
             ModeSelectionRenderer.Action.BACK -> {
@@ -605,6 +608,7 @@ class EucGame(
 
         when (timeTrialLevelRenderer.render()) {
             TimeTrialLevelRenderer.Action.SELECT_LEVEL -> {
+                wheelSelectionRenderer.onEnter()
                 stateManager.transition(GameState.WheelSelection)
             }
             TimeTrialLevelRenderer.Action.BACK -> {
@@ -1556,10 +1560,12 @@ class EucGame(
         speedWarningManager.stop()
         motorSoundManager.stop()
 
-        // Record completion and check for new best time
-        val isNewBest = timeTrialManager.recordCompletion(level, session.playTimeSeconds)
+        // Check if next level was locked BEFORE recording completion
         val nextLevel = level.nextLevel()
         val wasNextLevelLocked = nextLevel != null && !timeTrialManager.isUnlocked(nextLevel)
+
+        // Record completion and check for new best time (this unlocks next level)
+        val isNewBest = timeTrialManager.recordCompletion(level, session.playTimeSeconds)
 
         // Award Volts for completing the level
         voltsManager.awardPickup()  // Using pickup as base, we'll add level-specific

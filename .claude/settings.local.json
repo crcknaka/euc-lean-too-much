@@ -30,7 +30,9 @@
       "Bash(type:*)",
       "Bash(dir /s /b *.log)",
       "Bash(cmd /c \"gradlew.bat lwjgl3:run\")",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(cmd /c \"cd C:\\\\Projects\\\\euc-lean-too-much && gradlew.bat android:assembleDebug\")",
+      "Bash(cmd /c \"c:\\\\Projects\\\\euc-lean-too-much\\\\gradlew.bat -p c:\\\\Projects\\\\euc-lean-too-much android:assembleDebug\")"
     ]
   }
 }

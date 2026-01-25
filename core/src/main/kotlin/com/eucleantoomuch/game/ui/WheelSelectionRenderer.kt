@@ -95,9 +95,17 @@ class WheelSelectionRenderer(
     }
 
     init {
-        // Initialize to saved selection
-        currentIndex = wheels.indexOfFirst { it.id == settingsManager.selectedWheelId }
-            .takeIf { it >= 0 } ?: 0  // Default to Standard (first in list)
+        // Initialize to saved selection, but only if that wheel is unlocked
+        val savedIndex = wheels.indexOfFirst { it.id == settingsManager.selectedWheelId }
+            .takeIf { it >= 0 } ?: 0
+
+        currentIndex = if (savedIndex >= 0 && isWheelUnlocked(wheels[savedIndex])) {
+            // Saved wheel is unlocked, use it
+            savedIndex
+        } else {
+            // Saved wheel is locked, find the last unlocked wheel
+            wheels.indexOfLast { isWheelUnlocked(it) }.takeIf { it >= 0 } ?: 0
+        }
 
         initPreview()
     }
@@ -355,8 +363,10 @@ class WheelSelectionRenderer(
 
         ui.endShapes()
 
-        // === Render 3D Preview ===
-        render3DPreview(previewX, previewY, previewSize, currentWheel, isCurrentWheelUnlocked)
+        // === Render 3D Preview (skip first frames to avoid flash) ===
+        if (enterAnimProgress > 0.1f) {
+            render3DPreview(previewX, previewY, previewSize, currentWheel, isCurrentWheelUnlocked)
+        }
 
         // === Draw lock overlay for locked wheels ===
         if (!isCurrentWheelUnlocked) {
@@ -667,9 +677,20 @@ class WheelSelectionRenderer(
         }
     }
 
+    /** Called when entering the wheel selection screen */
+    fun onEnter() {
+        enterAnimProgress = 0f
+
+        // Reset to an unlocked wheel if current is locked
+        if (!isWheelUnlocked(wheels[currentIndex])) {
+            currentIndex = wheels.indexOfLast { isWheelUnlocked(it) }.takeIf { it >= 0 } ?: 0
+            resetCameraView()
+        }
+    }
+
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
-        enterAnimProgress = 0f
+        onEnter()
     }
 
     fun recreate() {
