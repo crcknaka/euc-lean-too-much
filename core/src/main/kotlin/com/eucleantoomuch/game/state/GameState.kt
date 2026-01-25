@@ -3,6 +3,8 @@ package com.eucleantoomuch.game.state
 sealed class GameState {
     object Loading : GameState()
     object Menu : GameState()
+    object ModeSelection : GameState()
+    object TimeTrialLevelSelection : GameState()
     object WheelSelection : GameState()
     data class Settings(val returnTo: GameState) : GameState()
     object Credits : GameState()

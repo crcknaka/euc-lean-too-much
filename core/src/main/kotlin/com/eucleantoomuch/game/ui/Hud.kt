@@ -159,19 +159,25 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             drawSpeedLines(sw, sh, scale)
         }
 
-        // === Top Score Badge (minimalist) ===
-        val scoreBadgeWidth = 180f * scale
-        val scoreBadgeHeight = 70f * scale
-        val scoreBadgeY = sh - scoreBadgeHeight - 20f * scale
-        val scoreBadgeX = sw / 2 - scoreBadgeWidth / 2
+        // === Top Badge (Score or Time Trial) ===
+        if (session.isTimeTrial) {
+            // Time Trial: Show timer and progress
+            drawTimeTrialBadge(session)
+        } else {
+            // Endless mode: Show score
+            val scoreBadgeWidth = 180f * scale
+            val scoreBadgeHeight = 70f * scale
+            val scoreBadgeY = sh - scoreBadgeHeight - 20f * scale
+            val scoreBadgeX = sw / 2 - scoreBadgeWidth / 2
 
-        // Subtle glow when score changes
-        if (scorePopScale > 1.01f) {
-            ui.neonGlow(scoreBadgeX, scoreBadgeY, scoreBadgeWidth, scoreBadgeHeight,
-                16f * scale, UITheme.accent, (scorePopScale - 1f) * 3f, 3)
+            // Subtle glow when score changes
+            if (scorePopScale > 1.01f) {
+                ui.neonGlow(scoreBadgeX, scoreBadgeY, scoreBadgeWidth, scoreBadgeHeight,
+                    16f * scale, UITheme.accent, (scorePopScale - 1f) * 3f, 3)
+            }
+            ui.glassPanel(scoreBadgeX, scoreBadgeY, scoreBadgeWidth, scoreBadgeHeight,
+                radius = 16f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
         }
-        ui.glassPanel(scoreBadgeX, scoreBadgeY, scoreBadgeWidth, scoreBadgeHeight,
-            radius = 16f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.7f))
 
         // === Volts Badge (top right) ===
         drawVoltsPanel()
@@ -194,12 +200,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // === Text ===
         ui.beginBatch()
 
-        // Score - centered in badge, compact
-        val scoreY = scoreBadgeY + scoreBadgeHeight / 2
-        val originalScale = UIFonts.heading.data.scaleX
-        UIFonts.heading.data.setScale(originalScale * scorePopScale)
-        ui.textCentered(session.score.toString(), sw / 2, scoreY, UIFonts.heading, UITheme.accent)
-        UIFonts.heading.data.setScale(originalScale)
+        // Score or Time Trial info - centered in badge
+        if (!session.isTimeTrial) {
+            val scoreBadgeHeight = 70f * scale
+            val scoreBadgeY = sh - scoreBadgeHeight - 20f * scale
+            val scoreY = scoreBadgeY + scoreBadgeHeight / 2
+            val originalScale = UIFonts.heading.data.scaleX
+            UIFonts.heading.data.setScale(originalScale * scorePopScale)
+            ui.textCentered(session.score.toString(), sw / 2, scoreY, UIFonts.heading, UITheme.accent)
+            UIFonts.heading.data.setScale(originalScale)
+        }
+        // Time Trial text is handled in drawTimeTrialBadge
 
         // Warnings - positioned lower to not obstruct view
         val warningBaseY = sh * 0.22f  // Lower on screen (22% from bottom)
@@ -804,6 +815,78 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             UIFonts.body.draw(ui.batch, text, baseX, y)
             index++
         }
+    }
+
+    private fun drawTimeTrialBadge(session: GameSession) {
+        val scale = UITheme.Dimensions.scale()
+        val sw = ui.screenWidth
+        val sh = ui.screenHeight
+
+        val badgeWidth = 300f * scale
+        val badgeHeight = 100f * scale
+        val badgeY = sh - badgeHeight - 15f * scale
+        val badgeX = sw / 2 - badgeWidth / 2
+
+        val timeRemaining = session.timeRemaining
+        val isLowTime = timeRemaining < 10f
+
+        // Color based on time remaining
+        val timerColor = when {
+            timeRemaining <= 5f -> UITheme.danger
+            timeRemaining <= 10f -> UITheme.warning
+            else -> UITheme.accent
+        }
+
+        // Pulsing glow when low time
+        val glowIntensity = if (isLowTime) {
+            UITheme.Anim.pulse(8f, 0.4f, 0.8f)
+        } else 0.2f
+
+        if (glowIntensity > 0.3f) {
+            ui.neonGlow(badgeX, badgeY, badgeWidth, badgeHeight,
+                16f * scale, timerColor, glowIntensity, 3)
+        }
+        ui.glassPanel(badgeX, badgeY, badgeWidth, badgeHeight,
+            radius = 16f * scale, tintColor = UITheme.withAlpha(UITheme.surfaceSolid, 0.8f))
+
+        // Progress bar at bottom of badge
+        val barMargin = 14f * scale
+        val barHeight = 10f * scale
+        val barWidth = badgeWidth - barMargin * 2
+        val barX = badgeX + barMargin
+        val barY = badgeY + barMargin
+
+        ui.neonBar(barX, barY, barWidth, barHeight, session.distanceProgress,
+            backgroundColor = UITheme.withAlpha(UITheme.surfaceLight, 0.6f),
+            fillColor = UITheme.primary,
+            glowIntensity = 0.3f)
+
+        // Text content
+        ui.endShapes()
+        ui.beginBatch()
+
+        // Timer text
+        val mins = (timeRemaining / 60).toInt()
+        val secs = (timeRemaining % 60).toInt()
+        val millis = ((timeRemaining % 1) * 10).toInt()
+        val timerText = if (mins > 0) {
+            "$mins:${secs.toString().padStart(2, '0')}"
+        } else {
+            "$secs.${millis}"
+        }
+
+        val timerY = badgeY + badgeHeight - 25f * scale
+        ui.textCentered(timerText, sw / 2, timerY, UIFonts.heading, timerColor)
+
+        // Distance progress text
+        val level = session.timeTrialLevel
+        if (level != null) {
+            val distText = "${session.distanceTraveled.toInt()}m / ${level.targetDistance.toInt()}m"
+            ui.textCentered(distText, sw / 2, badgeY + 35f * scale, UIFonts.caption, UITheme.textSecondary)
+        }
+
+        ui.endBatch()
+        ui.beginShapes()
     }
 
     /**

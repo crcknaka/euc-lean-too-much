@@ -1,6 +1,7 @@
 package com.eucleantoomuch.game.state
 
 import com.eucleantoomuch.game.util.Constants
+import kotlin.math.max
 
 class GameSession {
     var distanceTraveled: Float = 0f
@@ -13,6 +14,21 @@ class GameSession {
     var nearMisses: Int = 0
     var startTime: Long = System.currentTimeMillis()
         private set
+
+    // Time Trial mode
+    var timeTrialLevel: TimeTrialLevel? = null
+
+    val isTimeTrial: Boolean
+        get() = timeTrialLevel != null
+
+    val timeRemaining: Float
+        get() = timeTrialLevel?.let { max(0f, it.timeLimit - playTimeSeconds) } ?: 0f
+
+    val levelCompleted: Boolean
+        get() = timeTrialLevel?.let { distanceTraveled >= it.targetDistance } ?: false
+
+    val distanceProgress: Float
+        get() = timeTrialLevel?.let { (distanceTraveled / it.targetDistance).coerceIn(0f, 1f) } ?: 0f
 
     // Battery system
     var batteryCapacity: Int = 2400  // mAh (set from WheelType)
@@ -102,5 +118,6 @@ class GameSession {
         batteryLevel = 1f
         isBatteryLow = false
         isBatteryDead = false
+        timeTrialLevel = null
     }
 }

@@ -36,6 +36,8 @@ import com.eucleantoomuch.game.state.GameStateManager
 import com.eucleantoomuch.game.state.HighScoreManager
 import com.eucleantoomuch.game.state.SettingsManager
 import com.eucleantoomuch.game.state.VoltsManager
+import com.eucleantoomuch.game.state.TimeTrialManager
+import com.eucleantoomuch.game.state.TimeTrialLevel
 import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.CreditsRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
@@ -46,6 +48,8 @@ import com.eucleantoomuch.game.ui.SettingsRenderer
 import com.eucleantoomuch.game.ui.UIFeedback
 import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
+import com.eucleantoomuch.game.ui.ModeSelectionRenderer
+import com.eucleantoomuch.game.ui.TimeTrialLevelRenderer
 import com.eucleantoomuch.game.ui.DebugMenu
 import com.eucleantoomuch.game.ui.DebugConfig
 import com.eucleantoomuch.game.physics.RagdollPhysics
@@ -65,6 +69,7 @@ class EucGame(
     private lateinit var highScoreManager: HighScoreManager
     private lateinit var settingsManager: SettingsManager
     private lateinit var voltsManager: VoltsManager
+    private lateinit var timeTrialManager: TimeTrialManager
 
     // UI Renderers
     private lateinit var hud: Hud
@@ -75,6 +80,8 @@ class EucGame(
     private lateinit var settingsRenderer: SettingsRenderer
     private lateinit var creditsRenderer: CreditsRenderer
     private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
+    private lateinit var modeSelectionRenderer: ModeSelectionRenderer
+    private lateinit var timeTrialLevelRenderer: TimeTrialLevelRenderer
 
     // Debug menu (admin tools)
     private lateinit var debugMenu: DebugMenu
@@ -89,6 +96,7 @@ class EucGame(
     private var countdownTimer = 3f
     private var lastCountdownSecond = -1  // Track last displayed second for beep
     private var isNewHighScore = false
+    private var timeTrialResult: GameOverRenderer.TimeTrialResult? = null
 
     // Systems that need direct access
     private lateinit var eucPhysicsSystem: EucPhysicsSystem
@@ -138,6 +146,7 @@ class EucGame(
         highScoreManager = HighScoreManager()
         settingsManager = SettingsManager()
         voltsManager = VoltsManager()
+        timeTrialManager = TimeTrialManager()
 
         // Initialize input based on platform
         accelerometerInput = AccelerometerInput()
@@ -263,6 +272,8 @@ class EucGame(
         settingsRenderer = SettingsRenderer(settingsManager)
         creditsRenderer = CreditsRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager)
+        modeSelectionRenderer = ModeSelectionRenderer()
+        timeTrialLevelRenderer = TimeTrialLevelRenderer(timeTrialManager)
 
         // Initialize debug menu (admin tools)
         debugMenu = DebugMenu(engine)
@@ -439,6 +450,8 @@ class EucGame(
         when (stateManager.current()) {
             is GameState.Loading -> renderLoading()
             is GameState.Menu -> renderMenu()
+            is GameState.ModeSelection -> renderModeSelection()
+            is GameState.TimeTrialLevelSelection -> renderTimeTrialLevelSelection()
             is GameState.WheelSelection -> renderWheelSelection()
             is GameState.Settings -> renderSettings()
             is GameState.Credits -> renderCredits()
@@ -522,8 +535,8 @@ class EucGame(
 
         when (menuRenderer.render(highScoreManager.highScore, highScoreManager.maxDistance, highScoreManager.maxNearMisses, voltsManager.totalVolts)) {
             MenuRenderer.ButtonClicked.PLAY -> {
-                // Go to wheel selection first
-                stateManager.transition(GameState.WheelSelection)
+                // Go to mode selection first
+                stateManager.transition(GameState.ModeSelection)
             }
             MenuRenderer.ButtonClicked.CALIBRATE -> {
                 stateManager.transition(GameState.Calibrating())
@@ -544,6 +557,45 @@ class EucGame(
         }
     }
 
+    private fun renderModeSelection() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        musicManager.update(Gdx.graphics.deltaTime)
+
+        when (modeSelectionRenderer.render()) {
+            ModeSelectionRenderer.Action.ENDLESS -> {
+                timeTrialManager.clearSelection()
+                stateManager.transition(GameState.WheelSelection)
+            }
+            ModeSelectionRenderer.Action.TIME_TRIAL -> {
+                stateManager.transition(GameState.TimeTrialLevelSelection)
+            }
+            ModeSelectionRenderer.Action.BACK -> {
+                stateManager.transition(GameState.Menu)
+            }
+            ModeSelectionRenderer.Action.NONE -> {}
+        }
+    }
+
+    private fun renderTimeTrialLevelSelection() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        musicManager.update(Gdx.graphics.deltaTime)
+
+        when (timeTrialLevelRenderer.render()) {
+            TimeTrialLevelRenderer.Action.SELECT_LEVEL -> {
+                stateManager.transition(GameState.WheelSelection)
+            }
+            TimeTrialLevelRenderer.Action.BACK -> {
+                timeTrialManager.clearSelection()
+                stateManager.transition(GameState.ModeSelection)
+            }
+            TimeTrialLevelRenderer.Action.NONE -> {}
+        }
+    }
+
     private fun renderWheelSelection() {
         Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
@@ -561,7 +613,12 @@ class EucGame(
                 }
             }
             WheelSelectionRenderer.Action.BACK -> {
-                stateManager.transition(GameState.Menu)
+                // Go back to mode selection (or time trial level selection if selected)
+                if (timeTrialManager.selectedLevel != null) {
+                    stateManager.transition(GameState.TimeTrialLevelSelection)
+                } else {
+                    stateManager.transition(GameState.ModeSelection)
+                }
             }
             WheelSelectionRenderer.Action.NONE -> {}
         }
@@ -759,6 +816,19 @@ class EucGame(
                 return
             }
 
+            // Check for time trial completion or timeout
+            if (session.isTimeTrial) {
+                if (session.levelCompleted) {
+                    // Level completed successfully!
+                    handleTimeTrialCompletion()
+                    return
+                } else if (session.timeRemaining <= 0f) {
+                    // Time ran out
+                    handleTimeTrialTimeout()
+                    return
+                }
+            }
+
             // Sync rider position with player
             riderEntity?.getComponent(TransformComponent::class.java)?.let { riderTransform ->
                 riderTransform.position.set(playerTransform.position)
@@ -914,13 +984,14 @@ class EucGame(
         renderer.render()
 
         // Render game over UI
-        when (gameOverRenderer.render(state.session, isNewHighScore, voltsManager.sessionVolts, voltsManager.totalVolts)) {
+        when (gameOverRenderer.render(state.session, isNewHighScore, voltsManager.sessionVolts, voltsManager.totalVolts, timeTrialResult)) {
             GameOverRenderer.ButtonClicked.RETRY -> {
                 resetGame()
                 startGame()
             }
             GameOverRenderer.ButtonClicked.MENU -> {
                 resetGame()
+                timeTrialManager.clearSelection()
                 stateManager.transition(GameState.Menu)
             }
             GameOverRenderer.ButtonClicked.NONE -> {}
@@ -965,9 +1036,14 @@ class EucGame(
         lastCountdownSecond = -1  // Reset for beep tracking
         session.reset()
         session.setBatteryCapacity(wheelType.batteryCapacity)  // Set battery from wheel type
+
+        // Set time trial level if selected
+        session.timeTrialLevel = timeTrialManager.selectedLevel
+
         hud.reset()
         voltsManager.resetSession()
         isNewHighScore = false
+        timeTrialResult = null
         stateManager.transition(GameState.Countdown(3))
     }
 
@@ -1404,6 +1480,70 @@ class EucGame(
 
         // Transition to falling state (will show animation before game over)
         stateManager.transition(GameState.Falling(session))
+
+        // Set time trial result as failed (crashed) if in time trial mode
+        if (session.isTimeTrial) {
+            timeTrialResult = GameOverRenderer.TimeTrialResult(
+                completed = false,
+                isNewBestTime = false,
+                nextLevelUnlocked = null,
+                completionTime = session.playTimeSeconds
+            )
+        }
+    }
+
+    private fun handleTimeTrialCompletion() {
+        val level = session.timeTrialLevel ?: return
+
+        // Stop sounds
+        speedWarningManager.stop()
+        motorSoundManager.stop()
+
+        // Record completion and check for new best time
+        val isNewBest = timeTrialManager.recordCompletion(level, session.playTimeSeconds)
+        val nextLevel = level.nextLevel()
+        val wasNextLevelLocked = nextLevel != null && !timeTrialManager.isUnlocked(nextLevel)
+
+        // Award Volts for completing the level
+        voltsManager.awardPickup()  // Using pickup as base, we'll add level-specific
+        for (i in 0 until level.voltReward / 15) {
+            voltsManager.awardPickup()
+        }
+        voltsManager.finalizeSession()
+
+        // Set time trial result for game over screen
+        val completionTime = session.playTimeSeconds
+        timeTrialResult = GameOverRenderer.TimeTrialResult(
+            completed = true,
+            isNewBestTime = isNewBest,
+            nextLevelUnlocked = if (wasNextLevelLocked) nextLevel else null,
+            completionTime = completionTime
+        )
+
+        // Skip falling animation, go directly to game over
+        gameOverRenderer.reset()
+        stateManager.transition(GameState.GameOver(session))
+    }
+
+    private fun handleTimeTrialTimeout() {
+        // Stop sounds
+        speedWarningManager.stop()
+        motorSoundManager.stop()
+
+        // Finalize Volts (player still keeps what they earned)
+        voltsManager.finalizeSession()
+
+        // Set time trial result as failed (timeout)
+        timeTrialResult = GameOverRenderer.TimeTrialResult(
+            completed = false,
+            isNewBestTime = false,
+            nextLevelUnlocked = null,
+            completionTime = session.playTimeSeconds
+        )
+
+        // Skip falling animation, go directly to game over
+        gameOverRenderer.reset()
+        stateManager.transition(GameState.GameOver(session))
     }
 
     // Temp vectors for ragdoll position extraction
@@ -1446,6 +1586,7 @@ class EucGame(
             // Also flush deferred disk writes here (non-critical frame)
             highScoreManager.flushDeferred()
             voltsManager.flushDeferred()
+            timeTrialManager.flushDeferred()
         }
 
         // Check if ragdoll bodies knock down standing pedestrians
@@ -1609,6 +1750,8 @@ class EucGame(
         settingsRenderer.resize(width, height)
         creditsRenderer.resize(width, height)
         wheelSelectionRenderer.resize(width, height)
+        modeSelectionRenderer.resize(width, height)
+        timeTrialLevelRenderer.resize(width, height)
         if (DebugConfig.DEBUG_MENU_ENABLED) {
             debugMenu.resize(width, height)
         }
@@ -1630,6 +1773,8 @@ class EucGame(
         settingsRenderer.recreate()
         creditsRenderer.recreate()
         wheelSelectionRenderer.recreate()
+        modeSelectionRenderer.recreate()
+        timeTrialLevelRenderer.recreate()
         if (DebugConfig.DEBUG_MENU_ENABLED) {
             debugMenu.recreate()
         }
@@ -1648,6 +1793,8 @@ class EucGame(
         settingsRenderer.dispose()
         creditsRenderer.dispose()
         wheelSelectionRenderer.dispose()
+        modeSelectionRenderer.dispose()
+        timeTrialLevelRenderer.dispose()
         ragdollPhysics?.dispose()
         ragdollRenderer?.dispose()
         if (DebugConfig.DEBUG_MENU_ENABLED) {
