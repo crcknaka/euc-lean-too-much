@@ -711,6 +711,43 @@ class UIRenderer : Disposable {
         )
     }
 
+    /** Draw a help icon (question mark in circle) */
+    fun helpIcon(cx: Float, cy: Float, size: Float, color: Color) {
+        shapes.color = color
+        val radius = size * 0.5f
+
+        // Outer circle
+        shapes.circle(cx, cy, radius)
+
+        // Inner circle (darker background)
+        shapes.color = UITheme.darken(color, 0.3f)
+        shapes.circle(cx, cy, radius * 0.85f)
+
+        // Question mark
+        shapes.color = color
+
+        // Question mark curve (top part) - approximated with circles
+        val qSize = radius * 0.5f
+        val qTop = cy + qSize * 0.5f
+
+        // Arc of the question mark (using small circles)
+        val arcRadius = qSize * 0.5f
+        val arcCx = cx
+        val arcCy = qTop
+        for (i in -30..180 step 15) {
+            val angle = Math.toRadians(i.toDouble())
+            val px = arcCx + cos(angle).toFloat() * arcRadius
+            val py = arcCy + sin(angle).toFloat() * arcRadius
+            shapes.circle(px, py, qSize * 0.18f)
+        }
+
+        // Stem of question mark (vertical part going down)
+        shapes.rect(cx - qSize * 0.12f, cy - qSize * 0.3f, qSize * 0.24f, qSize * 0.5f)
+
+        // Dot at the bottom
+        shapes.circle(cx, cy - qSize * 0.7f, qSize * 0.2f)
+    }
+
     /** Draw a separator line with gradient fade */
     fun separator(x: Float, y: Float, width: Float, color: Color = UITheme.surfaceBorder) {
         val scale = UITheme.Dimensions.scale()

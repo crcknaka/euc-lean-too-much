@@ -21,6 +21,7 @@ class MenuRenderer : Disposable {
     private val settingsButton = Rectangle()
     private val creditsButton = Rectangle()
     private val exitButton = Rectangle()
+    private val helpButton = Rectangle()
 
     // Animation states
     private var playButtonHover = 0f
@@ -28,6 +29,7 @@ class MenuRenderer : Disposable {
     private var settingsButtonHover = 0f
     private var creditsButtonHover = 0f
     private var exitButtonHover = 0f
+    private var helpButtonHover = 0f
     private var enterAnimProgress = 0f
 
     // Trail particles (like EUC tire marks)
@@ -53,7 +55,7 @@ class MenuRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, PLAY, CALIBRATE, SETTINGS, CREDITS, EXIT
+        NONE, PLAY, CALIBRATE, SETTINGS, CREDITS, EXIT, HELP
     }
 
     fun render(highScore: Int, maxDistance: Float, maxNearMisses: Int, totalVolts: Int = 0): ButtonClicked {
@@ -79,12 +81,14 @@ class MenuRenderer : Disposable {
         val settingsHovered = settingsButton.contains(touchX, touchY)
         val creditsHovered = creditsButton.contains(touchX, touchY)
         val exitHovered = exitButton.contains(touchX, touchY)
+        val helpHovered = helpButton.contains(touchX, touchY)
 
         playButtonHover = UITheme.Anim.ease(playButtonHover, if (playHovered) 1f else 0f, 10f)
         calibrateButtonHover = UITheme.Anim.ease(calibrateButtonHover, if (calibrateHovered) 1f else 0f, 10f)
         settingsButtonHover = UITheme.Anim.ease(settingsButtonHover, if (settingsHovered) 1f else 0f, 10f)
         creditsButtonHover = UITheme.Anim.ease(creditsButtonHover, if (creditsHovered) 1f else 0f, 10f)
         exitButtonHover = UITheme.Anim.ease(exitButtonHover, if (exitHovered) 1f else 0f, 10f)
+        helpButtonHover = UITheme.Anim.ease(helpButtonHover, if (helpHovered) 1f else 0f, 10f)
 
         // === Draw Background Image ===
         ui.beginBatch()
@@ -186,6 +190,14 @@ class MenuRenderer : Disposable {
         val hintHeight = 50f * scale
         ui.glassPanel(0f, 0f, sw, hintHeight, radius = 0f, borderGlow = UITheme.accent)
 
+        // Help button - small circular button in top right corner
+        val helpSize = 50f * scale
+        val helpX = sw - helpSize - 20f * scale
+        val helpY = sh - helpSize - 20f * scale
+        helpButton.set(helpX, helpY, helpSize, helpSize)
+        val helpColor = UITheme.lerp(UITheme.cyan, UITheme.textPrimary, helpButtonHover * 0.3f)
+        ui.helpIcon(helpX + helpSize / 2, helpY + helpSize / 2, helpSize, helpColor)
+
         ui.endShapes()
 
         // === Draw Text ===
@@ -265,6 +277,10 @@ class MenuRenderer : Disposable {
             if (exitButton.contains(touchX, touchY)) {
                 UIFeedback.click()
                 return ButtonClicked.EXIT
+            }
+            if (helpButton.contains(touchX, touchY)) {
+                UIFeedback.click()
+                return ButtonClicked.HELP
             }
         }
 

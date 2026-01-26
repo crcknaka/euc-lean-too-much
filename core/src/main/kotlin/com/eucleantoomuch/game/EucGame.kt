@@ -40,6 +40,7 @@ import com.eucleantoomuch.game.state.TimeTrialManager
 import com.eucleantoomuch.game.state.TimeTrialLevel
 import com.eucleantoomuch.game.ui.CalibrationRenderer
 import com.eucleantoomuch.game.ui.CreditsRenderer
+import com.eucleantoomuch.game.ui.HelpRenderer
 import com.eucleantoomuch.game.ui.GameOverRenderer
 import com.eucleantoomuch.game.ui.Hud
 import com.eucleantoomuch.game.ui.MenuRenderer
@@ -50,8 +51,6 @@ import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 import com.eucleantoomuch.game.ui.ModeSelectionRenderer
 import com.eucleantoomuch.game.ui.TimeTrialLevelRenderer
-import com.eucleantoomuch.game.ui.DebugMenu
-import com.eucleantoomuch.game.ui.DebugConfig
 import com.eucleantoomuch.game.physics.RagdollPhysics
 import com.eucleantoomuch.game.physics.RagdollRenderer
 
@@ -79,13 +78,10 @@ class EucGame(
     private lateinit var calibrationRenderer: CalibrationRenderer
     private lateinit var settingsRenderer: SettingsRenderer
     private lateinit var creditsRenderer: CreditsRenderer
+    private lateinit var helpRenderer: HelpRenderer
     private lateinit var wheelSelectionRenderer: WheelSelectionRenderer
     private lateinit var modeSelectionRenderer: ModeSelectionRenderer
     private lateinit var timeTrialLevelRenderer: TimeTrialLevelRenderer
-
-    // Debug menu (admin tools)
-    private lateinit var debugMenu: DebugMenu
-    private lateinit var debugShapeRenderer: com.badlogic.gdx.graphics.glutils.ShapeRenderer
 
     // Game state
     private var session = GameSession()
@@ -274,13 +270,10 @@ class EucGame(
         calibrationRenderer = CalibrationRenderer()
         settingsRenderer = SettingsRenderer(settingsManager)
         creditsRenderer = CreditsRenderer()
+        helpRenderer = HelpRenderer()
         wheelSelectionRenderer = WheelSelectionRenderer(settingsManager, voltsManager)
         modeSelectionRenderer = ModeSelectionRenderer(highScoreManager)
         timeTrialLevelRenderer = TimeTrialLevelRenderer(timeTrialManager)
-
-        // Initialize debug menu (admin tools)
-        debugMenu = DebugMenu(engine)
-        debugShapeRenderer = com.badlogic.gdx.graphics.glutils.ShapeRenderer()
 
         // Apply saved render distance setting
         applyRenderDistance()
@@ -431,21 +424,7 @@ class EucGame(
         // Apply FPS limit if set
         applyFpsLimit()
 
-        var delta = Gdx.graphics.deltaTime
-
-        // Apply slow motion from debug menu
-        if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.slowMotion) {
-            delta *= debugMenu.timeScale
-        }
-
-        // Update debug menu
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            debugMenu.update(Gdx.graphics.deltaTime)  // Use real delta for menu responsiveness
-
-            // Sync freeze AI state to AI systems
-            pedestrianAISystem.frozen = debugMenu.freezeAI
-            carAISystem.frozen = debugMenu.freezeAI
-        }
+        val delta = Gdx.graphics.deltaTime
 
         // Update input
         gameInput.update(delta)
@@ -458,6 +437,7 @@ class EucGame(
             is GameState.WheelSelection -> renderWheelSelection()
             is GameState.Settings -> renderSettings()
             is GameState.Credits -> renderCredits()
+            is GameState.Help -> renderHelp()
             is GameState.Calibrating -> renderCalibration()
             is GameState.Countdown -> renderCountdown(delta)
             is GameState.Playing -> renderPlaying(delta)
@@ -504,23 +484,6 @@ class EucGame(
                 cameraViewModeTimer -= delta
             }
         }
-
-        // Render debug overlays and menu (always on top, after all other rendering)
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            // Render debug info overlays (stats, entity info, etc.)
-            debugMenu.renderOverlays(
-                playerEntity = playerEntity,
-                inputData = gameInput.getInput(),
-                cameraPosition = renderer.cameraController.getCameraPosition(),
-                cameraYaw = renderer.cameraController.getCameraYaw()
-            )
-
-            // Render debug toggle button (when menu is closed)
-            debugMenu.renderDebugButton()
-
-            // Render debug menu panel (if open)
-            debugMenu.render()
-        }
     }
 
     private fun renderLoading() {
@@ -550,6 +513,10 @@ class EucGame(
             MenuRenderer.ButtonClicked.CREDITS -> {
                 creditsRenderer.reset()
                 stateManager.transition(GameState.Credits)
+            }
+            MenuRenderer.ButtonClicked.HELP -> {
+                helpRenderer.reset()
+                stateManager.transition(GameState.Help)
             }
             MenuRenderer.ButtonClicked.EXIT -> {
                 Gdx.app.exit()
@@ -683,6 +650,21 @@ class EucGame(
                 stateManager.transition(GameState.Menu)
             }
             CreditsRenderer.ButtonClicked.NONE -> {}
+        }
+    }
+
+    private fun renderHelp() {
+        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
+
+        // Continue music during help
+        musicManager.update(Gdx.graphics.deltaTime)
+
+        when (helpRenderer.render()) {
+            HelpRenderer.ButtonClicked.BACK -> {
+                stateManager.transition(GameState.Menu)
+            }
+            HelpRenderer.ButtonClicked.NONE -> {}
         }
     }
 
@@ -928,15 +910,6 @@ class EucGame(
 
         // Render
         renderer.render()
-
-        // Render 3D debug visualizations (colliders, etc.)
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            debugMenu.render3DDebug(
-                shapeRenderer = debugShapeRenderer,
-                camera = renderer.camera,
-                playerPosition = playerTransform?.position
-            )
-        }
 
         // Render HUD
         if (eucComponent != null) {
@@ -1481,12 +1454,6 @@ class EucGame(
     }
 
     private fun handlePlayerFall() {
-        // God mode - prevent death
-        if (DebugConfig.DEBUG_MENU_ENABLED && debugMenu.godMode) {
-            Gdx.app.log("Debug", "God mode: Player death prevented")
-            return
-        }
-
         // Stop speed warnings
         speedWarningManager.stop()
         // Stop motor sound
@@ -1813,12 +1780,10 @@ class EucGame(
         calibrationRenderer.resize(width, height)
         settingsRenderer.resize(width, height)
         creditsRenderer.resize(width, height)
+        helpRenderer.resize(width, height)
         wheelSelectionRenderer.resize(width, height)
         modeSelectionRenderer.resize(width, height)
         timeTrialLevelRenderer.resize(width, height)
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            debugMenu.resize(width, height)
-        }
     }
 
     override fun resume() {
@@ -1836,12 +1801,10 @@ class EucGame(
         calibrationRenderer.recreate()
         settingsRenderer.recreate()
         creditsRenderer.recreate()
+        helpRenderer.recreate()
         wheelSelectionRenderer.recreate()
         modeSelectionRenderer.recreate()
         timeTrialLevelRenderer.recreate()
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            debugMenu.recreate()
-        }
     }
 
     override fun dispose() {
@@ -1856,15 +1819,12 @@ class EucGame(
         calibrationRenderer.dispose()
         settingsRenderer.dispose()
         creditsRenderer.dispose()
+        helpRenderer.dispose()
         wheelSelectionRenderer.dispose()
         modeSelectionRenderer.dispose()
         timeTrialLevelRenderer.dispose()
         ragdollPhysics?.dispose()
         ragdollRenderer?.dispose()
-        if (DebugConfig.DEBUG_MENU_ENABLED) {
-            debugMenu.dispose()
-            debugShapeRenderer.dispose()
-        }
     }
 
     // Add physics colliders for nearby world objects during ragdoll

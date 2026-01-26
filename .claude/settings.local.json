@@ -32,7 +32,9 @@
       "Bash(cmd /c \"gradlew.bat lwjgl3:run\")",
       "Bash(python3:*)",
       "Bash(cmd /c \"cd C:\\\\Projects\\\\euc-lean-too-much && gradlew.bat android:assembleDebug\")",
-      "Bash(cmd /c \"c:\\\\Projects\\\\euc-lean-too-much\\\\gradlew.bat -p c:\\\\Projects\\\\euc-lean-too-much android:assembleDebug\")"
+      "Bash(cmd /c \"c:\\\\Projects\\\\euc-lean-too-much\\\\gradlew.bat -p c:\\\\Projects\\\\euc-lean-too-much android:assembleDebug\")",
+      "Bash(.gradlew.bat :core:compileKotlin)",
+      "Bash(powershell.exe -Command \"cd ''c:\\\\Projects\\\\euc-lean-too-much''; .\\\\gradlew.bat :core:compileKotlin 2>&1\")"
     ]
   }
 }
