@@ -29,7 +29,7 @@ object Constants {
     // World Generation
     const val CHUNK_LENGTH = 50f            // meters
     const val RENDER_DISTANCE = 150f        // 3 chunks ahead
-    const val DESPAWN_DISTANCE = -30f       // Behind player
+    const val DESPAWN_DISTANCE = -60f       // Behind player (keep 1 chunk behind for camera turns)
 
     // Road layout (X coordinates)
     const val ROAD_WIDTH = 8f

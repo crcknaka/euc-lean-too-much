@@ -392,7 +392,7 @@ class WorldGenerator(
     }
 
     fun update(playerZ: Float, totalDistance: Float) {
-        val behindDistance = 50f
+        val behindDistance = 75f  // Keep 1+ chunk behind player to avoid world edge visible on sharp turns
         val startChunk = ((playerZ - behindDistance) / Constants.CHUNK_LENGTH).toInt()
         val endChunk = ((playerZ + renderDistance) / Constants.CHUNK_LENGTH).toInt()
 
