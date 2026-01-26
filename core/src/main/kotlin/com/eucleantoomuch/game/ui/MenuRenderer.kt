@@ -192,7 +192,7 @@ class MenuRenderer : Disposable {
 
         // Help button - small circular button in top right corner
         val helpSize = 50f * scale
-        val helpX = sw - helpSize - 20f * scale
+        val helpX = sw - helpSize - 50f * scale
         val helpY = sh - helpSize - 20f * scale
         helpButton.set(helpX, helpY, helpSize, helpSize)
         val helpColor = UITheme.lerp(UITheme.cyan, UITheme.textPrimary, helpButtonHover * 0.3f)

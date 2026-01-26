@@ -1550,6 +1550,10 @@ class EucGame(
             completionTime = completionTime
         )
 
+        // Flush deferred writes to persist level unlock and volts
+        timeTrialManager.flushDeferred()
+        voltsManager.flushDeferred()
+
         // Skip falling animation, go directly to game over
         gameOverRenderer.reset()
         stateManager.transition(GameState.GameOver(session))
