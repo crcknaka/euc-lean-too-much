@@ -550,19 +550,25 @@ class WheelSelectionRenderer(
         handlePreviewTouch(touchX, touchY)
 
         if (Gdx.input.justTouched()) {
-            // Don't process button clicks if touch started in preview area
+            // Arrow buttons have priority - check them first regardless of preview area
+            when {
+                leftButton.contains(touchX, touchY) -> {
+                    UIFeedback.swipe()
+                    currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
+                    resetCameraView()
+                    return Action.NONE  // Consume touch
+                }
+                rightButton.contains(touchX, touchY) -> {
+                    UIFeedback.swipe()
+                    currentIndex = (currentIndex + 1) % wheels.size
+                    resetCameraView()
+                    return Action.NONE  // Consume touch
+                }
+            }
+
+            // Other buttons - don't process if touch is in preview area (for drag/zoom)
             if (!previewBounds.contains(touchX, touchY)) {
                 when {
-                    leftButton.contains(touchX, touchY) -> {
-                        UIFeedback.swipe()
-                        currentIndex = (currentIndex - 1 + wheels.size) % wheels.size
-                        resetCameraView()
-                    }
-                    rightButton.contains(touchX, touchY) -> {
-                        UIFeedback.swipe()
-                        currentIndex = (currentIndex + 1) % wheels.size
-                        resetCameraView()
-                    }
                     startButton.contains(touchX, touchY) -> {
                         val currentWheel = wheels[currentIndex]
                         if (isWheelUnlocked(currentWheel)) {
