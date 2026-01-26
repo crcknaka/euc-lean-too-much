@@ -155,19 +155,22 @@ class GameOverRenderer : Disposable {
             radius = 16f * scale,
             glowColor = missGlow, glowIntensity = 0.25f * statsReveal)
 
-        // === RIGHT SIDE: Buttons ===
-        val buttonWidth = rightWidth - contentPadding * 2
-        val buttonHeight = 70f * scale
-        val buttonGap = 18f * scale
+        // === BUTTONS: Right side, vertically centered ===
+        val buttonWidth = 280f * scale
+        val buttonHeight = 100f * scale  // Taller for easier tapping
+        val buttonGap = 25f * scale
 
-        // Retry button (main action) - moved lower
-        val retryY = panelY + panelHeight - 160f * scale
+        // Center buttons vertically on panel
+        val totalButtonsHeight = buttonHeight * 2 + buttonGap
+        val buttonsStartY = panelY + (panelHeight - totalButtonsHeight) / 2
+
+        // Retry button (main action) - top
+        val retryY = buttonsStartY + buttonHeight + buttonGap
         retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
         ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.4f + retryHover * 0.6f)
 
-        // Menu button
-        val menuY = retryY - buttonHeight - buttonGap
-        menuButton.set(rightCenterX - buttonWidth / 2, menuY, buttonWidth, buttonHeight)
+        // Menu button - bottom
+        menuButton.set(rightCenterX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
         ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
 
         ui.endShapes()
