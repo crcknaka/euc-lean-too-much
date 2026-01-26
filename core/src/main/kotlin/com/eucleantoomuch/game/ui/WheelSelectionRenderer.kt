@@ -342,8 +342,8 @@ class WheelSelectionRenderer(
         // START button - large like PLAY in main menu
         val startButtonWidth = 280f * scale
         val startButtonHeight = 100f * scale
-        val backButtonWidth = 140f * scale
-        val backButtonHeight = 70f * scale
+        val backButtonWidth = 200f * scale
+        val backButtonHeight = 80f * scale
         val buttonGap = 20f * scale
         val buttonsY = panelY + 40f * scale
 
@@ -681,10 +681,12 @@ class WheelSelectionRenderer(
     fun onEnter() {
         enterAnimProgress = 0f
 
+        // Always reset camera to default position
+        resetCameraView()
+
         // Reset to an unlocked wheel if current is locked
         if (!isWheelUnlocked(wheels[currentIndex])) {
             currentIndex = wheels.indexOfLast { isWheelUnlocked(it) }.takeIf { it >= 0 } ?: 0
-            resetCameraView()
         }
     }
 

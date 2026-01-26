@@ -117,10 +117,10 @@ class TimeTrialLevelRenderer(
             ui.neonButton(levelButtons[i], bgColor, glowColor, glowIntensity)
         }
 
-        // Back button
-        val backWidth = 140f * scale
-        val backHeight = 60f * scale
-        backButton.set(centerX - backWidth / 2, panelY + 30f * scale, backWidth, backHeight)
+        // Back button (same size as in Settings)
+        val backWidth = 260f * scale
+        val backHeight = 80f * scale
+        backButton.set(centerX - backWidth / 2, panelY + 20f * scale, backWidth, backHeight)
         ui.neonButton(backButton, UITheme.surfaceLight, UITheme.textSecondary, backHover * 0.4f)
 
         ui.endShapes()
@@ -147,12 +147,15 @@ class TimeTrialLevelRenderer(
 
             val textColor = if (isUnlocked) UITheme.textPrimary else UITheme.textMuted
 
-            // Level number
-            ui.textCentered("LEVEL ${i + 1}", cardCenterX, cardsY + cardHeight - 30f * scale * cardScale,
+            // Level number and name - wider spacing on narrow screens
+            val levelNumOffset = if (isNarrowScreen) 15f else 30f
+            val levelNameOffset = if (isNarrowScreen) 55f else 60f
+
+            ui.textCentered("LEVEL ${i + 1}", cardCenterX, cardsY + cardHeight - levelNumOffset * scale * cardScale,
                 bodyFont, textColor)
 
             // Level name
-            ui.textCentered(level.displayName, cardCenterX, cardsY + cardHeight - 60f * scale * cardScale,
+            ui.textCentered(level.displayName, cardCenterX, cardsY + cardHeight - levelNameOffset * scale * cardScale,
                 UIFonts.caption, textColor)
 
             if (isUnlocked) {

@@ -104,10 +104,10 @@ class ModeSelectionRenderer(private val highScoreManager: HighScoreManager) : Di
         nightHardcoreButton.set(buttonsStartX + (buttonWidth + buttonGap) * 3, buttonsY, buttonWidth, buttonHeight)
         ui.neonButton(nightHardcoreButton, nightPurple, nightPurple, 0.3f + nightHardcoreHover * 0.5f)
 
-        // Back button at bottom
-        val backWidth = 140f * scale
-        val backHeight = 60f * scale
-        backButton.set(centerX - backWidth / 2, panelY + 40f * scale, backWidth, backHeight)
+        // Back button at bottom (same size as in Settings)
+        val backWidth = 260f * scale
+        val backHeight = 80f * scale
+        backButton.set(centerX - backWidth / 2, panelY + 30f * scale, backWidth, backHeight)
         ui.neonButton(backButton, UITheme.surfaceLight, UITheme.textSecondary, backHover * 0.4f)
 
         // Draw trophy icons for high scores
