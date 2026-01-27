@@ -115,6 +115,14 @@ class TimeTrialLevelRenderer(
             val glowIntensity = if (isUnlocked) 0.2f + levelHovers[i] * 0.4f else 0.1f
 
             ui.neonButton(levelButtons[i], bgColor, glowColor, glowIntensity)
+
+            // Draw lock icon for locked levels (during shapes phase)
+            if (!isUnlocked) {
+                val cardCenterX = cardX + cardWidth / 2
+                val lockSize = 80f * scale * cardScale
+                val lockColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.2f, 1f)  // Gold
+                ui.lock(cardCenterX, cardsY + cardHeight / 2, lockSize, lockColor)
+            }
         }
 
         // Back button (same size as in Settings)
@@ -181,10 +189,7 @@ class TimeTrialLevelRenderer(
                 ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale * cardScale,
                     UIFonts.caption, UITheme.warning)
             } else {
-                // Locked indicator
-                ui.textCentered("LOCKED", cardCenterX, cardsY + cardHeight / 2,
-                    bodyFont, UITheme.textMuted)
-
+                // Lock icon is drawn in shapes phase above
                 // Volt reward (show even for locked levels)
                 ui.textCentered("+${level.voltReward}V", cardCenterX, cardsY + 25f * scale * cardScale,
                     UIFonts.caption, UITheme.textMuted)

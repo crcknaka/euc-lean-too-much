@@ -706,15 +706,16 @@ class UIRenderer : Disposable {
         shapes.circle(cx + shackleW / 2 - shackleT / 2, shackleY + shackleH, shackleT / 2)
         shapes.rect(cx - shackleW / 2 + shackleT / 2, shackleY + shackleH, shackleW - shackleT, shackleT)
 
-        // Keyhole on body
+        // Keyhole on body (square style)
         shapes.color = UITheme.darken(color, 0.35f)
-        val keyholeY = bodyY + bodyH * 0.5f
-        shapes.circle(cx, keyholeY, s * 0.1f)
-        shapes.triangle(
-            cx - s * 0.06f, keyholeY,
-            cx + s * 0.06f, keyholeY,
-            cx, bodyY + s * 0.08f
-        )
+        val keyholeW = s * 0.22f
+        val keyholeY = bodyY + bodyH * 0.55f
+        // Top part - rounded
+        shapes.circle(cx, keyholeY, keyholeW / 2)
+        // Bottom part - rectangle
+        val slotW = s * 0.1f
+        val slotH = s * 0.25f
+        shapes.rect(cx - slotW / 2, bodyY + bodyH * 0.12f, slotW, slotH)
     }
 
     /** Draw a help icon (question mark in circle) */
