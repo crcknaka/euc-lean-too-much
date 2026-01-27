@@ -17,6 +17,7 @@ class GameOverRenderer : Disposable {
 
     private val retryButton = Rectangle()
     private val menuButton = Rectangle()
+    private val nextLevelButton = Rectangle()
 
     // Animation states
     private var overlayAlpha = 0f
@@ -25,6 +26,7 @@ class GameOverRenderer : Disposable {
     private var newHighScoreAnim = 0f
     private var retryHover = 0f
     private var menuHover = 0f
+    private var nextLevelHover = 0f
     private var safetyTipAnim = 0f  // Animation timer for safety tip
 
     // Current safety tip (randomized on reset)
@@ -56,7 +58,7 @@ class GameOverRenderer : Disposable {
     }
 
     enum class ButtonClicked {
-        NONE, RETRY, MENU
+        NONE, RETRY, MENU, NEXT_LEVEL
     }
 
     // Time Trial result info
@@ -97,6 +99,10 @@ class GameOverRenderer : Disposable {
         val touchY = sh - Gdx.input.y.toFloat()
         retryHover = UITheme.Anim.ease(retryHover, if (retryButton.contains(touchX, touchY)) 1f else 0f, 10f)
         menuHover = UITheme.Anim.ease(menuHover, if (menuButton.contains(touchX, touchY)) 1f else 0f, 10f)
+        nextLevelHover = UITheme.Anim.ease(nextLevelHover, if (nextLevelButton.contains(touchX, touchY)) 1f else 0f, 10f)
+
+        // Check if we should show Next Level button
+        val showNextLevel = timeTrialResult?.completed == true && timeTrialResult.nextLevelUnlocked != null
 
         ui.beginShapes()
 
@@ -160,18 +166,41 @@ class GameOverRenderer : Disposable {
         val buttonHeight = 100f * scale  // Taller for easier tapping
         val buttonGap = 25f * scale
 
-        // Center buttons vertically on panel
-        val totalButtonsHeight = buttonHeight * 2 + buttonGap
-        val buttonsStartY = panelY + (panelHeight - totalButtonsHeight) / 2
+        if (showNextLevel) {
+            // 3 buttons: NEXT LEVEL (green, top), RETRY (middle), MENU (bottom)
+            val totalButtonsHeight = buttonHeight * 3 + buttonGap * 2
+            val buttonsStartY = panelY + (panelHeight - totalButtonsHeight) / 2
 
-        // Retry button (main action) - top
-        val retryY = buttonsStartY + buttonHeight + buttonGap
-        retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
-        ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.4f + retryHover * 0.6f)
+            // Next Level button (green, top)
+            val nextLevelY = buttonsStartY + buttonHeight * 2 + buttonGap * 2
+            nextLevelButton.set(rightCenterX - buttonWidth / 2, nextLevelY, buttonWidth, buttonHeight)
+            ui.neonButton(nextLevelButton, UITheme.primary, UITheme.primary, 0.5f + nextLevelHover * 0.5f)
 
-        // Menu button - bottom
-        menuButton.set(rightCenterX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
-        ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
+            // Retry button - middle
+            val retryY = buttonsStartY + buttonHeight + buttonGap
+            retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
+            ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.3f + retryHover * 0.5f)
+
+            // Menu button - bottom
+            menuButton.set(rightCenterX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
+            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
+        } else {
+            // 2 buttons: RETRY (top), MENU (bottom)
+            val totalButtonsHeight = buttonHeight * 2 + buttonGap
+            val buttonsStartY = panelY + (panelHeight - totalButtonsHeight) / 2
+
+            // Retry button (main action) - top
+            val retryY = buttonsStartY + buttonHeight + buttonGap
+            retryButton.set(rightCenterX - buttonWidth / 2, retryY, buttonWidth, buttonHeight)
+            ui.neonButton(retryButton, UITheme.accent, UITheme.accent, 0.4f + retryHover * 0.6f)
+
+            // Menu button - bottom
+            menuButton.set(rightCenterX - buttonWidth / 2, buttonsStartY, buttonWidth, buttonHeight)
+            ui.neonButton(menuButton, UITheme.surfaceLight, UITheme.textMuted, menuHover * 0.4f)
+
+            // Reset next level button bounds when not shown
+            nextLevelButton.set(0f, 0f, 0f, 0f)
+        }
 
         ui.endShapes()
 
@@ -200,12 +229,12 @@ class GameOverRenderer : Disposable {
                         ui.textCentered("NEW BEST TIME!", leftCenterX, titleY - 95f * scale, UIFonts.body, badgeColor)
                     }
 
-                    // Next level unlocked
+                    // Next level unlocked - more spacing from stats below
                     if (timeTrialResult.nextLevelUnlocked != null) {
                         val unlockPulse = UITheme.Anim.pulse(3f, 0.7f, 1f)
                         val unlockColor = UITheme.withAlpha(UITheme.warning, unlockPulse)
                         ui.textCentered("${timeTrialResult.nextLevelUnlocked.displayName} UNLOCKED!",
-                            leftCenterX, titleY - 130f * scale, UIFonts.caption, unlockColor)
+                            leftCenterX, titleY - 135f * scale, UIFonts.body, unlockColor)
                     }
                 } else {
                     // Failed - time ran out or crashed
@@ -306,6 +335,10 @@ class GameOverRenderer : Disposable {
             }
 
             // Button labels
+            if (showNextLevel) {
+                ui.textCentered("NEXT LEVEL", nextLevelButton.x + nextLevelButton.width / 2, nextLevelButton.y + nextLevelButton.height / 2,
+                    UIFonts.button, UITheme.textPrimary)
+            }
             ui.textCentered("RETRY", retryButton.x + retryButton.width / 2, retryButton.y + retryButton.height / 2,
                 UIFonts.button, UITheme.textPrimary)
             ui.textCentered("MENU", menuButton.x + menuButton.width / 2, menuButton.y + menuButton.height / 2,
@@ -316,6 +349,10 @@ class GameOverRenderer : Disposable {
 
         // === Input ===
         if (Gdx.input.justTouched()) {
+            if (showNextLevel && nextLevelButton.contains(touchX, touchY)) {
+                UIFeedback.clickHeavy()
+                return ButtonClicked.NEXT_LEVEL
+            }
             if (retryButton.contains(touchX, touchY)) {
                 UIFeedback.clickHeavy()
                 return ButtonClicked.RETRY

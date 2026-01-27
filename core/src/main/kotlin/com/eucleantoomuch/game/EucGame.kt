@@ -999,6 +999,15 @@ class EucGame(
                 resetGame()
                 startGame()
             }
+            GameOverRenderer.ButtonClicked.NEXT_LEVEL -> {
+                // Go to next level
+                val nextLevel = timeTrialResult?.nextLevelUnlocked
+                if (nextLevel != null) {
+                    timeTrialManager.selectLevel(nextLevel)
+                    resetGame()
+                    startGame()
+                }
+            }
             GameOverRenderer.ButtonClicked.MENU -> {
                 resetGame()
                 timeTrialManager.clearSelection()
