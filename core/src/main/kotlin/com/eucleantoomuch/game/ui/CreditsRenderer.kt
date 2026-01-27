@@ -81,13 +81,13 @@ class CreditsRenderer : Disposable {
 
             // Game title
             ui.textCentered("EUC Rider - Lean too much", centerX, textY, UIFonts.heading, UITheme.accent)
-            textY -= 60f * scale
+            textY -= 35f * scale
+            ui.textCentered("By EUC riders. For everyone.", centerX, textY, UIFonts.caption, UITheme.textSecondary)
+            textY -= 50f * scale
 
             // Developer
-            ui.textCentered("Developed by", centerX, textY, UIFonts.caption, UITheme.textSecondary)
-            textY -= 35f * scale
-            ui.textCentered("cRc^", centerX, textY, UIFonts.body, UITheme.textPrimary)
-            textY -= 60f * scale
+            ui.textCentered("Developed by cRc^ in 2025", centerX, textY, UIFonts.body, UITheme.textPrimary)
+            textY -= 55f * scale
 
             // Special Thanks section
             ui.textCentered("SPECIAL THANKS", centerX, textY, UIFonts.body, UITheme.accent)
@@ -98,7 +98,9 @@ class CreditsRenderer : Disposable {
             ui.textCentered("Beta Testers", centerX, textY, UIFonts.caption, UITheme.textPrimary)
             textY -= 30f * scale
             ui.textCentered("Family & Friends", centerX, textY, UIFonts.caption, UITheme.textPrimary)
-            textY -= 60f * scale
+            textY -= 30f * scale
+            ui.textCentered("KidCloud", centerX, textY, UIFonts.caption, UITheme.textPrimary)
+            textY -= 55f * scale
 
             // Third-party assets section
             ui.textCentered("THIRD-PARTY ASSETS", centerX, textY, UIFonts.body, UITheme.accent)

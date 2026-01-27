@@ -100,10 +100,12 @@ class HelpRenderer : Disposable {
 
             ui.textCentered("Dodge pedestrians", leftCol, leftY, UIFonts.caption, UITheme.textPrimary)
             leftY -= 28f * scale
+            ui.textCentered("Pigeons fly away - safe!", leftCol, leftY, UIFonts.caption, UITheme.textSecondary)
+            leftY -= 28f * scale
             ui.textCentered("Near misses = bonus points!", leftCol, leftY, UIFonts.caption, UITheme.textPrimary)
             leftY -= 28f * scale
             ui.textCentered("Collect VOLTS for new wheels", leftCol, leftY, UIFonts.caption, UITheme.textPrimary)
-            leftY -= 50f * scale
+            leftY -= 45f * scale
 
             // Game Modes
             ui.textCentered("GAME MODES", leftCol, leftY, UIFonts.heading, UITheme.accent)
@@ -135,17 +137,24 @@ class HelpRenderer : Disposable {
             ui.textCentered("Or you will crash...", rightCol, rightY, UIFonts.caption, UITheme.textMuted)
             rightY -= 55f * scale
 
-            // Tips on right side
-            ui.textCentered("TIPS", rightCol, rightY, UIFonts.heading, UITheme.accent)
+            // In-Game controls on right side
+            ui.textCentered("IN-GAME", rightCol, rightY, UIFonts.heading, UITheme.accent)
             rightY -= 50f * scale
 
+            ui.textCentered("TAP - Change camera view", rightCol, rightY, UIFonts.caption, UITheme.textPrimary)
+            rightY -= 26f * scale
+            ui.textCentered("2-FINGER TAP - Pause", rightCol, rightY, UIFonts.caption, UITheme.textPrimary)
+            rightY -= 26f * scale
+            ui.textCentered("Settings in pause menu", rightCol, rightY, UIFonts.caption, UITheme.textSecondary)
+            rightY -= 50f * scale
+
+            // Tips
+            ui.textCentered("TIPS", rightCol, rightY, UIFonts.heading, UITheme.accent)
+            rightY -= 45f * scale
+
             ui.textCentered("Calibrate phone first!", rightCol, rightY, UIFonts.caption, UITheme.textSecondary)
-            rightY -= 26f * scale
-            ui.textCentered("Watch crossing pedestrians", rightCol, rightY, UIFonts.caption, UITheme.textSecondary)
-            rightY -= 26f * scale
+            rightY -= 24f * scale
             ui.textCentered("Better wheels = less wobble", rightCol, rightY, UIFonts.caption, UITheme.textSecondary)
-            rightY -= 26f * scale
-            ui.textCentered("Balance speed vs control", rightCol, rightY, UIFonts.caption, UITheme.textSecondary)
 
             // Back button label
             ui.textCentered("BACK", backButton.x + backButton.width / 2, backButton.y + backButton.height / 2,

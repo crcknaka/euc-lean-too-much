@@ -446,20 +446,21 @@ class EucGame(
             is GameState.GameOver -> renderGameOver()
         }
 
-        // Check for pause - keyboard or two-finger tap (only when playing)
-        if (stateManager.current() is GameState.Playing) {
+        // Check for pause - keyboard or two-finger tap (during playing or countdown)
+        val currentState = stateManager.current()
+        if (currentState is GameState.Playing || currentState is GameState.Countdown) {
             val shouldPause = Gdx.input.isKeyJustPressed(Input.Keys.BACK) ||
                 Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) ||
                 (Gdx.input.justTouched() && Gdx.input.isTouched(1))  // Two fingers touched
 
             if (shouldPause) {
                 UIFeedback.pauseOpen()
-                val playingState = stateManager.current() as GameState.Playing
                 pauseRenderer.reset()
                 // Reset touch state and ignore taps for a few frames when returning
                 wasTouched = false
                 ignoreTapFrames = 5
-                stateManager.transition(GameState.Paused(playingState.session))
+                val fromCountdown = currentState is GameState.Countdown
+                stateManager.transition(GameState.Paused(session, fromCountdown))
                 return  // Don't process further input this frame
             }
 
@@ -943,14 +944,19 @@ class EucGame(
         when (pauseRenderer.render()) {
             PauseRenderer.ButtonClicked.RESUME -> {
                 val pausedState = stateManager.current() as GameState.Paused
-                // Resume motor sound
-                motorSoundManager.start()
-                // Resume music
-                musicManager.resume()
                 // Prevent camera mode change on resume - ignore taps for a few frames
                 wasTouched = false
                 ignoreTapFrames = 5
-                stateManager.transition(GameState.Playing(pausedState.session))
+                if (pausedState.fromCountdown) {
+                    // Resume to countdown
+                    stateManager.transition(GameState.Countdown(countdownTimer.toInt() + 1))
+                } else {
+                    // Resume motor sound
+                    motorSoundManager.start()
+                    // Resume music
+                    musicManager.resume()
+                    stateManager.transition(GameState.Playing(pausedState.session))
+                }
             }
             PauseRenderer.ButtonClicked.RESTART -> {
                 resetGame()
