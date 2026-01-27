@@ -1802,6 +1802,8 @@ class EucGame(
 
         // Force font and UI reinitialization on resume (GL context may have been lost on Android)
         UIFonts.dispose()
+        // Immediately reinitialize fonts to avoid black rectangles
+        UIFonts.initialize()
 
         // Recreate all UI renderer resources (SpriteBatch, ShapeRenderer)
         hud.recreate()
