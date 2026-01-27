@@ -33,14 +33,14 @@ class MenuRenderer : Disposable {
     private var enterAnimProgress = 0f
 
     // Trail particles (like EUC tire marks)
-    private val trailParticles = Array(25) { TrailParticle() }
+    private val trailParticles = Array(40) { TrailParticle() }
 
     private class TrailParticle {
         var x = MathUtils.random(0f, 1f)
         var y = MathUtils.random(0f, 1f)
-        var length = MathUtils.random(30f, 80f)
-        var speed = MathUtils.random(0.08f, 0.18f)
-        var alpha = MathUtils.random(0.08f, 0.2f)
+        var length = MathUtils.random(50f, 120f)
+        var speed = MathUtils.random(0.1f, 0.22f)
+        var alpha = MathUtils.random(0.15f, 0.35f)
         var angle = MathUtils.random(-15f, 15f)
 
         fun update() {
@@ -48,8 +48,8 @@ class MenuRenderer : Disposable {
             if (y < -0.15f) {
                 y = 1.1f
                 x = MathUtils.random(0f, 1f)
-                length = MathUtils.random(30f, 80f)
-                alpha = MathUtils.random(0.08f, 0.2f)
+                length = MathUtils.random(50f, 120f)
+                alpha = MathUtils.random(0.15f, 0.35f)
             }
         }
     }
@@ -103,8 +103,8 @@ class MenuRenderer : Disposable {
             val px = p.x * sw
             val py = p.y * sh
             val len = p.length * scale
-            // Draw as elongated shape
-            ui.shapes.rect(px - 2f * scale, py, 4f * scale, len)
+            // Draw as elongated shape (thicker lines)
+            ui.shapes.rect(px - 3f * scale, py, 6f * scale, len)
         }
 
         // === HORIZONTAL LAYOUT ===
