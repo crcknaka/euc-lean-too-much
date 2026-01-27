@@ -385,7 +385,7 @@ class WheelSelectionRenderer(
             ui.neonButton(rightButton, UITheme.secondary)
 
             // Large lock icon in center of preview
-            val lockSize = 120f * scale
+            val lockSize = 190f * scale
             val lockColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.2f, 1f)  // Bright gold
             ui.lock(previewX, previewY + previewSize / 2, lockSize, lockColor)
 

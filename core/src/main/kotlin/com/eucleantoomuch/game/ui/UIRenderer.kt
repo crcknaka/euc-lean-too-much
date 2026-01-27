@@ -677,37 +677,43 @@ class UIRenderer : Disposable {
         shapes.color = color
         val s = size * 0.5f
 
-        // Lock body (rounded rectangle)
-        val bodyW = s * 1.2f
-        val bodyH = s * 0.9f
-        val bodyY = cy - s * 0.5f
-        shapes.rect(cx - bodyW / 2, bodyY, bodyW, bodyH)
+        // Lock body (square style with rounded corners effect)
+        val bodyW = s * 0.95f
+        val bodyH = s * 0.8f
+        val bodyY = cy - s * 0.35f
+        val cornerR = s * 0.08f
 
-        // Lock shackle (arc at top) - using circles and rectangles
+        // Main body rectangle with rounded corners
+        shapes.rect(cx - bodyW / 2 + cornerR, bodyY, bodyW - cornerR * 2, bodyH)
+        shapes.rect(cx - bodyW / 2, bodyY + cornerR, bodyW, bodyH - cornerR * 2)
+        shapes.circle(cx - bodyW / 2 + cornerR, bodyY + cornerR, cornerR)
+        shapes.circle(cx + bodyW / 2 - cornerR, bodyY + cornerR, cornerR)
+        shapes.circle(cx - bodyW / 2 + cornerR, bodyY + bodyH - cornerR, cornerR)
+        shapes.circle(cx + bodyW / 2 - cornerR, bodyY + bodyH - cornerR, cornerR)
+
+        // Lock shackle (wide U-shape, no transparency)
         val shackleW = s * 0.7f
-        val shackleH = s * 0.6f
+        val shackleH = s * 0.35f
         val shackleY = bodyY + bodyH
+        val shackleT = s * 0.13f
 
-        // Shackle outer arc (thick arc made with circles)
-        val shackleThickness = s * 0.2f
-        shapes.circle(cx - shackleW / 2 + shackleThickness / 2, shackleY, shackleThickness / 2)
-        shapes.circle(cx + shackleW / 2 - shackleThickness / 2, shackleY, shackleThickness / 2)
-        shapes.rect(cx - shackleW / 2, shackleY, shackleThickness, shackleH)
-        shapes.rect(cx + shackleW / 2 - shackleThickness, shackleY, shackleThickness, shackleH)
-        shapes.circle(cx, shackleY + shackleH, shackleW / 2)
-
-        // Inner cutout for shackle (darker)
-        shapes.color = UITheme.darken(color, 0.4f)
-        shapes.circle(cx, shackleY + shackleH, shackleW / 2 - shackleThickness)
+        shapes.color = com.badlogic.gdx.graphics.Color(0.55f, 0.55f, 0.55f, 1f)
+        // Left bar, right bar
+        shapes.rect(cx - shackleW / 2, shackleY, shackleT, shackleH)
+        shapes.rect(cx + shackleW / 2 - shackleT, shackleY, shackleT, shackleH)
+        // Top arc - rounded corners
+        shapes.circle(cx - shackleW / 2 + shackleT / 2, shackleY + shackleH, shackleT / 2)
+        shapes.circle(cx + shackleW / 2 - shackleT / 2, shackleY + shackleH, shackleT / 2)
+        shapes.rect(cx - shackleW / 2 + shackleT / 2, shackleY + shackleH, shackleW - shackleT, shackleT)
 
         // Keyhole on body
-        shapes.color = UITheme.darken(color, 0.3f)
+        shapes.color = UITheme.darken(color, 0.35f)
         val keyholeY = bodyY + bodyH * 0.5f
-        shapes.circle(cx, keyholeY, s * 0.15f)
+        shapes.circle(cx, keyholeY, s * 0.1f)
         shapes.triangle(
-            cx - s * 0.08f, keyholeY,
-            cx + s * 0.08f, keyholeY,
-            cx, bodyY + s * 0.1f
+            cx - s * 0.06f, keyholeY,
+            cx + s * 0.06f, keyholeY,
+            cx, bodyY + s * 0.08f
         )
     }
 
