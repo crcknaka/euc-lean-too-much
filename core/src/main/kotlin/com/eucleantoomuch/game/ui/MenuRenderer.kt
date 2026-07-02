@@ -7,6 +7,7 @@ import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.math.MathUtils
 import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
+import com.eucleantoomuch.game.util.Constants
 
 /**
  * Modern main menu with "Neon Street" design.
@@ -164,17 +165,17 @@ class MenuRenderer : Disposable {
             glowColor = if (highScore > 0) UITheme.accent else null,
             glowIntensity = if (highScore > 0) 0.3f else 0f)
 
-        // Near Misses card
+        // Best Distance card (second from top - matches label order below)
         val nearMissCardY = scoreCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
         ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, nearMissCardY, cardWidth, cardHeight,
-            glowColor = if (maxNearMisses > 0) UITheme.cyan else null,
-            glowIntensity = if (maxNearMisses > 0) 0.25f else 0f)
-
-        // Best Distance card
-        val distCardY = nearMissCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
-        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, distCardY, cardWidth, cardHeight,
             glowColor = if (maxDistance > 100) UITheme.primary else null,
             glowIntensity = if (maxDistance > 100) 0.25f else 0f)
+
+        // Near Misses card (third from top - matches label order below)
+        val distCardY = nearMissCardY - cardHeight - cardGap - (1 - enterAnimProgress) * 40
+        ui.card(rightCenterX - cardWidth / 2 + cardsOffsetX, distCardY, cardWidth, cardHeight,
+            glowColor = if (maxNearMisses > 0) UITheme.cyan else null,
+            glowIntensity = if (maxNearMisses > 0) 0.25f else 0f)
 
         // Volts card
         val voltsCardColor = com.badlogic.gdx.graphics.Color(1f, 0.85f, 0.1f, 1f)
@@ -252,6 +253,10 @@ class MenuRenderer : Disposable {
 
         // Bottom hint
         ui.textCentered("Tilt to steer  ~  Lean forward to accelerate", centerX, hintHeight / 2,
+            UIFonts.caption, UITheme.textMuted)
+
+        // Game version in the bottom-right corner of the hint bar
+        ui.textCentered("v${Constants.GAME_VERSION}", sw - 70f * scale, hintHeight / 2,
             UIFonts.caption, UITheme.textMuted)
 
         ui.endBatch()
