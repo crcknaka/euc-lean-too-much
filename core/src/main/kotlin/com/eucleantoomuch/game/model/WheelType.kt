@@ -66,7 +66,7 @@ sealed class WheelType(
         wheelRadius = 0.2f,
         bodyColor = Color(0.25f, 0.25f, 0.25f, 1f),  // Dark gray
         accentColor = Color(0.4f, 0.4f, 0.4f, 1f),   // Gray
-        unlockVoltsRequired = 10_000  // Requires 10,000 volts
+        unlockVoltsRequired = 0     // Unlocked by default
     )
 
     // Performance wheel - 22" - fast, stable
@@ -85,7 +85,7 @@ sealed class WheelType(
         wheelRadius = 0.25f,
         bodyColor = Color(0.6f, 0.15f, 0.15f, 1f),  // Dark red
         accentColor = Color(1f, 0.3f, 0.1f, 1f),    // Orange accent
-        unlockVoltsRequired = 100_000  // Requires 100,000 volts
+        unlockVoltsRequired = 0     // Unlocked by default
     )
 
     companion object {

@@ -56,8 +56,8 @@ object EucPhysics {
         turnResponsiveness: Float = Constants.TURN_RESPONSIVENESS,
         maxSpeed: Float = Constants.MAX_SPEED
     ): Float {
-        // Speed factor: turning is harder at high speed
-        val speedFactor = 1f - (currentSpeed / maxSpeed) * 0.5f
+        // Speed factor: turning is harder at high speed (30% penalty at max speed)
+        val speedFactor = 1f - (currentSpeed / maxSpeed) * 0.3f
         // Turn responsiveness affects how agile the wheel is
         val responsivenessFactor = turnResponsiveness / Constants.TURN_RESPONSIVENESS
         return sideLean * Constants.MAX_TURN_RATE * speedFactor * responsivenessFactor

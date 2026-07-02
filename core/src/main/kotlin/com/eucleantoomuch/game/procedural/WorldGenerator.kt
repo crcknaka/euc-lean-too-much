@@ -1768,11 +1768,12 @@ class WorldGenerator(
             position.set(x, 0f, z)
             yaw = rotation
             updateRotationFromYaw()
+            // Vary size via transform scale so all puddles share one Model -
+            // building a Model per puddle leaks GPU meshes until app exit
+            scale.set(widthScale, 1f, lengthScale)
         })
 
-        // Create custom sized puddle model
-        val customPuddleModel = models.createPuddleModel(puddleWidth, puddleLength)
-        entity.add(ModelComponent().apply { modelInstance = ModelInstance(customPuddleModel) })
+        entity.add(ModelComponent().apply { modelInstance = ModelInstance(puddleModel) })
 
         entity.add(ColliderComponent().apply {
             setSize(puddleWidth, 0.5f, puddleLength)

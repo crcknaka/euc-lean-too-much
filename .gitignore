@@ -17,3 +17,9 @@ nul
 
 # Android
 android/build/
+
+# Release signing (keep private)
+android/release.keystore
+android/keystore.properties
+android/libs/
+EUC-Lean-Too-Much-*.apk

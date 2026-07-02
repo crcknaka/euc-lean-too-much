@@ -113,6 +113,11 @@ class GameRenderer(
     }
     private val headlightPosition = Vector3()
 
+    // Cached sin/cos for headlight direction, recomputed only when yaw changes
+    private var headlightCachedYaw = Float.NaN
+    private var headlightSinYaw = 0f
+    private var headlightCosYaw = 1f
+
 
 
 
@@ -169,11 +174,16 @@ class GameRenderer(
         iblBuilder.dispose()
 
         // BRDF lookup texture (provided by gdx-gltf library)
-        brdfLUT = Texture(Gdx.files.classpath("net/mgsx/gltf/shaders/brdfLUT.png"))
+        brdfLUT = try {
+            Texture(Gdx.files.classpath("net/mgsx/gltf/shaders/brdfLUT.png"))
+        } catch (e: Exception) {
+            Gdx.app.error("GameRenderer", "Failed to load BRDF LUT texture, PBR quality will be degraded", e)
+            null
+        }
 
         // Apply IBL to environment
         sceneManager.setAmbientLight(1f)
-        sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
+        brdfLUT?.let { sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, it)) }
         sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
         sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
 
@@ -265,15 +275,18 @@ class GameRenderer(
             for (entity in engine.getEntitiesFor(Families.player)) {
                 val transform = transformMapper.get(entity) ?: continue
 
-                val yawRad = Math.toRadians(transform.yaw.toDouble()).toFloat()
-                val sinYaw = kotlin.math.sin(yawRad)
-                val cosYaw = kotlin.math.cos(yawRad)
+                if (transform.yaw != headlightCachedYaw) {
+                    headlightCachedYaw = transform.yaw
+                    val yawRad = Math.toRadians(transform.yaw.toDouble()).toFloat()
+                    headlightSinYaw = kotlin.math.sin(yawRad)
+                    headlightCosYaw = kotlin.math.cos(yawRad)
+                }
 
                 // Position headlight ahead of player (same as drawn spot)
                 headlightPosition.set(
-                    transform.position.x - sinYaw * 8f,
+                    transform.position.x - headlightSinYaw * 8f,
                     1.0f,
-                    transform.position.z + cosYaw * 8f
+                    transform.position.z + headlightCosYaw * 8f
                 )
                 headlightPbrLight.position.set(headlightPosition)
                 break

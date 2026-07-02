@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     kotlin("android")
@@ -8,6 +10,12 @@ val gdxVersion: String by project
 // Configuration for native libraries
 val natives: Configuration by configurations.creating
 
+// Release signing credentials (android/keystore.properties, not committed to git)
+val keystoreProps = Properties().apply {
+    val f = file("keystore.properties")
+    if (f.exists()) f.inputStream().use { stream -> load(stream) }
+}
+
 android {
     namespace = "com.eucleantoomuch.game"
     compileSdk = 35
@@ -16,10 +24,22 @@ android {
         applicationId = "com.eucleantoomuch.game"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            // Real phones only - x86/x86_64 would add ~13 MB of natives for Intel emulators
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
+        }
+    }
+
+    signingConfigs {
+        if (keystoreProps.isNotEmpty()) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
 
@@ -28,6 +48,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreProps.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         debug {
             isMinifyEnabled = false
@@ -54,6 +77,11 @@ android {
         }
     }
 
+    androidResources {
+        // Keep archived wheel models in the repo but out of the APK
+        ignoreAssetsPatterns.add("!old_Wheels")
+    }
+
     packaging {
         resources {
             excludes += listOf(
@@ -76,19 +104,13 @@ dependencies {
 
     natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-x86_64")
 
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-x86_64")
 
     // Bullet physics natives
     natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-arm64-v8a")
-    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-x86")
-    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-x86_64")
 }
 
 // Task to copy native libraries to jniLibs folder

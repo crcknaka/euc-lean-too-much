@@ -12,7 +12,7 @@ object Constants {
     const val MAX_SPEED = 23.6f             // m/s (85 km/h)
     const val ACCELERATION = 5f             // m/s²
     const val DECELERATION = 8f             // m/s² (braking)
-    const val MAX_TURN_RATE = 90f           // degrees/second
+    const val MAX_TURN_RATE = 100f          // degrees/second
     const val TURN_RESPONSIVENESS = 3f
     const val WHEEL_RADIUS = 0.2f           // 20cm wheel
     const val EUC_GROUND_OFFSET = 0.15f     // Height offset to prevent wheel clipping into ground

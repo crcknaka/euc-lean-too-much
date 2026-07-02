@@ -51,6 +51,7 @@ import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 import com.eucleantoomuch.game.ui.ModeSelectionRenderer
 import com.eucleantoomuch.game.ui.TimeTrialLevelRenderer
+import com.eucleantoomuch.game.physics.RagdollInteractions
 import com.eucleantoomuch.game.physics.RagdollPhysics
 import com.eucleantoomuch.game.physics.RagdollRenderer
 
@@ -117,6 +118,7 @@ class EucGame(
     private var ragdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
     private var ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
     private var useRagdollPhysics = true  // Toggle for ragdoll vs scripted animation
+    private lateinit var ragdollInteractions: RagdollInteractions
 
     // Background music manager
     private lateinit var musicManager: MusicManager
@@ -219,11 +221,11 @@ class EucGame(
         }
         collisionSystem.onPedestrianHit = { pedestrianEntity ->
             // Start ragdoll physics for the hit pedestrian
-            startPedestrianRagdoll(pedestrianEntity)
+            ragdollInteractions.startPedestrianRagdoll(pedestrianEntity)
         }
         collisionSystem.onKnockableHit = { obstacleEntity ->
             // Start ragdoll physics for knockable objects (trash cans)
-            startTrashCanRagdoll(obstacleEntity)
+            ragdollInteractions.startTrashCanRagdoll(obstacleEntity)
         }
         collisionSystem.onPowerupCollected = { powerupComponent ->
             when (powerupComponent.type) {
@@ -246,6 +248,14 @@ class EucGame(
             val voltsEarned = voltsManager.awardPigeonStartle()
             hud.triggerVoltsEarned(voltsEarned, "Pigeons")
         }
+        ragdollInteractions = RagdollInteractions(
+            engine = engine,
+            platformServices = platformServices,
+            pigeonSystem = pigeonSystem,
+            ragdollPhysics = { ragdollPhysics },
+            playerEntity = { playerEntity },
+            useRagdollPhysics = { useRagdollPhysics }
+        )
         cullingSystem = CullingSystem()
         pedestrianAISystem = PedestrianAISystem()
         carAISystem = CarAISystem()
@@ -785,11 +795,11 @@ class EucGame(
 
         // Update pedestrian ragdoll physics (if any pedestrians are falling)
         ragdollPhysics?.update(delta)
-        updateFallingPedestrians()
-        updateKnockedOverTrashCans()
+        ragdollInteractions.updateFallingPedestrians()
+        ragdollInteractions.updateKnockedOverTrashCans()
 
         // Check if ragdoll bodies knock down standing pedestrians
-        checkRagdollPedestrianCollisions()
+        ragdollInteractions.checkRagdollPedestrianCollisions()
 
         // Update session
         val playerTransform = playerEntity?.getComponent(TransformComponent::class.java)
@@ -1140,332 +1150,9 @@ class EucGame(
 
         // Reset pedestrian crossing probability
         pedestrianAISystem.crossingProbability = 0f
-    }
 
-    // Temp vector for pedestrian ragdoll
-    private val pedestrianImpactDir = com.badlogic.gdx.math.Vector3()
-
-    private fun startPedestrianRagdoll(pedestrianEntity: com.badlogic.ashley.core.Entity) {
-        // Early exit without logging to reduce overhead
-        if (!useRagdollPhysics || ragdollPhysics == null) return
-
-        val pedestrianComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
-        ) ?: return
-
-        // Don't ragdoll if already ragdolling
-        if (pedestrianComponent.isRagdolling) return
-
-        val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
-        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
-        val eucComponent = playerEntity?.getComponent(EucComponent::class.java) ?: return
-
-        // Calculate impact direction (from player to pedestrian)
-        val yawRad = Math.toRadians(playerTransform.yaw.toDouble()).toFloat()
-        pedestrianImpactDir.set(
-            kotlin.math.sin(yawRad),
-            0f,
-            kotlin.math.cos(yawRad)
-        )
-
-        // Hide models first to avoid any visual glitch
-        val modelComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
-        )
-        modelComponent?.visible = false
-
-        val shadowComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
-        )
-        shadowComponent?.visible = false
-
-        // Extract shirt color from pedestrian model for ragdoll rendering
-        val shirtColor = extractPedestrianShirtColor(modelComponent?.modelInstance)
-            ?: com.badlogic.gdx.graphics.Color.GREEN
-
-        // Add pedestrian ragdoll body (this is the heavy operation)
-        val bodyIndex = ragdollPhysics!!.addPedestrianRagdoll(
-            position = pedestrianTransform.position,
-            yaw = pedestrianTransform.yaw,
-            playerVelocity = eucComponent.speed,
-            playerDirection = pedestrianImpactDir,
-            entityIndex = pedestrianEntity.hashCode(),
-            shirtColor = shirtColor
-        )
-
-        // Mark pedestrian as ragdolling
-        pedestrianComponent.isRagdolling = true
-        pedestrianComponent.ragdollBodyIndex = bodyIndex
-        pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
-
-        // Startle nearby pigeons when pedestrian is hit
-        pigeonSystem.addStartleSource(pedestrianTransform.position)
-    }
-
-    /**
-     * Start ragdoll physics for a trash can (knockable object).
-     */
-    private fun startTrashCanRagdoll(obstacleEntity: com.badlogic.ashley.core.Entity) {
-        if (ragdollPhysics == null) return
-
-        val obstacleComponent = obstacleEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
-        ) ?: return
-
-        val obstacleTransform = obstacleEntity.getComponent(TransformComponent::class.java) ?: return
-        val playerTransform = playerEntity?.getComponent(TransformComponent::class.java) ?: return
-        val eucComponent = playerEntity?.getComponent(EucComponent::class.java) ?: return
-
-        // Calculate impact direction (from player to obstacle)
-        val yawRad = Math.toRadians(playerTransform.yaw.toDouble()).toFloat()
-        val impactDir = com.badlogic.gdx.math.Vector3(
-            kotlin.math.sin(yawRad),
-            0f,
-            kotlin.math.cos(yawRad)
-        )
-
-        // Hide original model
-        val modelComponent = obstacleEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
-        )
-        modelComponent?.visible = false
-
-        // Hide shadow
-        val shadowComponent = obstacleEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
-        )
-        shadowComponent?.visible = false
-
-        // Add trash can ragdoll
-        val bodyIndex = ragdollPhysics!!.addTrashCanRagdoll(
-            position = obstacleTransform.position,
-            playerVelocity = eucComponent.speed,
-            playerDirection = impactDir,
-            entityIndex = obstacleEntity.hashCode()
-        )
-
-        obstacleComponent.ragdollBodyIndex = bodyIndex
-    }
-
-    /**
-     * Extract shirt color from pedestrian model instance for ragdoll rendering.
-     */
-    private fun extractPedestrianShirtColor(modelInstance: com.badlogic.gdx.graphics.g3d.ModelInstance?): com.badlogic.gdx.graphics.Color? {
-        if (modelInstance == null) return null
-
-        // Find the torso material and extract its color
-        for (material in modelInstance.materials) {
-            val id = material.id?.lowercase() ?: ""
-            if (id.contains("torso") || id.contains("shirt") || id.contains("upper")) {
-                val colorAttr = material.get(com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute.Diffuse)
-                    as? com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
-                if (colorAttr != null) return colorAttr.color
-            }
-        }
-
-        // Fallback: return first material color that's not skin/pants/hair
-        for (material in modelInstance.materials) {
-            val colorAttr = material.get(com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute.Diffuse)
-                as? com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
-            if (colorAttr != null) {
-                val c = colorAttr.color
-                // Skip skin-like colors (high R, medium G, low-medium B)
-                if (c.r > 0.7f && c.g > 0.5f && c.b > 0.4f) continue
-                // Skip pants-like colors (dark)
-                if (c.r < 0.35f && c.g < 0.35f && c.b < 0.45f) continue
-                // Skip hair-like colors (brown)
-                if (c.r < 0.4f && c.g < 0.3f && c.b < 0.2f) continue
-                return c
-            }
-        }
-        return null
-    }
-
-    // Temp vectors for ragdoll-to-pedestrian collision checking
-    private val ragdollCheckPos = com.badlogic.gdx.math.Vector3()
-    private val pedestrianCheckPos = com.badlogic.gdx.math.Vector3()
-    private val ragdollImpactDir = com.badlogic.gdx.math.Vector3()
-    private val ragdollCollisionRadius = 0.8f  // Collision radius for ragdoll body
-
-    // Temp vectors for car-ragdoll collision checking
-    private val carCheckPos = com.badlogic.gdx.math.Vector3()
-    private val carVelocity = com.badlogic.gdx.math.Vector3()
-    private val carsHitRagdoll = mutableSetOf<Entity>()  // Track which cars already hit ragdoll
-
-    /**
-     * Check if any ragdoll body (player or pedestrian) collides with standing pedestrians.
-     * If collision detected, knock down the standing pedestrian.
-     */
-    private fun checkRagdollPedestrianCollisions() {
-        if (!useRagdollPhysics || ragdollPhysics == null) return
-
-        // Get all active ragdoll bodies with significant velocity
-        val ragdollBodies = ragdollPhysics!!.getActiveRagdollBodies(minVelocity = 3f)
-        if (ragdollBodies.isEmpty()) return
-
-        // Get all pedestrians
-        val pedestrians = engine.getEntitiesFor(Families.pedestrians)
-        if (pedestrians.size() == 0) return
-
-        for (ragdollBody in ragdollBodies) {
-            ragdollCheckPos.set(ragdollBody.position)
-
-            for (i in 0 until pedestrians.size()) {
-                val pedestrianEntity = pedestrians[i]
-                val pedestrianComponent = pedestrianEntity.getComponent(
-                    com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
-                ) ?: continue
-
-                // Skip if already ragdolling
-                if (pedestrianComponent.isRagdolling) continue
-
-                val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: continue
-                pedestrianCheckPos.set(pedestrianTransform.position)
-                pedestrianCheckPos.y += 0.8f  // Check at torso height
-
-                // Simple distance check
-                val dx = ragdollCheckPos.x - pedestrianCheckPos.x
-                val dy = ragdollCheckPos.y - pedestrianCheckPos.y
-                val dz = ragdollCheckPos.z - pedestrianCheckPos.z
-                val distSq = dx * dx + dy * dy + dz * dz
-
-                if (distSq < ragdollCollisionRadius * ragdollCollisionRadius) {
-                    // Collision detected! Start ragdoll for this pedestrian
-                    startRagdollFromImpact(pedestrianEntity, ragdollBody.velocity)
-
-                    // Play quieter impact sound (chain reaction)
-                    platformServices.playPersonImpactSound(0.4f)
-                }
-            }
-        }
-    }
-
-    /**
-     * Start pedestrian ragdoll from being hit by another ragdoll body.
-     * Similar to startPedestrianRagdoll but uses the ragdoll's velocity as impact direction.
-     */
-    private fun startRagdollFromImpact(
-        pedestrianEntity: com.badlogic.ashley.core.Entity,
-        impactVelocity: com.badlogic.gdx.math.Vector3
-    ) {
-        if (!useRagdollPhysics || ragdollPhysics == null) return
-
-        val pedestrianComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
-        ) ?: return
-
-        if (pedestrianComponent.isRagdolling) return
-
-        val pedestrianTransform = pedestrianEntity.getComponent(TransformComponent::class.java) ?: return
-
-        // Hide models
-        val modelComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ModelComponent::class.java
-        )
-        modelComponent?.visible = false
-
-        val shadowComponent = pedestrianEntity.getComponent(
-            com.eucleantoomuch.game.ecs.components.ShadowComponent::class.java
-        )
-        shadowComponent?.visible = false
-
-        // Calculate impact direction from velocity (normalized)
-        ragdollImpactDir.set(impactVelocity).nor()
-        ragdollImpactDir.y = 0f  // Keep horizontal
-
-        // Impact speed is reduced (secondary impact)
-        val impactSpeed = impactVelocity.len() * 0.6f
-
-        // Extract shirt color
-        val shirtColor = extractPedestrianShirtColor(modelComponent?.modelInstance)
-            ?: com.badlogic.gdx.graphics.Color.GREEN
-
-        // Add pedestrian ragdoll
-        val bodyIndex = ragdollPhysics!!.addPedestrianRagdoll(
-            position = pedestrianTransform.position,
-            yaw = pedestrianTransform.yaw,
-            playerVelocity = impactSpeed,
-            playerDirection = ragdollImpactDir,
-            entityIndex = pedestrianEntity.hashCode(),
-            shirtColor = shirtColor
-        )
-
-        // Mark pedestrian as ragdolling
-        pedestrianComponent.isRagdolling = true
-        pedestrianComponent.ragdollBodyIndex = bodyIndex
-        pedestrianComponent.state = com.eucleantoomuch.game.ecs.components.PedestrianState.FALLING
-
-        // Startle nearby pigeons when pedestrian is knocked down (secondary impact)
-        pigeonSystem.addStartleSource(pedestrianTransform.position)
-    }
-
-    /**
-     * Check if moving cars collide with the player ragdoll.
-     * If collision detected, apply impulse to ragdoll and startle pigeons.
-     */
-    private fun checkRagdollCarCollisions() {
-        if (!useRagdollPhysics || ragdollPhysics == null) return
-        if (!ragdollPhysics!!.isActive()) return
-
-        // Get player ragdoll torso position
-        ragdollPhysics!!.getTorsoPosition(ragdollCheckPos)
-        if (ragdollCheckPos.isZero) return
-
-        // Get all cars
-        val cars = engine.getEntitiesFor(Families.cars)
-        if (cars.size() == 0) return
-
-        for (i in 0 until cars.size()) {
-            val carEntity = cars[i]
-
-            // Skip if already hit this car
-            if (carEntity in carsHitRagdoll) continue
-
-            val carTransform = carEntity.getComponent(TransformComponent::class.java) ?: continue
-            val carComponent = carEntity.getComponent(com.eucleantoomuch.game.ecs.components.CarComponent::class.java) ?: continue
-            val carCollider = carEntity.getComponent(com.eucleantoomuch.game.ecs.components.ColliderComponent::class.java)
-
-            // Car dimensions
-            val carHalfWidth = carCollider?.halfExtents?.x ?: 1.0f
-            val carHalfHeight = carCollider?.halfExtents?.y ?: 0.7f
-            val carHalfLength = carCollider?.halfExtents?.z ?: 2.2f
-
-            carCheckPos.set(carTransform.position)
-            carCheckPos.y += carHalfHeight  // Center of car
-
-            // Simple AABB check (car is axis-aligned or rotated 180)
-            val yawRad = Math.toRadians(carTransform.yaw.toDouble()).toFloat()
-            val cosYaw = kotlin.math.cos(yawRad)
-            val sinYaw = kotlin.math.sin(yawRad)
-
-            // Transform ragdoll position to car's local space
-            val localX = (ragdollCheckPos.x - carCheckPos.x) * cosYaw + (ragdollCheckPos.z - carCheckPos.z) * sinYaw
-            val localY = ragdollCheckPos.y - carCheckPos.y
-            val localZ = -(ragdollCheckPos.x - carCheckPos.x) * sinYaw + (ragdollCheckPos.z - carCheckPos.z) * cosYaw
-
-            // Check if ragdoll is inside car AABB (with some margin for ragdoll radius)
-            val margin = 0.5f
-            if (kotlin.math.abs(localX) < carHalfWidth + margin &&
-                kotlin.math.abs(localY) < carHalfHeight + margin &&
-                kotlin.math.abs(localZ) < carHalfLength + margin) {
-
-                // Collision detected!
-                carsHitRagdoll.add(carEntity)
-
-                // Calculate car velocity direction
-                carVelocity.set(0f, 0f, carComponent.speed)
-                carVelocity.rotate(com.badlogic.gdx.math.Vector3.Y, carTransform.yaw)
-
-                // Apply impulse to ragdoll
-                ragdollPhysics!!.applyExternalImpulse(ragdollCheckPos, carVelocity)
-
-                // Startle nearby pigeons
-                pigeonSystem.addStartleSource(ragdollCheckPos)
-
-                // Play car hit sound
-                platformServices.playGenericHitSound(0.8f)
-            }
-        }
+        // Drop tracked ragdoll entities from the previous session
+        ragdollInteractions.reset()
     }
 
     private fun handlePlayerFall() {
@@ -1640,10 +1327,10 @@ class EucGame(
         }
 
         // Check if ragdoll bodies knock down standing pedestrians
-        checkRagdollPedestrianCollisions()
+        ragdollInteractions.checkRagdollPedestrianCollisions()
 
         // Check if moving cars hit the player ragdoll
-        checkRagdollCarCollisions()
+        ragdollInteractions.checkRagdollCarCollisions()
 
         // Update ragdoll physics if active
         val ragdollActive = useRagdollPhysics && ragdollPhysics != null && ragdollPhysics!!.isActive()
@@ -1760,8 +1447,8 @@ class EucGame(
         }
 
         // Update falling pedestrians (always, not just when player ragdoll is active)
-        updateFallingPedestrians()
-        updateKnockedOverTrashCans()
+        ragdollInteractions.updateFallingPedestrians()
+        ragdollInteractions.updateKnockedOverTrashCans()
 
         // Render the scene (ragdoll is rendered inside main render pass via activeRagdollRenderer)
         renderer.render()
@@ -1809,10 +1496,10 @@ class EucGame(
         // Re-enable high FPS on resume (Android may reset this)
         Gdx.graphics.setForegroundFPS(240)
 
-        // Force font and UI reinitialization on resume (GL context may have been lost on Android)
-        UIFonts.dispose()
-        // Immediately reinitialize fonts to avoid black rectangles
-        UIFonts.initialize()
+        // Force font reinitialization on resume (GL context may have been lost on Android).
+        // Fonts are regenerated lazily on the next render, when the surface size is final -
+        // regenerating here can bake in a stale height and break all text scaling.
+        UIFonts.invalidate()
 
         // Recreate all UI renderer resources (SpriteBatch, ShapeRenderer)
         hud.recreate()
@@ -2061,88 +1748,7 @@ class EucGame(
     private fun resetColliderTracking() {
         addedColliderEntities.clear()
         lastColliderUpdateZ = Float.MIN_VALUE
-        carsHitRagdoll.clear()  // Reset car collision tracking
-    }
-
-    // Temp matrix for pedestrian transform updates
-    private val pedestrianTempMatrix = com.badlogic.gdx.math.Matrix4()
-    private val pedestrianTempPos = com.badlogic.gdx.math.Vector3()
-
-    /**
-     * Update positions of falling pedestrians from ragdoll physics.
-     * Hides original model and uses ragdoll renderer for articulated body.
-     */
-    private fun updateFallingPedestrians() {
-        if (ragdollPhysics == null) return
-
-        val pedestrians = engine.getEntitiesFor(Families.pedestrians)
-        for (i in 0 until pedestrians.size()) {
-            val entity = pedestrians[i]
-            val pedestrianComponent = entity.getComponent(
-                com.eucleantoomuch.game.ecs.components.PedestrianComponent::class.java
-            ) ?: continue
-
-            if (!pedestrianComponent.isRagdolling) continue
-
-            val transform = entity.getComponent(TransformComponent::class.java) ?: continue
-            val modelComponent = entity.getComponent(ModelComponent::class.java) ?: continue
-
-            // Hide original pedestrian model - ragdoll renderer will draw the articulated body
-            modelComponent.visible = false
-
-            // Get physics transform (torso position)
-            val physicsTransform = ragdollPhysics!!.getPedestrianTransform(pedestrianComponent.ragdollBodyIndex)
-            if (physicsTransform != null) {
-                // Extract position from physics
-                physicsTransform.getTranslation(pedestrianTempPos)
-
-                // Update entity transform position (for culling/tracking)
-                transform.position.set(pedestrianTempPos)
-                // Offset Y down by half torso height since physics center is at torso
-                transform.position.y = pedestrianTempPos.y - 0.25f
-
-                // Continuously startle pigeons near falling pedestrians
-                pigeonSystem.addStartleSource(pedestrianTempPos.x, pedestrianTempPos.z)
-            }
-        }
-    }
-
-    // Temp matrix for dynamic object (trash can) transform updates
-    private val trashCanTempMatrix = com.badlogic.gdx.math.Matrix4()
-    private val trashCanTempPos = com.badlogic.gdx.math.Vector3()
-
-    /**
-     * Update positions and render knocked over trash cans using ragdoll physics transforms.
-     */
-    private fun updateKnockedOverTrashCans() {
-        if (ragdollPhysics == null) return
-
-        val obstacles = engine.getEntitiesFor(Families.obstacles)
-        for (i in 0 until obstacles.size()) {
-            val entity = obstacles[i]
-            val obstacleComponent = entity.getComponent(
-                com.eucleantoomuch.game.ecs.components.ObstacleComponent::class.java
-            ) ?: continue
-
-            if (!obstacleComponent.isKnockedOver || obstacleComponent.ragdollBodyIndex < 0) continue
-
-            val transform = entity.getComponent(TransformComponent::class.java) ?: continue
-            val modelComponent = entity.getComponent(ModelComponent::class.java) ?: continue
-
-            // Get physics transform
-            val physicsTransform = ragdollPhysics!!.getDynamicObjectTransform(obstacleComponent.ragdollBodyIndex)
-            if (physicsTransform != null) {
-                // Update model instance transform directly from physics
-                modelComponent.modelInstance?.transform?.set(physicsTransform)
-
-                // Also update entity position for culling
-                physicsTransform.getTranslation(trashCanTempPos)
-                transform.position.set(trashCanTempPos)
-
-                // Make model visible again (it's now controlled by physics)
-                modelComponent.visible = true
-            }
-        }
+        ragdollInteractions.resetCarHits()  // Reset car collision tracking
     }
 
     /**

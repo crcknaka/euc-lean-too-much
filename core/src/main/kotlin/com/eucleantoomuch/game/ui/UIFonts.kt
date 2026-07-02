@@ -16,7 +16,7 @@ object UIFonts : Disposable {
     private val fonts = mutableMapOf<FontStyle, BitmapFont>()
     private var initialized = false
     private var generator: FreeTypeFontGenerator? = null
-    private var lastGlContext = 0  // Track GL context changes
+    private var fontGenHeight = 0  // Screen height the fonts were generated for
 
     enum class FontStyle {
         DISPLAY,     // Extra large - Big titles, countdown
@@ -44,19 +44,36 @@ object UIFonts : Disposable {
     private const val CHARS = FreeTypeFontGenerator.DEFAULT_CHARS +
             "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
 
+    /**
+     * Drop all fonts so they are regenerated lazily on the next initialize() call.
+     * Call on Android resume: regenerating immediately inside resume() is unsafe because
+     * the surface size may not be final yet, producing wrongly-scaled fonts.
+     */
+    fun invalidate() {
+        disposeInternal()
+    }
+
     fun initialize() {
         // Check if GL context was recreated (happens on Android resume)
         // We detect this by checking if any font texture became invalid
         val contextLost = initialized && fonts.isNotEmpty() &&
             fonts.values.any { !it.region.texture.isManaged || it.region.texture.textureObjectHandle == 0 }
 
-        if (contextLost) {
-            Gdx.app.log("UIFonts", "GL context lost, reinitializing fonts")
+        // Fonts are sized from screen height - if it changed (resize, resume with a
+        // different surface), regenerate so text doesn't render at the wrong scale
+        val heightChanged = initialized && fontGenHeight > 0 && Gdx.graphics.height > 0 &&
+            Gdx.graphics.height != fontGenHeight
+
+        if (contextLost || heightChanged) {
+            Gdx.app.log("UIFonts", "Reinitializing fonts (contextLost=$contextLost, heightChanged=$heightChanged)")
             disposeInternal()
         }
 
         if (initialized) return
+        // Surface not ready yet - retry on the next frame
+        if (Gdx.graphics.height <= 0) return
         initialized = true
+        fontGenHeight = Gdx.graphics.height
 
         val density = Gdx.graphics.density.coerceAtLeast(1f)
         // Scale based on screen height (base is 1080p)
@@ -107,7 +124,9 @@ object UIFonts : Disposable {
             this.magFilter = Texture.TextureFilter.Linear
             this.characters = CHARS
             this.kerning = true
-            this.genMipMaps = true
+            // No mipmaps: Linear filtering never samples them, and mipmap regeneration
+            // after GL context loss corrupts font atlases on some Android drivers
+            this.genMipMaps = false
         }
         return generator!!.generateFont(param)
     }

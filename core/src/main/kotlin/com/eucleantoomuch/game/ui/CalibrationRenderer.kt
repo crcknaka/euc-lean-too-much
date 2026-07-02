@@ -29,6 +29,11 @@ class CalibrationRenderer : Disposable {
     private var successFlash = 0f
     private var readyTimer = 0f  // Time the dot has been stable
 
+    // Auto-calibration: tapping the screen shifts the phone and ruins the neutral position,
+    // so once the device is held steady long enough we calibrate automatically.
+    private val stableThreshold = 0.5f      // Seconds of stillness before "ready"
+    private val autoCalibrateDelay = 2f     // Additional steady seconds before auto-calibrate
+
     enum class Action {
         NONE, CALIBRATE, SKIP
     }
@@ -72,7 +77,17 @@ class CalibrationRenderer : Disposable {
         } else {
             readyTimer = 0f
         }
-        val isStable = readyTimer > 0.5f  // Stable for 0.5 seconds
+        val isStable = readyTimer > stableThreshold
+        // 0..1 progress toward auto-calibration while held steady
+        val autoProgress = ((readyTimer - stableThreshold) / autoCalibrateDelay).coerceIn(0f, 1f)
+
+        // Held steady long enough - calibrate without requiring a tap
+        if (isStable && autoProgress >= 1f) {
+            readyTimer = 0f
+            UIFeedback.clickHeavy()
+            successFlash = 1f
+            return Action.CALIBRATE
+        }
 
         ui.beginShapes()
 
@@ -105,21 +120,27 @@ class CalibrationRenderer : Disposable {
         ui.shapes.color = if (isStable) UITheme.withAlpha(UITheme.accent, 0.15f) else UITheme.surfaceLight
         ui.shapes.circle(centerX, indicatorCenterY, indicatorSize / 2)
 
-        // Outer ring - glows when stable
+        // Outer ring - glows when stable, fills up as auto-calibration approaches
         if (isStable) {
             val glowPulse = UITheme.Anim.pulse(2f, 0.4f, 0.7f)
-            ui.shapes.color = UITheme.withAlpha(UITheme.accent, glowPulse * 0.5f)
             val segments = 36
             val radius = indicatorSize / 2
+            // Progress arc starts at the top (12 o'clock) and fills clockwise
+            val filledSegments = (segments * autoProgress).toInt()
             for (i in 0 until segments) {
-                val angle1 = (i.toFloat() / segments) * MathUtils.PI2
-                val angle2 = ((i + 1).toFloat() / segments) * MathUtils.PI2
+                val angle1 = MathUtils.PI / 2 - (i.toFloat() / segments) * MathUtils.PI2
+                val angle2 = MathUtils.PI / 2 - ((i + 1).toFloat() / segments) * MathUtils.PI2
+                ui.shapes.color = if (i < filledSegments) {
+                    UITheme.accent
+                } else {
+                    UITheme.withAlpha(UITheme.accent, glowPulse * 0.3f)
+                }
                 ui.shapes.rectLine(
                     centerX + radius * MathUtils.cos(angle1),
                     indicatorCenterY + radius * MathUtils.sin(angle1),
                     centerX + radius * MathUtils.cos(angle2),
                     indicatorCenterY + radius * MathUtils.sin(angle2),
-                    4f
+                    if (i < filledSegments) 6f else 4f
                 )
             }
         }
@@ -214,7 +235,13 @@ class CalibrationRenderer : Disposable {
 
         val instrY3 = instrY2 - 55f * scale
         val hintColor = if (isStable) UITheme.accent else UITheme.textMuted
-        val hintText = if (isStable) "Ready! Tap CALIBRATE" else "Hold steady..."
+        val hintText = when {
+            isStable -> {
+                val secondsLeft = (autoCalibrateDelay * (1f - autoProgress)).toInt() + 1
+                "Hold steady... calibrating in $secondsLeft"
+            }
+            else -> "Hold steady..."
+        }
         ui.textCentered(hintText, centerX, instrY3, UIFonts.body, hintColor)
 
         // Accelerometer values
@@ -233,11 +260,13 @@ class CalibrationRenderer : Disposable {
         // === Input ===
         if (Gdx.input.justTouched()) {
             if (calibrateButton.contains(touchX, touchY)) {
+                readyTimer = 0f
                 UIFeedback.clickHeavy()
                 successFlash = 1f
                 return Action.CALIBRATE
             }
             if (skipButton.contains(touchX, touchY)) {
+                readyTimer = 0f
                 UIFeedback.click()
                 return Action.SKIP
             }
@@ -259,6 +288,7 @@ class CalibrationRenderer : Disposable {
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
         enterAnim = 0f
+        readyTimer = 0f
     }
 
     fun recreate() {

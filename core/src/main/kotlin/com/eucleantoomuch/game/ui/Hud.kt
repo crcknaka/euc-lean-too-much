@@ -19,6 +19,18 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
     // Animation states
     private var scorePopScale = 1f
     private var lastScore = 0
+
+    // Cached strings - rebuilt only when the underlying value changes (avoids per-frame allocations)
+    private var scoreText = "0"
+    private var cachedSpeedKmh = Int.MIN_VALUE
+    private var speedText = "0"
+    private var speedTextWidth = 0f
+    private var cachedTimerKey = -1
+    private var timerText = ""
+    private var cachedDistMeters = -1
+    private var distText = ""
+    private var cachedFps = -1
+    private var fpsText = ""
     private var warningFlash = 0f
     private var speedBarSmooth = 0f
     private var pwmWarningFlash = 0f
@@ -88,6 +100,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         if (session.score != lastScore) {
             scorePopScale = 1.25f
             lastScore = session.score
+            scoreText = session.score.toString()
         }
         scorePopScale = UITheme.Anim.ease(scorePopScale, 1f, 8f)
 
@@ -139,14 +152,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             // Only render FPS counter in No HUD mode if showFps is enabled
             if (settingsManager.showFps) {
                 ui.beginBatch()
-                val fps = Gdx.graphics.framesPerSecond
-                val fpsColor = when {
-                    fps >= 55 -> UITheme.accent
-                    fps >= 30 -> UITheme.warning
-                    else -> UITheme.danger
-                }
-                UIFonts.caption.color = fpsColor
-                UIFonts.caption.draw(ui.batch, "FPS: $fps", 14f * scale, sh - 14f * scale)
+                drawFpsCounter(scale, sh)
                 ui.endBatch()
             }
             return
@@ -210,34 +216,42 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val scoreY = scoreBadgeY + scoreBadgeHeight / 2
             val originalScale = UIFonts.heading.data.scaleX
             UIFonts.heading.data.setScale(originalScale * scorePopScale)
-            ui.textCentered(session.score.toString(), sw / 2, scoreY, UIFonts.heading, UITheme.accent)
+            ui.textCentered(scoreText, sw / 2, scoreY, UIFonts.heading, UITheme.accent)
             UIFonts.heading.data.setScale(originalScale)
         }
         // Time Trial text is handled in drawTimeTrialBadge
         // Hardcore text is handled in drawHardcoreBadge
 
-        // Warnings - positioned lower to not obstruct view
+        // Warnings - stacked vertically so active badges never overlap.
+        // Most critical (wobbling) takes the lowest slot; the rest fill upward.
         val warningBaseY = sh * 0.22f  // Lower on screen (22% from bottom)
+        val warningSpacing = 70f * scale
+        var warningY = warningBaseY
 
-        if (euc.inPuddle) {
-            drawWarningBadge("SLIPPERY!", UITheme.cyan, warningBaseY + 70f * scale)
+        // Wobbling warning - show when wobbling is active
+        if (euc.isWobbling) {
+            val wobbleProgress = (euc.wobbleTimer / 3f).coerceIn(0f, 1f)  // 0-1 over 3 seconds
+            val urgencyPulse = UITheme.Anim.pulse(6f + wobbleProgress * 8f, 0.7f, 1f)  // Faster pulse as time runs out
+            // Color shifts from warning yellow to danger red as time runs out
+            val wobbleColor = UITheme.lerp(UITheme.warning, UITheme.danger, wobbleProgress)
+            val timeLeft = (3f - euc.wobbleTimer).coerceAtLeast(0f)
+            val displayText = if (timeLeft < 1f) "WOBBLING!" else "WOBBLING"
+            drawWarningBadge(displayText, UITheme.withAlpha(wobbleColor, urgencyPulse), warningY)
+            warningY += warningSpacing
         }
 
+        if (euc.inPuddle) {
+            drawWarningBadge("SLIPPERY!", UITheme.cyan, warningY)
+            warningY += warningSpacing
+        }
 
         // PWM warning indicator
         if (pwmWarningFlash > 0.1f) {
             val pwmPercent = euc.getPwmPercent()
             val warningPulse = MathUtils.sin(pwmWarningFlash * 8f) * 0.5f + 0.5f
             val warningColor = UITheme.lerp(UITheme.warning, UITheme.warningBright, warningPulse)
-            drawWarningBadge("PWM $pwmPercent%", warningColor, warningBaseY + 140f * scale)
-        }
-
-        // Battery low warning
-        if (batteryLowFlash > 0.1f) {
-            val batteryPercent = session.batteryPercent
-            val warningPulse = MathUtils.sin(batteryLowFlash * 6f) * 0.5f + 0.5f
-            val warningColor = UITheme.lerp(UITheme.warning, UITheme.danger, warningPulse)
-            drawWarningBadge("BATTERY LOW $batteryPercent%", warningColor, warningBaseY + 280f * scale)
+            drawWarningBadge("PWM $pwmPercent%", warningColor, warningY)
+            warningY += warningSpacing
         }
 
         // Near miss notification
@@ -246,36 +260,43 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
             val alpha = (nearMissTimer / nearMissDisplayDuration).coerceIn(0f, 1f)
             val pulse = UITheme.Anim.pulse(8f, 0.8f, 1f)
             val nearMissColor = UITheme.withAlpha(UITheme.accent, alpha * pulse)
-            drawWarningBadge("NEAR MISS!", nearMissColor, warningBaseY + 210f * scale)
+            drawWarningBadge("NEAR MISS!", nearMissColor, warningY)
+            warningY += warningSpacing
+        }
+
+        // Battery low warning
+        if (batteryLowFlash > 0.1f) {
+            val batteryPercent = session.batteryPercent
+            val warningPulse = MathUtils.sin(batteryLowFlash * 6f) * 0.5f + 0.5f
+            val warningColor = UITheme.lerp(UITheme.warning, UITheme.danger, warningPulse)
+            drawWarningBadge("BATTERY LOW $batteryPercent%", warningColor, warningY)
+            warningY += warningSpacing
         }
 
         // Volts earned notifications (floating up from bottom-right)
         drawVoltsNotifications()
 
-        // Wobbling warning - show when wobbling is active (at top position where DANGER was)
-        if (euc.isWobbling) {
-            val wobbleProgress = (euc.wobbleTimer / 3f).coerceIn(0f, 1f)  // 0-1 over 3 seconds
-            val urgencyPulse = UITheme.Anim.pulse(6f + wobbleProgress * 8f, 0.7f, 1f)  // Faster pulse as time runs out
-            // Color shifts from warning yellow to danger red as time runs out
-            val wobbleColor = UITheme.lerp(UITheme.warning, UITheme.danger, wobbleProgress)
-            val timeLeft = (3f - euc.wobbleTimer).coerceAtLeast(0f)
-            val displayText = if (timeLeft < 1f) "WOBBLING!" else "WOBBLING"
-            drawWarningBadge(displayText, UITheme.withAlpha(wobbleColor, urgencyPulse), warningBaseY)
-        }
-
         // FPS counter (top-left, visible but unobtrusive)
         if (settingsManager.showFps) {
-            val fps = Gdx.graphics.framesPerSecond
-            val fpsColor = when {
-                fps >= 55 -> UITheme.accent
-                fps >= 30 -> UITheme.warning
-                else -> UITheme.danger
-            }
-            UIFonts.caption.color = fpsColor
-            UIFonts.caption.draw(ui.batch, "FPS: $fps", 14f * scale, sh - 14f * scale)
+            drawFpsCounter(scale, sh)
         }
 
         ui.endBatch()
+    }
+
+    private fun drawFpsCounter(scale: Float, sh: Float) {
+        val fps = Gdx.graphics.framesPerSecond
+        if (fps != cachedFps) {
+            cachedFps = fps
+            fpsText = "FPS: $fps"
+        }
+        val fpsColor = when {
+            fps >= 55 -> UITheme.accent
+            fps >= 30 -> UITheme.warning
+            else -> UITheme.danger
+        }
+        UIFonts.caption.color = fpsColor
+        UIFonts.caption.draw(ui.batch, fpsText, 14f * scale, sh - 14f * scale)
     }
 
     private fun drawSpeedPanel(euc: EucComponent) {
@@ -316,12 +337,17 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.beginBatch()
 
         val speedKmh = (euc.speed * 3.6f).toInt()
+        if (speedKmh != cachedSpeedKmh) {
+            cachedSpeedKmh = speedKmh
+            speedText = speedKmh.toString()
+            ui.layout.setText(UIFonts.heading, speedText)
+            speedTextWidth = ui.layout.width
+        }
         UIFonts.heading.color = speedColor
-        UIFonts.heading.draw(ui.batch, "$speedKmh", panelX + 18f * scale, panelY + panelHeight - 18f * scale)
+        UIFonts.heading.draw(ui.batch, speedText, panelX + 18f * scale, panelY + panelHeight - 18f * scale)
 
-        ui.layout.setText(UIFonts.heading, "$speedKmh")
         UIFonts.caption.color = UITheme.textMuted
-        UIFonts.caption.draw(ui.batch, "km/h", panelX + 24f * scale + ui.layout.width, panelY + panelHeight - 26f * scale)
+        UIFonts.caption.draw(ui.batch, "km/h", panelX + 24f * scale + speedTextWidth, panelY + panelHeight - 26f * scale)
 
         ui.endBatch()
         ui.beginShapes()
@@ -869,23 +895,31 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         ui.endShapes()
         ui.beginBatch()
 
-        // Timer text
-        val mins = (timeRemaining / 60).toInt()
-        val secs = (timeRemaining % 60).toInt()
-        val millis = ((timeRemaining % 1) * 10).toInt()
-        val timerText = if (mins > 0) {
-            "$mins:${secs.toString().padStart(2, '0')}"
-        } else {
-            "$secs.${millis}"
+        // Timer text - rebuilt only when the displayed tenth of a second changes
+        val timerKey = (timeRemaining * 10).toInt()
+        if (timerKey != cachedTimerKey) {
+            cachedTimerKey = timerKey
+            val mins = (timeRemaining / 60).toInt()
+            val secs = (timeRemaining % 60).toInt()
+            val millis = ((timeRemaining % 1) * 10).toInt()
+            timerText = if (mins > 0) {
+                "$mins:${secs.toString().padStart(2, '0')}"
+            } else {
+                "$secs.${millis}"
+            }
         }
 
         val timerY = badgeY + badgeHeight - 25f * scale
         ui.textCentered(timerText, sw / 2, timerY, UIFonts.heading, timerColor)
 
-        // Distance progress text
+        // Distance progress text - rebuilt only when whole meters change
         val level = session.timeTrialLevel
         if (level != null) {
-            val distText = "${session.distanceTraveled.toInt()}m / ${level.targetDistance.toInt()}m"
+            val distMeters = session.distanceTraveled.toInt()
+            if (distMeters != cachedDistMeters) {
+                cachedDistMeters = distMeters
+                distText = "${distMeters}m / ${level.targetDistance.toInt()}m"
+            }
             ui.textCentered(distText, sw / 2, badgeY + 35f * scale, UIFonts.caption, UITheme.textSecondary)
         }
 
@@ -965,7 +999,7 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
         // Score (like endless mode)
         val originalScale = UIFonts.heading.data.scaleX
         UIFonts.heading.data.setScale(originalScale * scorePopScale)
-        ui.textCentered(session.score.toString(), sw / 2 - 30f * scale, badgeY + badgeHeight / 2 - 5f * scale, UIFonts.heading, UITheme.accent)
+        ui.textCentered(scoreText, sw / 2 - 30f * scale, badgeY + badgeHeight / 2 - 5f * scale, UIFonts.heading, UITheme.accent)
         UIFonts.heading.data.setScale(originalScale)
 
         // Volts multiplier indicator - 2.5x for night hardcore, 2x for regular
@@ -1071,10 +1105,20 @@ class Hud(private val settingsManager: SettingsManager) : Disposable {
 
     fun resize(width: Int, height: Int) {
         ui.resize(width, height)
+        invalidateTextCaches()
     }
 
     fun recreate() {
         ui.recreate()
+        invalidateTextCaches()
+    }
+
+    /** Drop cached text measurements - fonts may have been regenerated at a new scale */
+    private fun invalidateTextCaches() {
+        cachedSpeedKmh = Int.MIN_VALUE
+        cachedTimerKey = -1
+        cachedDistMeters = -1
+        cachedFps = -1
     }
 
     override fun dispose() {

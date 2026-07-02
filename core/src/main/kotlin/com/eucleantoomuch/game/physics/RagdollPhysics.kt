@@ -1268,70 +1268,46 @@ class RagdollPhysics : Disposable {
      * @param index Index returned by addPedestrianRagdoll
      * @return Transform matrix or null if invalid
      */
-    fun getPedestrianTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.torso.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianTransform(index: Int): Matrix4? = getPartTransform(index) { it.torso }
 
     /**
      * Get head transform for a pedestrian ragdoll.
      */
-    fun getPedestrianHeadTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.head.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianHeadTransform(index: Int): Matrix4? = getPartTransform(index) { it.head }
 
     /**
      * Get torso transform for a pedestrian ragdoll.
      */
-    fun getPedestrianTorsoTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.torso.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianTorsoTransform(index: Int): Matrix4? = getPartTransform(index) { it.torso }
 
     /**
      * Get left arm transform for a pedestrian ragdoll (simplified single arm).
      */
-    fun getPedestrianLeftArmTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.leftArm.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianLeftArmTransform(index: Int): Matrix4? = getPartTransform(index) { it.leftArm }
 
     /**
      * Get right arm transform for a pedestrian ragdoll (simplified single arm).
      */
-    fun getPedestrianRightArmTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.rightArm.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianRightArmTransform(index: Int): Matrix4? = getPartTransform(index) { it.rightArm }
 
     /**
      * Get left leg transform for a pedestrian ragdoll (simplified single leg).
      */
-    fun getPedestrianLeftLegTransform(index: Int): Matrix4? {
-        if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.leftLeg.motionState?.getWorldTransform(tempMatrix)
-        return tempMatrix
-    }
+    fun getPedestrianLeftLegTransform(index: Int): Matrix4? = getPartTransform(index) { it.leftLeg }
 
     /**
      * Get right leg transform for a pedestrian ragdoll (simplified single leg).
      */
-    fun getPedestrianRightLegTransform(index: Int): Matrix4? {
+    fun getPedestrianRightLegTransform(index: Int): Matrix4? = getPartTransform(index) { it.rightLeg }
+
+    /**
+     * Shared accessor: returns null (not a stale matrix) when the ragdoll
+     * is out of range or the part was retired/disposed.
+     */
+    private inline fun getPartTransform(index: Int, part: (PedestrianRagdoll) -> BodyPart): Matrix4? {
         if (index < 0 || index >= pedestrianRagdolls.size) return null
-        val ragdoll = pedestrianRagdolls[index]
-        ragdoll.rightLeg.motionState?.getWorldTransform(tempMatrix)
+        val motionState = part(pedestrianRagdolls[index]).motionState ?: return null
+        motionState.getWorldTransform(tempMatrix)
         return tempMatrix
     }
 
@@ -1347,6 +1323,50 @@ class RagdollPhysics : Disposable {
      * Get number of active pedestrian ragdolls.
      */
     fun getPedestrianCount(): Int = pedestrianRagdolls.size
+
+    // Temp vector for retire checks
+    private val retireCheckPos = Vector3()
+
+    /**
+     * Retire ragdolls (pedestrians and dynamic objects) that fell behind the player.
+     * Their Bullet bodies never deactivate, so without this every knocked-down
+     * pedestrian keeps simulating until the session ends - physics cost and native
+     * memory grow the longer you ride. Retired slots stay in the lists (so indices
+     * held by components remain valid) but their bodies are removed and disposed.
+     */
+    fun retireRagdollsBehind(minZ: Float) {
+        for (ragdoll in pedestrianRagdolls) {
+            val body = ragdoll.torso.body ?: continue  // Already retired
+            body.worldTransform.getTranslation(retireCheckPos)
+            if (retireCheckPos.z < minZ) {
+                for (constraint in ragdoll.constraints) {
+                    dynamicsWorld.removeConstraint(constraint)
+                    constraint.dispose()
+                }
+                ragdoll.constraints.clear()
+                cleanupPart(ragdoll.head)
+                cleanupPart(ragdoll.torso)
+                cleanupPart(ragdoll.leftArm)
+                cleanupPart(ragdoll.rightArm)
+                cleanupPart(ragdoll.leftLeg)
+                cleanupPart(ragdoll.rightLeg)
+            }
+        }
+
+        for (obj in dynamicObjects) {
+            val body = obj.body ?: continue  // Already retired
+            body.worldTransform.getTranslation(retireCheckPos)
+            if (retireCheckPos.z < minZ) {
+                dynamicsWorld.removeRigidBody(body)
+                body.dispose()
+                obj.body = null
+                obj.motionState?.dispose()
+                obj.motionState = null
+                obj.shape?.dispose()
+                obj.shape = null
+            }
+        }
+    }
 
     /**
      * Data class for returning ragdoll body info for collision checking.
