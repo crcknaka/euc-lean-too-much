@@ -9,7 +9,6 @@ class EucComponent : Component, Pool.Poolable {
     var sideLean: Float = 0f         // -1 (left) to +1 (right)
     var speed: Float = Constants.MIN_SPEED
     var maxSpeed: Float = Constants.MAX_SPEED
-    var criticalLean: Float = Constants.CRITICAL_LEAN
 
     // Wheel-specific physics parameters
     var acceleration: Float = Constants.ACCELERATION
@@ -41,7 +40,6 @@ class EucComponent : Component, Pool.Poolable {
         sideLean = 0f
         speed = Constants.MIN_SPEED
         maxSpeed = Constants.MAX_SPEED
-        criticalLean = Constants.CRITICAL_LEAN
         acceleration = Constants.ACCELERATION
         deceleration = Constants.DECELERATION
         pwmSensitivity = 1.0f
@@ -72,8 +70,18 @@ class EucComponent : Component, Pool.Poolable {
      * At PWM >= 1.0, the motor can't keep up = cutout
      */
     fun calculatePwm(): Float {
-        // Base PWM from current speed (cruising at max speed = ~70% PWM)
-        val speedFactor = (speed / maxSpeed) * 0.7f
+        val speedKmh = speed * 3.6f
+
+        // Relative load: how close to THIS wheel's own top speed (its headroom).
+        val relativeLoad = (speed / maxSpeed) * 0.5f
+
+        // Absolute load: raw-speed stress (air drag / voltage sag), on the SAME scale for
+        // every wheel. Without this, a high-top-speed wheel (Speed Demon) shows almost no
+        // PWM at normal city speeds and the mechanic feels dead - this keeps PWM a visible,
+        // live threat across the whole speed range on all wheels.
+        val absoluteLoad = (speedKmh / 110f).coerceIn(0f, 1f) * 0.22f
+
+        val speedFactor = relativeLoad + absoluteLoad
 
         // Additional PWM from forward lean (acceleration demand)
         // Positive lean = accelerating = more PWM needed

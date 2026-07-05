@@ -18,8 +18,7 @@ sealed class WheelType(
     val maxSpeed: Float,           // m/s
     val acceleration: Float,       // m/s²
     val deceleration: Float,       // m/s²
-    val criticalLean: Float,       // 0-1 threshold (higher = harder to fall)
-    val pwmSensitivity: Float,     // Multiplier for PWM (lower = more stable)
+    val pwmSensitivity: Float,     // Multiplier for PWM (lower = more stable). Also drives the STABILITY stat.
     val turnResponsiveness: Float, // Turn rate multiplier (higher = more agile)
     val batteryCapacity: Int,      // mAh - affects how far you can ride
 
@@ -40,7 +39,6 @@ sealed class WheelType(
         maxSpeed = 20.0f,           // ~72 km/h (+20%)
         acceleration = 3.5f,        // Slower than Street Runner
         deceleration = 6f,
-        criticalLean = 0.90f,
         pwmSensitivity = 1.1f,
         turnResponsiveness = 6.0f,  // Most agile
         batteryCapacity = 1800,     // mAh - shortest range
@@ -59,7 +57,6 @@ sealed class WheelType(
         maxSpeed = 26.6f,           // ~96 km/h (+20%)
         acceleration = 5f,
         deceleration = 8f,
-        criticalLean = 0.95f,
         pwmSensitivity = 1.0f,
         turnResponsiveness = 5.0f,  // Medium agility
         batteryCapacity = 2400,     // mAh - medium range
@@ -78,7 +75,6 @@ sealed class WheelType(
         maxSpeed = 38.3f,           // ~138 km/h (+20%)
         acceleration = 7f,
         deceleration = 10f,
-        criticalLean = 1.05f,       // Harder to cutout (more stable)
         pwmSensitivity = 0.95f,     // Lower sensitivity = more stable at high speeds
         turnResponsiveness = 3.5f,  // Less agile than others
         batteryCapacity = 4000,     // mAh - longest range

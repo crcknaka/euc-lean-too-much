@@ -1582,7 +1582,9 @@ class RagdollPhysics : Disposable {
     }
 
     override fun dispose() {
-        cleanup()
+        // clearPedestrians=true so pedestrian ragdolls and dynamic objects (their native
+        // Bullet bodies/shapes/constraints) are freed too, not just the player ragdoll.
+        cleanup(clearPedestrians = true)
 
         // Dispose ground
         dynamicsWorld.removeRigidBody(groundBody)

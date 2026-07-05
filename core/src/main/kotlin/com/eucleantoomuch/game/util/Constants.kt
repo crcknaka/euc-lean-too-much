@@ -2,7 +2,7 @@ package com.eucleantoomuch.game.util
 
 object Constants {
     // Game version - keep in sync with versionName in android/build.gradle.kts
-    const val GAME_VERSION = "1.1.0"
+    const val GAME_VERSION = "1.2.0"
 
     // Screen
     const val VIRTUAL_WIDTH = 1280f
@@ -10,7 +10,6 @@ object Constants {
 
     // EUC Physics
     const val MAX_LEAN_ANGLE = 45f          // degrees (increased for more range)
-    const val CRITICAL_LEAN = 0.95f         // 95% of max lean = instant fall (more forgiving)
     const val MIN_SPEED = 2f                // m/s (always moving forward)
     const val MAX_SPEED = 23.6f             // m/s (85 km/h)
     const val ACCELERATION = 5f             // m/s²

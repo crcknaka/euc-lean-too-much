@@ -713,4 +713,14 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
     override fun playPowerupSound() {
         soundPool.play(powerupSound, 1f, 1f, 1, 0, 1f)
     }
+
+    override fun releaseAudio() {
+        // Stop the motor-sound thread + its AudioTrack, then free the SoundPool and its
+        // 11 loaded samples. Without this they leak across an Activity restart.
+        stopMotorSound()
+        stopWobbleSound()
+        try { audioTrack?.release() } catch (_: Exception) { /* ignore */ }
+        audioTrack = null
+        try { soundPool.release() } catch (_: Exception) { /* ignore */ }
+    }
 }

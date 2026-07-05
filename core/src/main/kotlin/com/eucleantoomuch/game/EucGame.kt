@@ -1153,6 +1153,9 @@ class EucGame(
 
         // Drop tracked ragdoll entities from the previous session
         ragdollInteractions.reset()
+
+        // Re-arm pigeon flock-startle rewards (flock IDs from the last run must not linger)
+        pigeonSystem.clearStartleTracking()
     }
 
     private fun handlePlayerFall() {
@@ -1236,11 +1239,9 @@ class EucGame(
         // Record completion and check for new best time (this unlocks next level)
         val isNewBest = timeTrialManager.recordCompletion(level, session.playTimeSeconds)
 
-        // Award Volts for completing the level
-        voltsManager.awardPickup()  // Using pickup as base, we'll add level-specific
-        for (i in 0 until level.voltReward / 15) {
-            voltsManager.awardPickup()
-        }
+        // Award Volts for completing the level - exactly the advertised reward,
+        // not scaled by the near-miss streak multiplier or rounded via pickup chunks.
+        voltsManager.awardFlat(level.voltReward)
         voltsManager.finalizeSession()
 
         // Set time trial result for game over screen
@@ -1492,6 +1493,23 @@ class EucGame(
         timeTrialLevelRenderer.resize(width, height)
     }
 
+    override fun pause() {
+        // App sent to background (Android lifecycle). The render loop is suspended, so
+        // nothing else will stop the audio threads - do it explicitly here, otherwise the
+        // motor whine / wobble / music keep playing over other apps. Also drop a live run
+        // into the pause menu so the player doesn't return mid-crash.
+        motorSoundManager.stop()
+        speedWarningManager.stop()
+        platformServices.stopWobbleSound()
+        musicManager.pause()
+
+        when (val state = stateManager.current()) {
+            is GameState.Playing -> stateManager.transition(GameState.Paused(state.session, fromCountdown = false))
+            is GameState.Countdown -> stateManager.transition(GameState.Paused(session, fromCountdown = true))
+            else -> { /* menus/game-over: nothing to pause */ }
+        }
+    }
+
     override fun resume() {
         // Re-enable high FPS on resume (Android may reset this)
         Gdx.graphics.setForegroundFPS(240)
@@ -1533,6 +1551,7 @@ class EucGame(
         timeTrialLevelRenderer.dispose()
         ragdollPhysics?.dispose()
         ragdollRenderer?.dispose()
+        platformServices.releaseAudio()
     }
 
     // Add physics colliders for nearby world objects during ragdoll

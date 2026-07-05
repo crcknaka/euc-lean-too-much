@@ -77,7 +77,6 @@ class EntityFactory(
         // EUC state with wheel-specific physics
         entity.add(EucComponent().apply {
             maxSpeed = wheelType.maxSpeed
-            criticalLean = wheelType.criticalLean
             acceleration = wheelType.acceleration
             deceleration = wheelType.deceleration
             pwmSensitivity = wheelType.pwmSensitivity

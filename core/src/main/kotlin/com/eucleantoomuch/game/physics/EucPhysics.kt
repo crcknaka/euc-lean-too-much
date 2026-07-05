@@ -1,7 +1,6 @@
 package com.eucleantoomuch.game.physics
 
 import com.eucleantoomuch.game.util.Constants
-import kotlin.math.sqrt
 
 object EucPhysics {
     /**
@@ -61,23 +60,6 @@ object EucPhysics {
         // Turn responsiveness affects how agile the wheel is
         val responsivenessFactor = turnResponsiveness / Constants.TURN_RESPONSIVENESS
         return sideLean * Constants.MAX_TURN_RATE * speedFactor * responsivenessFactor
-    }
-
-    /**
-     * Check if the combined lean angle causes a fall
-     */
-    fun checkFall(forwardLean: Float, sideLean: Float, criticalLean: Float = Constants.CRITICAL_LEAN): Boolean {
-        val totalLean = sqrt(forwardLean * forwardLean + sideLean * sideLean)
-        return totalLean >= criticalLean
-    }
-
-    /**
-     * Calculate the danger level (0-1) based on lean
-     * 0 = safe, 1 = about to fall
-     */
-    fun getDangerLevel(forwardLean: Float, sideLean: Float): Float {
-        val totalLean = sqrt(forwardLean * forwardLean + sideLean * sideLean)
-        return (totalLean / Constants.CRITICAL_LEAN).coerceIn(0f, 1f)
     }
 
     private fun lerp(start: Float, end: Float, t: Float): Float {

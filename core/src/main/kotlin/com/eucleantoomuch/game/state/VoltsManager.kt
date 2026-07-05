@@ -150,6 +150,15 @@ class VoltsManager {
     }
 
     /**
+     * Award an exact, flat amount (no streak/hardcore multiplier) - e.g. a fixed
+     * time-trial completion reward that should pay exactly what the level advertises.
+     */
+    fun awardFlat(amount: Int): Int {
+        addSessionVolts(amount)
+        return amount
+    }
+
+    /**
      * Update per-frame state (streak timer decay).
      */
     fun update(deltaTime: Float) {

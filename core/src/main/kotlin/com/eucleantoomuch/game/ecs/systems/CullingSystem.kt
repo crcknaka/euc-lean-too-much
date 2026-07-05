@@ -18,6 +18,13 @@ class CullingSystem : EntitySystem(7) {
     // Flag to disable culling
     var enabled = true
 
+    // Reused across frames to avoid per-frame list allocation
+    private val toRemove = ArrayList<Entity>()
+
+    // Entities that pull this far AHEAD of the player (e.g. same-direction cars faster than
+    // the player) are past any render distance and would otherwise accumulate forever.
+    private val forwardCullDistance = 450f
+
     override fun addedToEngine(engine: Engine) {
         playerEntities = engine.getEntitiesFor(Families.player)
         obstacleEntities = engine.getEntitiesFor(Families.obstacles)
@@ -32,20 +39,23 @@ class CullingSystem : EntitySystem(7) {
         val cullDistance = Constants.DESPAWN_DISTANCE
 
         // Find entities to remove (can't modify during iteration)
-        val toRemove = mutableListOf<Entity>()
+        toRemove.clear()
 
         for (entity in obstacleEntities) {
             val transform = transformMapper.get(entity)
 
-            // Cull entities that have gone too far behind the player
-            // cullDistance is negative (-30), so this checks if entity Z < playerZ - 30
-            // This works for all entities including oncoming cars (they pass player then go behind)
-            if (transform.position.z < playerZ + cullDistance) {
+            // Cull entities too far BEHIND the player (cullDistance is negative, e.g. -60)...
+            // ...or too far AHEAD (faster same-direction cars that outran the player and are
+            // now beyond any render distance - without this they never despawn).
+            val relativeZ = transform.position.z - playerZ
+            if (relativeZ < cullDistance || relativeZ > forwardCullDistance) {
                 toRemove.add(entity)
             }
         }
 
         // Remove culled entities
-        toRemove.forEach { engine.removeEntity(it) }
+        for (i in toRemove.indices) {
+            engine.removeEntity(toRemove[i])
+        }
     }
 }

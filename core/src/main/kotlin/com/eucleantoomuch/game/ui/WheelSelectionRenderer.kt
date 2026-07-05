@@ -322,7 +322,9 @@ class WheelSelectionRenderer(
 
         // Stability bar
         val stabilityBarY = speedBarY - barSpacing
-        val stabilityNorm = ((currentWheel.criticalLean - 0.85f) / 0.25f).coerceIn(0f, 1f)
+        // Stability = resistance to PWM cutout, driven by the real gameplay metric
+        // (lower pwmSensitivity = more stable). Simple 1.1 -> ~0.17, Standard 1.0 -> 0.5, Speed Demon 0.95 -> ~0.67.
+        val stabilityNorm = ((1.15f - currentWheel.pwmSensitivity) / 0.30f).coerceIn(0f, 1f)
         ui.neonBar(barStartX, stabilityBarY, barWidth, barHeight, stabilityNorm,
             backgroundColor = UITheme.surface, fillColor = UITheme.primary)
 
@@ -731,6 +733,13 @@ class WheelSelectionRenderer(
         sceneManager.environment.set(PBRTextureAttribute(PBRTextureAttribute.BRDFLUTTexture, brdfLUT))
         sceneManager.environment.set(PBRCubemapAttribute.createSpecularEnv(specularCubemap))
         sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
+
+        // The wheel GLB models were uploaded to the OLD (now-lost) GL context - their meshes
+        // and textures are invalid. Reload them from disk or the preview shows nothing/garbage.
+        wheelSceneAssets.values.forEach { it.dispose() }
+        wheelSceneAssets.clear()
+        wheelScenes.clear()
+        loadWheelModels()
     }
 
     override fun dispose() {

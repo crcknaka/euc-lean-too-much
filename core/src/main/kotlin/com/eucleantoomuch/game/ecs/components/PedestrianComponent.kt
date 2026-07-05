@@ -49,6 +49,10 @@ class PedestrianComponent : Component, Pool.Poolable {
     var walkAnimPhase: Float = 0f         // Animation phase (0 to 2*PI)
     var walkAnimSpeed: Float = 8f         // Animation speed multiplier
 
+    // Cached shirt color (the source model never changes it) - avoids re-scanning materials
+    // and allocating a lowercased String per material every frame in PedestrianRenderer.
+    var shirtColor: com.badlogic.gdx.graphics.Color? = null
+
     override fun reset() {
         walkSpeed = 1.5f
         direction.set(1f, 0f, 0f)
@@ -70,5 +74,6 @@ class PedestrianComponent : Component, Pool.Poolable {
         ragdollBodyIndex = -1
         walkAnimPhase = 0f
         walkAnimSpeed = 8f
+        shirtColor = null
     }
 }

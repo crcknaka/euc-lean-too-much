@@ -117,8 +117,13 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
                 continue
             }
 
-            // Get shirt color from the original model instance material
-            val shirtColor = extractShirtColor(modelComp.modelInstance) ?: Color.GREEN
+            // Get shirt color - cached per pedestrian (the model's color never changes),
+            // so we only scan materials / allocate the lowercased id String once, not every frame.
+            var shirtColor = pedestrian.shirtColor
+            if (shirtColor == null) {
+                shirtColor = extractShirtColor(modelComp.modelInstance) ?: Color.GREEN
+                pedestrian.shirtColor = shirtColor
+            }
 
             // Get or create body part instances for this color
             val parts = getOrCreateInstances(shirtColor)

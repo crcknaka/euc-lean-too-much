@@ -47,6 +47,14 @@ class PigeonSystem(
     var onFlockStartled: (() -> Unit)? = null
     private val startledFlockIds = mutableSetOf<Int>()  // Track which flocks already triggered callback
 
+    /**
+     * Clear per-session startle tracking. Must be called on new-game reset, otherwise flock
+     * IDs from the previous session stay "already startled" and the Volts reward never fires again.
+     */
+    fun clearStartleTracking() {
+        startledFlockIds.clear()
+    }
+
     override fun addedToEngine(engine: Engine) {
         super.addedToEngine(engine)
         walkingModel = ModelInstance(models.createPigeonModel(isFlying = false))

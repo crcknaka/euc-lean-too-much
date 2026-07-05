@@ -149,6 +149,12 @@ interface PlatformServices {
      * Play powerup pickup sound when collecting a battery powerup.
      */
     fun playPowerupSound()
+
+    /**
+     * Release long-lived native audio resources (SoundPool, motor-sound thread/AudioTrack).
+     * Call on application dispose. Default no-op for platforms that hold nothing.
+     */
+    fun releaseAudio() {}
 }
 
 /**

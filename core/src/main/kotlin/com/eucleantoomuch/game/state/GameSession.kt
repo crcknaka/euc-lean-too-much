@@ -12,7 +12,10 @@ class GameSession {
         private set
     var obstaclesAvoided: Int = 0
     var nearMisses: Int = 0
-    var startTime: Long = System.currentTimeMillis()
+
+    // Elapsed play time, accumulated from update() deltas (NOT wall-clock) so the time-trial
+    // timer and hardcore difficulty freeze while the game is paused or backgrounded.
+    var playTimeSeconds: Float = 0f
         private set
 
     // Time Trial mode
@@ -85,9 +88,6 @@ class GameSession {
     val score: Int
         get() = (distanceTraveled * Constants.POINTS_PER_METER).toInt()
 
-    val playTimeSeconds: Float
-        get() = (System.currentTimeMillis() - startTime) / 1000f
-
     val batteryPercent: Int
         get() = (batteryLevel * 100).toInt()
 
@@ -105,6 +105,7 @@ class GameSession {
     }
 
     fun update(deltaTime: Float, speed: Float) {
+        playTimeSeconds += deltaTime
         distanceTraveled += speed * deltaTime
         currentSpeed = speed
         if (speed > maxSpeed) {
@@ -143,7 +144,7 @@ class GameSession {
         maxSpeed = 0f
         obstaclesAvoided = 0
         nearMisses = 0
-        startTime = System.currentTimeMillis()
+        playTimeSeconds = 0f
         batteryLevel = 1f
         isBatteryLow = false
         isBatteryDead = false

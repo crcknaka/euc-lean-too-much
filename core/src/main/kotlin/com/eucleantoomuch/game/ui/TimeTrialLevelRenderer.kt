@@ -179,7 +179,7 @@ class TimeTrialLevelRenderer(
                 if (isCompleted && bestTime != null) {
                     val timeStr = formatTime(bestTime)
                     ui.textCentered("BEST: $timeStr", cardCenterX, cardsY + 65f * scale * cardScale,
-                        UIFonts.caption, UITheme.surface)
+                        UIFonts.caption, UITheme.textPrimary)
                 } else {
                     ui.textCentered("--:--", cardCenterX, cardsY + 65f * scale * cardScale,
                         UIFonts.caption, UITheme.textMuted)
