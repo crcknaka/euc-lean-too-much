@@ -51,9 +51,10 @@ import com.eucleantoomuch.game.ui.UIFonts
 import com.eucleantoomuch.game.ui.WheelSelectionRenderer
 import com.eucleantoomuch.game.ui.ModeSelectionRenderer
 import com.eucleantoomuch.game.ui.TimeTrialLevelRenderer
+import com.eucleantoomuch.game.physics.RagdollEngine
 import com.eucleantoomuch.game.physics.RagdollInteractions
-import com.eucleantoomuch.game.physics.RagdollPhysics
 import com.eucleantoomuch.game.physics.RagdollRenderer
+import com.eucleantoomuch.game.physics.RagdollTypes
 
 class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
@@ -115,7 +116,7 @@ class EucGame(
     private lateinit var fallAnimationController: FallAnimationController
 
     // Ragdoll physics for fall animation
-    private var ragdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+    private var ragdollPhysics: com.eucleantoomuch.game.physics.RagdollEngine? = null
     private var ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
     private var useRagdollPhysics = true  // Toggle for ragdoll vs scripted animation
     private lateinit var ragdollInteractions: RagdollInteractions
@@ -133,13 +134,16 @@ class EucGame(
     private var lastFrameTimeNanos = 0L
     private var currentMaxFps = 0  // 0 = unlimited
 
+    // Guards pause/resume/dispose against firing before create() has built the subsystems
+    private var created = false
+
     override fun create() {
         Gdx.app.logLevel = Application.LOG_DEBUG
 
         // Disable libGDX foreground FPS limit to allow high refresh rates (120Hz+)
         // By default libGDX limits to 60 FPS on Android
         // Note: 0 means "use default" in libGDX, so we set a high value instead
-        Gdx.graphics.setForegroundFPS(240)
+        raiseForegroundFpsCap()
 
         // Initialize state manager
         stateManager = GameStateManager()
@@ -275,6 +279,7 @@ class EucGame(
         // Initialize UI
         hud = Hud(settingsManager)
         menuRenderer = MenuRenderer()
+        menuRenderer.showExit = platformServices.canExit()
         gameOverRenderer = GameOverRenderer()
         pauseRenderer = PauseRenderer()
         calibrationRenderer = CalibrationRenderer()
@@ -307,7 +312,7 @@ class EucGame(
 
         // Initialize ragdoll physics and renderer
         try {
-            ragdollPhysics = RagdollPhysics()
+            ragdollPhysics = platformServices.createRagdollEngine()
             ragdollRenderer = com.eucleantoomuch.game.physics.RagdollRenderer()
 
             // Set up collision callback for ragdoll hitting objects during flight
@@ -369,6 +374,8 @@ class EucGame(
 
         // Start at menu
         stateManager.transition(GameState.Menu)
+
+        created = true
     }
 
     private fun applyRenderDistance() {
@@ -399,12 +406,33 @@ class EucGame(
         renderer.shadowsEnabled = settingsManager.shadowsEnabled
     }
 
+    /**
+     * Lift libGDX's foreground FPS cap so 120 Hz screens are not limited to 60.
+     *
+     * Guarded because it is a desktop/Android-only concept: the web backend throws from
+     * setForegroundFPS, and this runs as the very first statement of create(), so an
+     * unguarded call killed the browser build before a single line was even logged.
+     */
+    private fun raiseForegroundFpsCap() {
+        if (Gdx.app.type == Application.ApplicationType.WebGL) return
+        try {
+            Gdx.graphics.setForegroundFPS(240)
+        } catch (e: Throwable) {
+            Gdx.app.log("EucGame", "setForegroundFPS unsupported on this backend")
+        }
+    }
+
     private fun applyFpsLimit() {
         // Check if max FPS setting changed
         val settingMaxFps = settingsManager.maxFps
         if (settingMaxFps != currentMaxFps) {
             currentMaxFps = settingMaxFps
         }
+
+        // Never busy-sleep in the browser: frames are already paced by requestAnimationFrame,
+        // and TeaVM implements Thread.sleep with green threads - calling it inside the frame
+        // callback suspends the render loop and the game silently freezes after a few frames.
+        if (Gdx.app.type == Application.ApplicationType.WebGL) return
 
         // Apply FPS limit only if explicitly set (0 = unlimited, let VSync handle it)
         if (currentMaxFps > 0) {
@@ -418,8 +446,11 @@ class EucGame(
                 val sleepNanosRemainder = (sleepNanos % 1_000_000L).toInt()
 
                 try {
-                    if (sleepMillis > 0 || sleepNanosRemainder > 0) {
-                        Thread.sleep(sleepMillis, sleepNanosRemainder)
+                    // Millisecond-only sleep: the (millis, nanos) overload does not exist in
+                    // TeaVM's class library, and sub-millisecond precision is meaningless for
+                    // frame pacing anyway (the browser paces frames via requestAnimationFrame).
+                    if (sleepMillis > 0) {
+                        Thread.sleep(sleepMillis)
                     }
                 } catch (e: InterruptedException) {
                     // Ignore
@@ -530,9 +561,12 @@ class EucGame(
                 stateManager.transition(GameState.Help)
             }
             MenuRenderer.ButtonClicked.EXIT -> {
+                // Gdx.app.exit() is the portable path. The hard System.exit() that used to
+                // follow it (to fully kill the Android process) does not exist in TeaVM's
+                // class library, so it is delegated to the platform layer instead - a browser
+                // tab cannot quit itself anyway, where this is simply a no-op.
                 Gdx.app.exit()
-                // Force kill the process on Android (Gdx.app.exit() only minimizes)
-                System.exit(0)
+                platformServices.exitProcess()
             }
             MenuRenderer.ButtonClicked.NONE -> {}
         }
@@ -1494,6 +1528,10 @@ class EucGame(
     }
 
     override fun pause() {
+        // The browser fires visibilitychange while create() is still loading assets, so pause
+        // can arrive before any subsystem exists - touching them would throw on a lateinit.
+        if (!created) return
+
         // App sent to background (Android lifecycle). The render loop is suspended, so
         // nothing else will stop the audio threads - do it explicitly here, otherwise the
         // motor whine / wobble / music keep playing over other apps. Also drop a live run
@@ -1511,8 +1549,10 @@ class EucGame(
     }
 
     override fun resume() {
+        if (!created) return
+
         // Re-enable high FPS on resume (Android may reset this)
-        Gdx.graphics.setForegroundFPS(240)
+        raiseForegroundFpsCap()
 
         // Force font reinitialization on resume (GL context may have been lost on Android).
         // Fonts are regenerated lazily on the next render, when the surface size is final -
@@ -1534,6 +1574,8 @@ class EucGame(
     }
 
     override fun dispose() {
+        if (!created) return
+
         renderer.dispose()
         models.dispose()
         musicManager.dispose()
@@ -1614,8 +1656,8 @@ class EucGame(
             val colliderType = when {
                 obstacle != null -> obstacleTypeToColliderType(obstacle.type)
                 ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
-                    RagdollPhysics.ColliderType.BUILDING
-                else -> RagdollPhysics.ColliderType.GENERIC
+                    RagdollTypes.ColliderType.BUILDING
+                else -> RagdollTypes.ColliderType.GENERIC
             }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
@@ -1652,12 +1694,12 @@ class EucGame(
                     transform.position.y + collider.halfExtents.y,
                     transform.position.z
                 )
-                physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
+                physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollTypes.ColliderType.CAR)
             } else {
                 // Default car size if no collider
                 tempColliderPos.set(transform.position.x, transform.position.y + 0.7f, transform.position.z)
                 tempHalfExtents.set(1.0f, 0.7f, 2.2f)
-                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
+                physics.addBoxCollider(tempColliderPos, tempHalfExtents, transform.yaw, RagdollTypes.ColliderType.CAR)
             }
         }
     }
@@ -1723,8 +1765,8 @@ class EucGame(
             val colliderType = when {
                 obstacle != null -> obstacleTypeToColliderType(obstacle.type)
                 ground?.type == com.eucleantoomuch.game.ecs.components.GroundType.BUILDING ->
-                    RagdollPhysics.ColliderType.BUILDING
-                else -> RagdollPhysics.ColliderType.GENERIC
+                    RagdollTypes.ColliderType.BUILDING
+                else -> RagdollTypes.ColliderType.GENERIC
             }
 
             if (obstacle != null && obstacle.type == ObstacleType.STREET_LIGHT) {
@@ -1755,7 +1797,7 @@ class EucGame(
                 transform.position.y + collider.halfExtents.y,
                 transform.position.z
             )
-            physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollPhysics.ColliderType.CAR)
+            physics.addBoxCollider(tempColliderPos, collider.halfExtents, transform.yaw, RagdollTypes.ColliderType.CAR)
 
             addedColliderEntities.add(entity)
         }
@@ -1773,17 +1815,17 @@ class EucGame(
     /**
      * Play appropriate sound when ragdoll collides with an object during flight.
      */
-    private fun playRagdollCollisionSound(colliderType: RagdollPhysics.ColliderType) {
+    private fun playRagdollCollisionSound(colliderType: RagdollTypes.ColliderType) {
         when (colliderType) {
-            RagdollPhysics.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
-            RagdollPhysics.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
-            RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound()
-            RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound()
-            RagdollPhysics.ColliderType.BENCH -> platformServices.playBenchImpactSound()
-            RagdollPhysics.ColliderType.BUILDING -> platformServices.playGenericHitSound()  // Building wall impact
-            RagdollPhysics.ColliderType.TREE -> platformServices.playGenericHitSound()  // Tree impact
-            RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound()
-            RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts handled by fall animation */ }
+            RagdollTypes.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
+            RagdollTypes.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
+            RagdollTypes.ColliderType.CAR -> platformServices.playCarCrashSound()
+            RagdollTypes.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound()
+            RagdollTypes.ColliderType.BENCH -> platformServices.playBenchImpactSound()
+            RagdollTypes.ColliderType.BUILDING -> platformServices.playGenericHitSound()  // Building wall impact
+            RagdollTypes.ColliderType.TREE -> platformServices.playGenericHitSound()  // Tree impact
+            RagdollTypes.ColliderType.GENERIC -> platformServices.playGenericHitSound()
+            RagdollTypes.ColliderType.GROUND -> { /* Ground impacts handled by fall animation */ }
         }
     }
 
@@ -1791,32 +1833,32 @@ class EucGame(
      * Play quieter sound when pedestrian ragdoll (secondary) collides with an object.
      * These are "chain reaction" sounds - quieter than direct player collisions.
      */
-    private fun playSecondaryRagdollCollisionSound(colliderType: RagdollPhysics.ColliderType) {
+    private fun playSecondaryRagdollCollisionSound(colliderType: RagdollTypes.ColliderType) {
         // Play same sounds but at lower volume (0.4x)
         when (colliderType) {
-            RagdollPhysics.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound(0.4f)
-            RagdollPhysics.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound(0.4f)
-            RagdollPhysics.ColliderType.CAR -> platformServices.playCarCrashSound(0.4f)
-            RagdollPhysics.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound(0.4f)
-            RagdollPhysics.ColliderType.BENCH -> platformServices.playBenchImpactSound(0.4f)
-            RagdollPhysics.ColliderType.BUILDING -> platformServices.playGenericHitSound(0.4f)
-            RagdollPhysics.ColliderType.TREE -> platformServices.playGenericHitSound(0.4f)
-            RagdollPhysics.ColliderType.GENERIC -> platformServices.playGenericHitSound(0.4f)
-            RagdollPhysics.ColliderType.GROUND -> { /* Ground impacts not needed for secondary */ }
+            RagdollTypes.ColliderType.STREET_LIGHT -> platformServices.playStreetLightImpactSound(0.4f)
+            RagdollTypes.ColliderType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound(0.4f)
+            RagdollTypes.ColliderType.CAR -> platformServices.playCarCrashSound(0.4f)
+            RagdollTypes.ColliderType.PEDESTRIAN -> platformServices.playPersonImpactSound(0.4f)
+            RagdollTypes.ColliderType.BENCH -> platformServices.playBenchImpactSound(0.4f)
+            RagdollTypes.ColliderType.BUILDING -> platformServices.playGenericHitSound(0.4f)
+            RagdollTypes.ColliderType.TREE -> platformServices.playGenericHitSound(0.4f)
+            RagdollTypes.ColliderType.GENERIC -> platformServices.playGenericHitSound(0.4f)
+            RagdollTypes.ColliderType.GROUND -> { /* Ground impacts not needed for secondary */ }
         }
     }
 
     /**
-     * Convert ObstacleType to RagdollPhysics.ColliderType for physics collisions.
+     * Convert ObstacleType to RagdollTypes.ColliderType for physics collisions.
      */
-    private fun obstacleTypeToColliderType(obstacleType: ObstacleType?): RagdollPhysics.ColliderType {
+    private fun obstacleTypeToColliderType(obstacleType: ObstacleType?): RagdollTypes.ColliderType {
         return when (obstacleType) {
-            ObstacleType.STREET_LIGHT -> RagdollPhysics.ColliderType.STREET_LIGHT
-            ObstacleType.RECYCLE_BIN -> RagdollPhysics.ColliderType.RECYCLE_BIN
-            ObstacleType.CAR -> RagdollPhysics.ColliderType.CAR
-            ObstacleType.PEDESTRIAN -> RagdollPhysics.ColliderType.PEDESTRIAN
-            ObstacleType.BENCH -> RagdollPhysics.ColliderType.BENCH
-            else -> RagdollPhysics.ColliderType.GENERIC
+            ObstacleType.STREET_LIGHT -> RagdollTypes.ColliderType.STREET_LIGHT
+            ObstacleType.RECYCLE_BIN -> RagdollTypes.ColliderType.RECYCLE_BIN
+            ObstacleType.CAR -> RagdollTypes.ColliderType.CAR
+            ObstacleType.PEDESTRIAN -> RagdollTypes.ColliderType.PEDESTRIAN
+            ObstacleType.BENCH -> RagdollTypes.ColliderType.BENCH
+            else -> RagdollTypes.ColliderType.GENERIC
         }
     }
 

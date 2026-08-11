@@ -37,3 +37,13 @@ fun randomFloat(min: Float, max: Float): Float {
 fun randomInt(min: Int, max: Int): Int {
     return MathUtils.random(min, max)
 }
+
+/**
+ * Pick a random element using libGDX's RNG.
+ *
+ * Must be used instead of Kotlin's stdlib `Collection.random()`: that one goes through
+ * `kotlin.random.Random.Default`, which on TeaVM resolves to `ThreadLocalRandom.current()` -
+ * unimplemented there, so it throws UnsupportedOperationException (and leaves a half-built
+ * ModelBuilder behind, cascading into "Call end() first"). This killed the whole web build.
+ */
+fun <T> List<T>.randomItem(): T = this[com.badlogic.gdx.math.MathUtils.random(size - 1)]

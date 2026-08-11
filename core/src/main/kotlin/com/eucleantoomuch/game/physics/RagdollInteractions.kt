@@ -31,7 +31,7 @@ class RagdollInteractions(
     private val engine: Engine,
     private val platformServices: PlatformServices,
     private val pigeonSystem: PigeonSystem,
-    private val ragdollPhysics: () -> RagdollPhysics?,
+    private val ragdollPhysics: () -> RagdollEngine?,
     private val playerEntity: () -> Entity?,
     private val useRagdollPhysics: () -> Boolean
 ) {

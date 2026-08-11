@@ -6,6 +6,7 @@ plugins {
 }
 
 val gdxVersion: String by project
+val joltVersion: String by project
 
 // Configuration for native libraries
 val natives: Configuration by configurations.creating
@@ -18,12 +19,13 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.eucleantoomuch.game"
-    compileSdk = 35
+    // 36 required by androidx.core 1.17, pulled in by the libGDX 1.14.2 Android backend
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.eucleantoomuch.game"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 3
         versionName = "1.2.0"
         ndk {
@@ -102,15 +104,17 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-freetype:$gdxVersion")
     implementation("androidx.core:core-ktx:1.12.0")
 
+    // Jolt physics natives for Android (arm64-v8a, armeabi-v7a, x86, x86_64)
+    implementation("com.github.xpenatan.xJolt:jolt-android:$joltVersion")
+    // libidl.so - the jParser loader opens it before libjolt.so, but the jolt-android
+    // AAR does not declare it, so it must be added explicitly or loading fails at runtime.
+    implementation("com.github.xpenatan.jParser:idl-helper-android:1.0.0")
+
     natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-arm64-v8a")
 
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-armeabi-v7a")
     natives("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-arm64-v8a")
-
-    // Bullet physics natives
-    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-armeabi-v7a")
-    natives("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-arm64-v8a")
 }
 
 // Task to copy native libraries to jniLibs folder

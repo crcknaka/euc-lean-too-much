@@ -225,7 +225,7 @@ class RagdollRenderer : Disposable {
      * Render ragdoll bodies using transforms from physics simulation.
      * Note: EUC wheel is NOT rendered here - original model stays visible
      */
-    fun render(modelBatch: ModelBatch, ragdollPhysics: RagdollPhysics, environment: Environment) {
+    fun render(modelBatch: ModelBatch, ragdollPhysics: RagdollEngine, environment: Environment) {
         if (!ragdollPhysics.isActive()) return
 
         // Head
@@ -287,7 +287,7 @@ class RagdollRenderer : Disposable {
     /**
      * Render all pedestrian ragdolls (simplified 6-part).
      */
-    fun renderPedestrians(modelBatch: ModelBatch, ragdollPhysics: RagdollPhysics, environment: Environment) {
+    fun renderPedestrians(modelBatch: ModelBatch, ragdollPhysics: RagdollEngine, environment: Environment) {
         val pedCount = ragdollPhysics.getPedestrianCount()
         if (pedCount == 0) return
 

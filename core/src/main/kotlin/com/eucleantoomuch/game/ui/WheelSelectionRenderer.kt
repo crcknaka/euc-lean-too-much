@@ -247,7 +247,9 @@ class WheelSelectionRenderer(
         val titleY = panelY + panelHeight - 40f * scale
 
         // === LEFT SIDE: 3D Preview with arrows ===
-        val previewSize = (panelHeight - 120f * scale).coerceAtMost(leftSectionWidth - 100f * scale)
+        // Fill the left column as much as the panel allows (was over-padded, leaving the
+        // wheel tiny on wide/short desktop windows).
+        val previewSize = (panelHeight - 80f * scale).coerceAtMost(leftSectionWidth - 40f * scale)
         val previewX = leftSectionX + leftSectionWidth / 2
         val previewY = panelY + (panelHeight - previewSize) / 2 - 20f * scale
 
@@ -299,23 +301,26 @@ class WheelSelectionRenderer(
         val sizeY = nameY - 50f * scale
         val descY = sizeY - 40f * scale
 
-        // Stats section (card style)
+        // Stats section (card style) - stretches to fill the space between the description and
+        // the buttons instead of being a fixed 170px block, which left most of the panel empty.
         val statsTopY = descY - 50f * scale
-        val statsHeight = 170f * scale  // Increased for 4 stats
         val statsWidth = rightSectionWidth - 80f * scale
         val statsX = rightSectionX + 40f * scale
+        // Buttons occupy panelY + 40 (gap) + 100 (START height); keep a margin above them.
+        val statsBottomLimit = panelY + 40f * scale + 100f * scale + 40f * scale
+        val statsHeight = (statsTopY - statsBottomLimit).coerceAtLeast(170f * scale)
         val statsY = statsTopY - statsHeight
 
         ui.card(statsX, statsY, statsWidth, statsHeight, 12f * scale, UITheme.surfaceLight)
 
-        // Stat bars (using neonBar for consistency)
-        val barWidth = 160f * scale
-        val barHeight = 14f * scale
-        val barStartX = rightCenterX + 20f * scale
-        val barSpacing = 38f * scale
+        // Stat bars (using neonBar for consistency) - sized from the card so they always fill it
+        val barSpacing = statsHeight / 5f
+        val barHeight = (barSpacing * 0.34f).coerceIn(14f * scale, 30f * scale)
+        val barWidth = statsWidth * 0.45f
+        val barStartX = statsX + statsWidth - barWidth - 24f * scale
 
         // Speed bar
-        val speedBarY = statsY + statsHeight - 40f * scale
+        val speedBarY = statsY + statsHeight - barSpacing
         val speedNorm = currentWheel.maxSpeed / 27.8f
         ui.neonBar(barStartX, speedBarY, barWidth, barHeight, speedNorm,
             backgroundColor = UITheme.surface, fillColor = UITheme.accent)

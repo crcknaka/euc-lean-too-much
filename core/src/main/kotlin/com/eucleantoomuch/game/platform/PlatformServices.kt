@@ -155,12 +155,37 @@ interface PlatformServices {
      * Call on application dispose. Default no-op for platforms that hold nothing.
      */
     fun releaseAudio() {}
+
+    /**
+     * Hard-terminate the process after Gdx.app.exit(), which on Android only backgrounds it.
+     * Default no-op: the browser has no System.exit (and TeaVM has no such method at all),
+     * and on desktop LWJGL already shuts down cleanly.
+     */
+    fun exitProcess() {}
+
+    /**
+     * Create the ragdoll physics backend for this platform.
+     *
+     * The default is the no-op engine, deliberately: it keeps the shared code free of any
+     * reference to the Jolt classes, so the browser build (whose native loader TeaVM cannot
+     * compile) never pulls them in. Desktop and Android override this to return the real
+     * Jolt engine.
+     */
+    fun createRagdollEngine(): com.eucleantoomuch.game.physics.RagdollEngine =
+        com.eucleantoomuch.game.physics.NoRagdollEngine()
+
+    /**
+     * Whether quitting the app is something this platform can actually do. A browser tab
+     * cannot close itself, so the web build hides the EXIT button rather than offering a
+     * button that does nothing.
+     */
+    fun canExit(): Boolean = true
 }
 
 /**
  * Default implementation that does nothing - used on platforms without these features.
  */
-class DefaultPlatformServices : PlatformServices {
+open class DefaultPlatformServices : PlatformServices {
     override fun vibrate(durationMs: Long, amplitude: Int) {
         // No-op on desktop/unsupported platforms
     }

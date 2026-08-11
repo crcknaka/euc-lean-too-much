@@ -33,6 +33,12 @@ class MenuRenderer : Disposable {
     private var helpButtonHover = 0f
     private var enterAnimProgress = 0f
 
+    /**
+     * Whether to offer an EXIT button. A browser tab cannot close itself, so the web build
+     * turns this off and CREDITS takes the whole bottom row instead of leaving a dead button.
+     */
+    var showExit = true
+
     // Trail particles (like EUC tire marks)
     private val trailParticles = Array(40) { TrailParticle() }
 
@@ -146,11 +152,17 @@ class MenuRenderer : Disposable {
         // Row 2: Credits and Exit - same size as row 1
         val row2Y = secButtonsY - secButtonHeight - secButtonGap
 
-        creditsButton.set(calibrateX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
+        val creditsX = if (showExit) calibrateX else leftCenterX - secButtonWidth / 2
+        creditsButton.set(creditsX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
         ui.neonButton(creditsButton, UITheme.surfaceLight, UITheme.textMuted, creditsButtonHover * 0.4f)
 
-        exitButton.set(settingsX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
-        ui.neonButton(exitButton, UITheme.danger, UITheme.danger, exitButtonHover * 0.6f)
+        if (showExit) {
+            exitButton.set(settingsX, row2Y - (1 - enterAnimProgress) * 200, secButtonWidth, secButtonHeight)
+            ui.neonButton(exitButton, UITheme.danger, UITheme.danger, exitButtonHover * 0.6f)
+        } else {
+            // Zero-size keeps every contains() hit-test below false without extra branching
+            exitButton.set(0f, 0f, 0f, 0f)
+        }
 
         // === RIGHT SIDE: Stats Cards ===
         val cardWidth = 280f * scale
@@ -215,8 +227,10 @@ class MenuRenderer : Disposable {
             UIFonts.body, UITheme.textPrimary)
         ui.textCentered("CREDITS", creditsButton.x + creditsButton.width / 2, creditsButton.y + creditsButton.height / 2,
             UIFonts.body, UITheme.textSecondary)
-        ui.textCentered("EXIT", exitButton.x + exitButton.width / 2, exitButton.y + exitButton.height / 2,
-            UIFonts.body, UITheme.textPrimary)
+        if (showExit) {
+            ui.textCentered("EXIT", exitButton.x + exitButton.width / 2, exitButton.y + exitButton.height / 2,
+                UIFonts.body, UITheme.textPrimary)
+        }
 
         // Stats card content
         val cardLabelOffset = 30f * scale
@@ -301,7 +315,7 @@ class MenuRenderer : Disposable {
             UIFeedback.click()
             return ButtonClicked.SETTINGS
         }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        if (showExit && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             UIFeedback.click()
             return ButtonClicked.EXIT
         }

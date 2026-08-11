@@ -4,6 +4,7 @@ plugins {
 }
 
 val gdxVersion: String by project
+val joltVersion: String by project
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -23,8 +24,9 @@ dependencies {
     implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
 
-    // Bullet physics natives for desktop
-    implementation("com.badlogicgames.gdx:gdx-bullet-platform:$gdxVersion:natives-desktop")
+
+    // Jolt physics natives for desktop (Windows/Linux/macOS Intel+ARM)
+    runtimeOnly("com.github.xpenatan.xJolt:jolt-desktop:$joltVersion")
 }
 
 sourceSets {

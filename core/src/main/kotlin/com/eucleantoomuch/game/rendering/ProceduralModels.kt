@@ -16,6 +16,7 @@ import com.badlogic.gdx.utils.Disposable
 import net.mgsx.gltf.loaders.glb.GLBLoader
 import net.mgsx.gltf.scene3d.scene.SceneAsset
 import com.eucleantoomuch.game.util.Constants
+import com.eucleantoomuch.game.util.randomItem
 
 class ProceduralModels : Disposable {
     private val modelBuilder = ModelBuilder()
@@ -742,7 +743,7 @@ class ProceduralModels : Disposable {
         Color(0.8f, 0.4f, 0.6f, 1f),   // Pink
     )
 
-    fun getRandomShirtColor(): Color = shirtColors.random()
+    fun getRandomShirtColor(): Color = shirtColors.randomItem()
 
     fun createCarModel(color: Color = carColor1): Model {
         modelBuilder.begin()
@@ -794,12 +795,12 @@ class ProceduralModels : Disposable {
             Color(0.9f, 0.85f, 0.7f, 1f),    // Light yellow
             Color(0.85f, 0.75f, 0.65f, 1f),  // Peach
         )
-        return colors.random()
+        return colors.randomItem()
     }
 
     fun getRandomCarColor(): Color {
         val colors = listOf(carColor1, carColor2, Color.WHITE, Color.BLACK, Color(0.3f, 0.3f, 0.3f, 1f))
-        return colors.random()
+        return colors.randomItem()
     }
 
     // ============ Environment Models ============
@@ -1507,9 +1508,9 @@ class ProceduralModels : Disposable {
 
         // Pick color based on fog level - further = more faded
         val color = when (fogLevel) {
-            0 -> listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).random()
-            1 -> listOf(bgBuildingMidColor1, bgBuildingMidColor2).random()
-            else -> listOf(bgBuildingFarColor1, bgBuildingFarColor2).random()
+            0 -> listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).randomItem()
+            1 -> listOf(bgBuildingMidColor1, bgBuildingMidColor2).randomItem()
+            else -> listOf(bgBuildingFarColor1, bgBuildingFarColor2).randomItem()
         }
         val material = Material(ColorAttribute.createDiffuse(color))
 
@@ -1546,7 +1547,7 @@ class ProceduralModels : Disposable {
     }
 
     fun getRandomBackgroundBuildingColor(): Color {
-        return listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).random()
+        return listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).randomItem()
     }
 
     /**

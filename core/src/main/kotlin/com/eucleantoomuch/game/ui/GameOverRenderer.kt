@@ -7,6 +7,7 @@ import com.badlogic.gdx.math.Rectangle
 import com.badlogic.gdx.utils.Disposable
 import com.eucleantoomuch.game.state.GameSession
 import com.eucleantoomuch.game.state.TimeTrialLevel
+import com.eucleantoomuch.game.util.randomItem
 
 /**
  * Modern game over screen with statistics and large action buttons.
@@ -393,7 +394,7 @@ class GameOverRenderer : Disposable {
         newHighScoreAnim = 0f
         safetyTipAnim = 0f
         // Pick a random safety tip
-        currentSafetyTip = safetyTips.random()
+        currentSafetyTip = safetyTips.randomItem()
     }
 
     fun resize(width: Int, height: Int) {

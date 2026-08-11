@@ -13,8 +13,8 @@ import com.eucleantoomuch.game.physics.EucPhysics
 import com.eucleantoomuch.game.ui.UIFeedback
 import com.eucleantoomuch.game.util.Constants
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.math.MathUtils
 import kotlin.math.sin
-import kotlin.random.Random
 
 class EucPhysicsSystem(
     private val gameInput: GameInput
@@ -212,7 +212,7 @@ class EucPhysicsSystem(
 
         // When we START flooring it (transition from not flooring to flooring), roll for wobble
         if (isFlooringIt && !wasFlooringIt) {
-            wobbleActive = Random.nextFloat() < wobbleChance
+            wobbleActive = MathUtils.random() < wobbleChance
             if (wobbleActive) {
                 Gdx.app.log("Wobble", "TRIGGERED! lean=${euc.forwardLean}, speed=${euc.speed}")
             }

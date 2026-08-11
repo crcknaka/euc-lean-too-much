@@ -14,6 +14,7 @@ import com.eucleantoomuch.game.util.Constants
 import net.mgsx.gltf.loaders.glb.GLBLoader
 import net.mgsx.gltf.scene3d.scene.Scene
 import net.mgsx.gltf.scene3d.scene.SceneAsset
+import com.eucleantoomuch.game.util.randomItem
 
 class WorldGenerator(
     private val engine: Engine,
@@ -598,7 +599,7 @@ class WorldGenerator(
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(pedestrianModels.random())
+            modelInstance = ModelInstance(pedestrianModels.randomItem())
         })
 
         entity.add(ColliderComponent().apply {
@@ -690,7 +691,7 @@ class WorldGenerator(
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(pedestrianModels.random())
+            modelInstance = ModelInstance(pedestrianModels.randomItem())
         })
 
         entity.add(ColliderComponent().apply {
@@ -741,7 +742,7 @@ class WorldGenerator(
             yaw = 90f  // Face each other
             updateRotationFromYaw()
         })
-        entity1.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
+        entity1.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.randomItem()) })
         entity1.add(ColliderComponent().apply {
             setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
             collisionGroup = CollisionGroups.OBSTACLE
@@ -766,7 +767,7 @@ class WorldGenerator(
             yaw = -90f  // Face first pedestrian
             updateRotationFromYaw()
         })
-        entity2.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
+        entity2.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.randomItem()) })
         entity2.add(ColliderComponent().apply {
             setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, Constants.PEDESTRIAN_WIDTH)
             collisionGroup = CollisionGroups.OBSTACLE
@@ -843,7 +844,7 @@ class WorldGenerator(
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(pedestrianModels.random())
+            modelInstance = ModelInstance(pedestrianModels.randomItem())
         })
 
         entity.add(ColliderComponent().apply {
@@ -957,9 +958,9 @@ class WorldGenerator(
             // Left side building
             val (heightL, detailedL, simpleL) = if (useSkyscraperLeft && skyscraperModels.isNotEmpty()) {
                 skyscraperClusterRemaining--
-                skyscraperModels.random()
+                skyscraperModels.randomItem()
             } else {
-                buildingModels.random()
+                buildingModels.randomItem()
             }
             entities.add(createBuildingEntity(
                 -Constants.BUILDING_OFFSET_X - leftXOffset,
@@ -974,9 +975,9 @@ class WorldGenerator(
             // Right side building
             val (heightR, detailedR, simpleR) = if (useSkyscraperRight && skyscraperModels.isNotEmpty()) {
                 skyscraperClusterRemaining--
-                skyscraperModels.random()
+                skyscraperModels.randomItem()
             } else {
-                buildingModels.random()
+                buildingModels.randomItem()
             }
             entities.add(createBuildingEntity(
                 Constants.BUILDING_OFFSET_X + rightXOffset,
@@ -1022,7 +1023,7 @@ class WorldGenerator(
             yaw = MathUtils.random(0f, 360f)
         })
 
-        val modelInstance = ModelInstance(treeModels.random().model)
+        val modelInstance = ModelInstance(treeModels.randomItem().model)
 
         // Scale down slightly to fit between buildings
         val treeScale = MathUtils.random(0.6f, 0.85f)
@@ -1243,7 +1244,7 @@ class WorldGenerator(
         }
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(modelList.random().model)
+            modelInstance = ModelInstance(modelList.randomItem().model)
         })
 
         entity.add(GroundComponent().apply {
@@ -1373,7 +1374,7 @@ class WorldGenerator(
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(cloudModels.random().model)
+            modelInstance = ModelInstance(cloudModels.randomItem().model)
         })
 
         entity.add(GroundComponent().apply {
@@ -1465,7 +1466,7 @@ class WorldGenerator(
         })
 
         entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(treeModels.random().model)
+            modelInstance = ModelInstance(treeModels.randomItem().model)
         })
 
         entity.add(GroundComponent().apply {
@@ -1844,7 +1845,7 @@ class WorldGenerator(
         val x = startSide * (effectiveRoadWidth / 2 + 1f)
 
         entity.add(TransformComponent().apply { position.set(x, 0f, z) })
-        entity.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.random()) })
+        entity.add(ModelComponent().apply { modelInstance = ModelInstance(pedestrianModels.randomItem()) })
         entity.add(VelocityComponent())
         entity.add(ColliderComponent().apply {
             setSize(Constants.PEDESTRIAN_WIDTH, Constants.PEDESTRIAN_HEIGHT, 0.3f)
@@ -1892,7 +1893,7 @@ class WorldGenerator(
         taxiGlbAsset?.let { availableAssets.add(Triple(it, taxiGlbScale, "taxi")) }
         sportscarGlbAsset?.let { availableAssets.add(Triple(it, sportscarGlbScale, "sportscar")) }
 
-        val chosen = if (availableAssets.isNotEmpty()) availableAssets.random() else null
+        val chosen = if (availableAssets.isNotEmpty()) availableAssets.randomItem() else null
         val chosenAsset = chosen?.first
         val chosenScale = chosen?.second ?: 1f
 
@@ -1914,7 +1915,7 @@ class WorldGenerator(
                 modelInstance = scene!!.modelInstance
                 isPbr = true
             } else {
-                modelInstance = ModelInstance(carModels.random().model)
+                modelInstance = ModelInstance(carModels.randomItem().model)
                 isPbr = false
             }
         })

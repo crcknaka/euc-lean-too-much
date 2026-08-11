@@ -2,7 +2,6 @@ package com.eucleantoomuch.game.lwjgl3
 
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Application
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration
-import com.badlogic.gdx.backends.lwjgl3.Lwjgl3ApplicationConfiguration.GLEmulation
 import com.eucleantoomuch.game.EucGame
 
 fun main() {
@@ -17,8 +16,12 @@ fun main() {
         setResizable(true)
         setWindowIcon("icon128.png", "icon64.png", "icon32.png", "icon16.png")
         disableAudio(false)
-        setOpenGLEmulation(GLEmulation.GL30, 3, 2)
+        // Default GL20 (compatibility profile). The previous GL 3.2 core-profile emulation
+        // broke every legacy-GLSL shader on macOS (attribute/varying + no #version):
+        // the game's post-processing shaders AND libGDX's own SpriteBatch/ShapeRenderer
+        // defaults failed to compile, crashing at startup. GL20 matches Android's GLES2
+        // path, so desktop renders exactly what the phone renders.
     }
 
-    Lwjgl3Application(EucGame(), config)
+    Lwjgl3Application(EucGame(DesktopPlatformServices()), config)
 }

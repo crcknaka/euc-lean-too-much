@@ -714,6 +714,15 @@ class AndroidPlatformServices(private val context: Context) : PlatformServices {
         soundPool.play(powerupSound, 1f, 1f, 1, 0, 1f)
     }
 
+    override fun createRagdollEngine(): com.eucleantoomuch.game.physics.RagdollEngine =
+        com.eucleantoomuch.game.physics.JoltRagdollPhysics()
+
+    override fun exitProcess() {
+        // Gdx.app.exit() only finishes the Activity on Android; kill the process so the
+        // game does not linger in the background holding audio/physics resources.
+        android.os.Process.killProcess(android.os.Process.myPid())
+    }
+
     override fun releaseAudio() {
         // Stop the motor-sound thread + its AudioTrack, then free the SoundPool and its
         // 11 loaded samples. Without this they leak across an Activity restart.

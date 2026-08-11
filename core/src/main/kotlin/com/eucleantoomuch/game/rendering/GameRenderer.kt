@@ -85,11 +85,11 @@ class GameRenderer(
 
     // Ragdoll renderer and physics (set when ragdoll is active)
     var activeRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
-    var activeRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+    var activeRagdollPhysics: com.eucleantoomuch.game.physics.RagdollEngine? = null
 
     // Pedestrian ragdoll renderer (always active for fallen pedestrians during gameplay)
     var pedestrianRagdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer? = null
-    var pedestrianRagdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics? = null
+    var pedestrianRagdollPhysics: com.eucleantoomuch.game.physics.RagdollEngine? = null
 
     // Articulated pedestrian renderer with walking animation
     val pedestrianRenderer: PedestrianRenderer
@@ -655,7 +655,7 @@ class GameRenderer(
      * Call this after render() when ragdoll is active.
      */
     fun renderRagdoll(ragdollRenderer: com.eucleantoomuch.game.physics.RagdollRenderer,
-                      ragdollPhysics: com.eucleantoomuch.game.physics.RagdollPhysics) {
+                      ragdollPhysics: com.eucleantoomuch.game.physics.RagdollEngine) {
         if (!ragdollPhysics.isActive()) return
 
         // Render ragdoll bodies with same environment as other models

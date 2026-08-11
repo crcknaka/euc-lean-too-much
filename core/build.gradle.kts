@@ -6,6 +6,7 @@ val gdxVersion: String by project
 val ktxVersion: String by project
 val ashleyVersion: String by project
 val gdxGltfVersion: String by project
+val joltVersion: String by project
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -25,8 +26,9 @@ dependencies {
     // FreeType for smooth fonts
     api("com.badlogicgames.gdx:gdx-freetype:$gdxVersion")
 
-    // Bullet physics for ragdoll
-    api("com.badlogicgames.gdx:gdx-bullet:$gdxVersion")
+
+    // Jolt physics - cross-platform incl. web (wasm), replacing Bullet for full parity
+    api("com.github.xpenatan.xJolt:jolt-core:$joltVersion")
 
     // Ashley ECS
     api("com.badlogicgames.ashley:ashley:$ashleyVersion")

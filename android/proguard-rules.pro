@@ -16,6 +16,13 @@
 -keep class net.mgsx.gltf.** { *; }
 -dontwarn net.mgsx.**
 
+# Jolt physics (xJolt/jParser): the native library resolves these Java classes and their
+# fields/methods by name through JNI, so renaming or stripping them breaks the bindings.
+-keep class jolt.** { *; }
+-keep class com.github.xpenatan.** { *; }
+-dontwarn jolt.**
+-dontwarn com.github.xpenatan.**
+
 # KTX extensions
 -keep class ktx.** { *; }
 -dontwarn ktx.**

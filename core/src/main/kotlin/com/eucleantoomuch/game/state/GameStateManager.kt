@@ -9,6 +9,7 @@ class GameStateManager {
     fun transition(newState: GameState) {
         val oldState = currentState
         currentState = newState
+        com.badlogic.gdx.Gdx.app?.log("GameState", "${oldState::class.simpleName} -> ${newState::class.simpleName}")
         listeners.forEach { it(oldState, newState) }
     }
 
