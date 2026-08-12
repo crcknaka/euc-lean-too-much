@@ -19,9 +19,10 @@ fun main() {
         // (Leaving the defaults gives the canvas' own attributes, i.e. 0x0 and a blank page.)
         width = 0
         height = 0
-        // Keep the drawing buffer in CSS pixels: on a Retina display the physical-pixel
-        // buffer would be 4x the fragments for no visible gain in a 3D scene this dense.
-        usePhysicalPixels = false
+        // Draw at the display's real pixel density. Without this the backing store is sized
+        // in CSS pixels and the browser upscales it, which on any Retina/HiDPI screen makes
+        // the whole game - text most visibly - look soft and blocky.
+        usePhysicalPixels = true
         antialiasing = true
         powerPreference = "high-performance"
     }

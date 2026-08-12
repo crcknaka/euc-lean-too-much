@@ -40,6 +40,11 @@ object UIFonts : Disposable {
         FontStyle.TINY to 20        // Debug info, FPS
     )
 
+    /** Frames the surface size must hold still before the atlases are rebuilt. */
+    private const val SETTLE_FRAMES = 6
+    private var lastSeenHeight = 0
+    private var stableFrames = 0
+
     // Characters to include in font
     private const val CHARS = FreeTypeFontGenerator.DEFAULT_CHARS +
             "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя"
@@ -60,9 +65,20 @@ object UIFonts : Disposable {
             fonts.values.any { !it.region.texture.isManaged || it.region.texture.textureObjectHandle == 0 }
 
         // Fonts are sized from screen height - if it changed (resize, resume with a
-        // different surface), regenerate so text doesn't render at the wrong scale
-        val heightChanged = initialized && fontGenHeight > 0 && Gdx.graphics.height > 0 &&
-            Gdx.graphics.height != fontGenHeight
+        // different surface), regenerate so text doesn't render at the wrong scale.
+        //
+        // Only once the height has stopped moving, though: dragging a window edge reports a
+        // new height every single frame, and rebuilding every atlas (seven styles, full Latin
+        // plus Cyrillic) that often turns a resize into a slideshow.
+        val height = Gdx.graphics.height
+        if (height != lastSeenHeight) {
+            lastSeenHeight = height
+            stableFrames = 0
+        } else if (stableFrames < SETTLE_FRAMES) {
+            stableFrames++
+        }
+        val heightChanged = initialized && fontGenHeight > 0 && height > 0 &&
+            height != fontGenHeight && stableFrames >= SETTLE_FRAMES
 
         if (contextLost || heightChanged) {
             Gdx.app.log("UIFonts", "Reinitializing fonts (contextLost=$contextLost, heightChanged=$heightChanged)")

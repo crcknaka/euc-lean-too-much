@@ -21,6 +21,8 @@ class UIRenderer : Disposable {
         private set
     val layout = GlyphLayout()
 
+    private val projection = com.badlogic.gdx.math.Matrix4()
+
     var screenWidth = Gdx.graphics.width.toFloat()
         private set
     var screenHeight = Gdx.graphics.height.toFloat()
@@ -29,8 +31,20 @@ class UIRenderer : Disposable {
     fun resize(width: Int, height: Int) {
         screenWidth = width.toFloat()
         screenHeight = height.toFloat()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapes.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        applyProjection()
+    }
+
+    /**
+     * Both projections must go through the setters, never through the matrix in place.
+     * ShapeRenderer only rebuilds the matrix it actually renders with when its dirty flag is
+     * set, and only the setter sets it - mutating getProjectionMatrix() leaves shapes drawing
+     * in the old coordinate space while text and images follow the new one, which is what made
+     * every menu come apart the moment a window was resized or a phone rotated.
+     */
+    private fun applyProjection() {
+        projection.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        batch.projectionMatrix = projection
+        shapes.projectionMatrix = projection
     }
 
     /** Force recreation of batch and shapes - call after GL context loss */
@@ -41,8 +55,7 @@ class UIRenderer : Disposable {
         try { shapes.dispose() } catch (_: Exception) { /* ignore */ }
         batch = SpriteBatch()
         shapes = ShapeRenderer()
-        batch.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
-        shapes.projectionMatrix.setToOrtho2D(0f, 0f, screenWidth, screenHeight)
+        applyProjection()
     }
 
     fun beginShapes(type: ShapeRenderer.ShapeType = ShapeRenderer.ShapeType.Filled) {
