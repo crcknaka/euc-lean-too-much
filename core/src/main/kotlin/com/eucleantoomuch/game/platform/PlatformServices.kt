@@ -180,6 +180,24 @@ interface PlatformServices {
      * button that does nothing.
      */
     fun canExit(): Boolean = true
+
+    /**
+     * Source of tilt readings for steering. Defaults to libGDX's own accelerometer, which is
+     * correct on Android and correctly absent on desktop; the browser build substitutes the
+     * DeviceMotion sensor, which libGDX's web backend leaves unimplemented.
+     */
+    fun createTiltProvider(): com.eucleantoomuch.game.input.TiltProvider =
+        com.eucleantoomuch.game.input.GdxTiltProvider()
+
+    /**
+     * Whether the player is on a touch screen, which decides if drag-steering is a sensible
+     * fallback when no tilt sensor is available. libGDX's web backend reports every peripheral
+     * as absent, so the browser build answers this itself.
+     */
+    fun hasTouchScreen(): Boolean =
+        com.badlogic.gdx.Gdx.input.isPeripheralAvailable(
+            com.badlogic.gdx.Input.Peripheral.MultitouchScreen
+        )
 }
 
 /**

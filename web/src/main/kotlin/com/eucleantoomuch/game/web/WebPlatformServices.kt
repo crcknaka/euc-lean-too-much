@@ -31,4 +31,9 @@ class WebPlatformServices : DefaultPlatformServices() {
 
     override fun createRagdollEngine(): com.eucleantoomuch.game.physics.RagdollEngine =
         com.eucleantoomuch.game.physics.JoltRagdollPhysics()
+
+    override fun createTiltProvider(): com.eucleantoomuch.game.input.TiltProvider =
+        WebTiltProvider()
+
+    override fun hasTouchScreen(): Boolean = WebDeviceMotion.hasTouchScreen()
 }

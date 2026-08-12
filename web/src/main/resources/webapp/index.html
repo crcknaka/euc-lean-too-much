@@ -79,6 +79,24 @@
                 0%   { transform: translateX(-100%); }
                 100% { transform: translateX(250%); }
             }
+            #tilt-permission {
+                position: fixed;
+                left: 50%;
+                bottom: 24px;
+                transform: translateX(-50%);
+                display: none;
+                z-index: 20;
+                padding: 14px 26px;
+                border: none;
+                border-radius: 999px;
+                background: linear-gradient(90deg, #ff5a3c, #ffb03a);
+                color: #1a1008;
+                font: 600 15px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                letter-spacing: 0.04em;
+                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+                cursor: pointer;
+            }
+            #tilt-permission.show { display: block; }
         </style>
     </head>
     <body oncontextmenu="return false">
@@ -92,6 +110,8 @@
             <p>Loading&hellip;</p>
         </div>
 
+        <button id="tilt-permission" type="button">Tilt to steer</button>
+
         <!-- FreeType (asm.js) defines the global `Module` the font generator calls into.
              Nothing loads it at runtime, so it has to be a plain script tag ahead of the
              game - otherwise every TTF falls back to libGDX's built-in bitmap font. -->
@@ -104,9 +124,36 @@
                 var boot = document.getElementById("boot");
                 if (boot) boot.classList.add("hidden");
             }
+            // iOS only hands out motion readings if requestPermission() is called from inside a
+            // real user gesture, which the game loop's own touch handling is not - it runs a
+            // frame later, in requestAnimationFrame. Hence a plain DOM button. Every other
+            // browser starts listening by itself, so the button never appears there.
+            function setUpTiltPermission() {
+                var button = document.getElementById("tilt-permission");
+                if (!button) return;
+                var needsPermission = typeof DeviceMotionEvent !== "undefined" &&
+                    typeof DeviceMotionEvent.requestPermission === "function";
+                if (!needsPermission) return;
+
+                button.classList.add("show");
+                button.addEventListener("click", function () {
+                    // The game installs the listener itself; asking here is what makes the
+                    // request happen inside the gesture.
+                    DeviceMotionEvent.requestPermission().then(function (state) {
+                        if (state === "granted" && window.__eucTiltEnable) {
+                            window.__eucTiltEnable();
+                        }
+                        button.classList.remove("show");
+                    }).catch(function () {
+                        button.classList.remove("show");
+                    });
+                });
+            }
+
             async function start() {
                 %MODE%
                 setTimeout(hideBootScreen, 400);
+                setUpTiltPermission();
             }
             window.addEventListener("load", start);
         </script>

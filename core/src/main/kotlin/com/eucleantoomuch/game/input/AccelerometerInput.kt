@@ -1,11 +1,15 @@
 package com.eucleantoomuch.game.input
 
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.Input
 import com.eucleantoomuch.game.util.Constants
 import kotlin.math.abs
 
-class AccelerometerInput : GameInput {
+/**
+ * Tilt steering. Reads through a [TiltProvider] rather than libGDX directly, so the browser
+ * build can feed it the DeviceMotion sensor - the values mean the same thing either way.
+ */
+class AccelerometerInput(
+    private val tilt: TiltProvider = GdxTiltProvider()
+) : GameInput {
     // Calibration values (neutral position)
     private var calibrationX: Float = 0f
     private var calibrationY: Float = 0f
@@ -20,7 +24,7 @@ class AccelerometerInput : GameInput {
     var sideSensitivity: Float = 1.0f
 
     override fun update(deltaTime: Float) {
-        if (!Gdx.input.isPeripheralAvailable(Input.Peripheral.Accelerometer)) {
+        if (!tilt.isAvailable()) {
             return
         }
 
@@ -28,8 +32,8 @@ class AccelerometerInput : GameInput {
         // In LANDSCAPE mode (phone held horizontally):
         // - X axis = forward/back tilt (pitch)
         // - Y axis = left/right tilt (roll)
-        val rawX = Gdx.input.accelerometerX
-        val rawY = Gdx.input.accelerometerY
+        val rawX = tilt.x()
+        val rawY = tilt.y()
 
         // Apply exponential moving average for smoothing
         smoothedX = smoothedX + (rawX - smoothedX) * Constants.INPUT_SMOOTHING
@@ -37,13 +41,13 @@ class AccelerometerInput : GameInput {
     }
 
     override fun calibrate() {
-        if (!Gdx.input.isPeripheralAvailable(Input.Peripheral.Accelerometer)) {
+        if (!tilt.isAvailable()) {
             calibrated = true
             return
         }
 
-        calibrationX = Gdx.input.accelerometerX
-        calibrationY = Gdx.input.accelerometerY
+        calibrationX = tilt.x()
+        calibrationY = tilt.y()
         smoothedX = calibrationX
         smoothedY = calibrationY
         calibrated = true

@@ -25,6 +25,8 @@ import com.eucleantoomuch.game.feedback.SpeedWarningManager
 import com.eucleantoomuch.game.input.AccelerometerInput
 import com.eucleantoomuch.game.input.GameInput
 import com.eucleantoomuch.game.input.KeyboardInput
+import com.eucleantoomuch.game.input.SwitchableGameInput
+import com.eucleantoomuch.game.input.TouchSteerInput
 import com.eucleantoomuch.game.platform.DefaultPlatformServices
 import com.eucleantoomuch.game.platform.PlatformServices
 import com.eucleantoomuch.game.procedural.WorldGenerator
@@ -60,8 +62,11 @@ class EucGame(
     private val platformServices: PlatformServices = DefaultPlatformServices()
 ) : ApplicationAdapter() {
     private lateinit var engine: Engine
-    private lateinit var gameInput: GameInput
+    private lateinit var gameInput: SwitchableGameInput
     private lateinit var accelerometerInput: AccelerometerInput
+    private lateinit var touchSteerInput: TouchSteerInput
+    private lateinit var keyboardInput: KeyboardInput
+    private lateinit var tiltProvider: com.eucleantoomuch.game.input.TiltProvider
     private lateinit var models: ProceduralModels
     private lateinit var renderer: GameRenderer
     private lateinit var worldGenerator: WorldGenerator
@@ -153,12 +158,13 @@ class EucGame(
         timeTrialManager = TimeTrialManager()
 
         // Initialize input based on platform
-        accelerometerInput = AccelerometerInput()
-        gameInput = if (Gdx.input.isPeripheralAvailable(Input.Peripheral.Accelerometer)) {
-            accelerometerInput
-        } else {
-            KeyboardInput()
-        }
+        tiltProvider = platformServices.createTiltProvider()
+        accelerometerInput = AccelerometerInput(tiltProvider)
+        touchSteerInput = TouchSteerInput()
+        keyboardInput = KeyboardInput()
+        // Wrapped, because the answer can change after startup: a browser only starts
+        // reporting tilt once the player has granted permission.
+        gameInput = SwitchableGameInput(pickInput())
 
         // Load saved calibration if available
         if (highScoreManager.hasCalibration()) {
@@ -413,6 +419,16 @@ class EucGame(
      * setForegroundFPS, and this runs as the very first statement of create(), so an
      * unguarded call killed the browser build before a single line was even logged.
      */
+    /**
+     * Best steering source available right now: the tilt sensor if there is one, otherwise a
+     * finger on a touch screen, otherwise the keyboard.
+     */
+    private fun pickInput(): GameInput = when {
+        tiltProvider.isAvailable() -> accelerometerInput
+        platformServices.hasTouchScreen() -> touchSteerInput
+        else -> keyboardInput
+    }
+
     private fun raiseForegroundFpsCap() {
         if (Gdx.app.type == Application.ApplicationType.WebGL) return
         try {
@@ -467,6 +483,10 @@ class EucGame(
 
         val delta = Gdx.graphics.deltaTime
 
+        // Re-check the steering source: in a browser the tilt sensor appears only once the
+        // player has granted permission, which is well after create().
+        gameInput.switchTo(pickInput())
+
         // Update input
         gameInput.update(delta)
 
@@ -512,7 +532,10 @@ class EucGame(
                 wasTouched = Gdx.input.isTouched(0)
             } else {
                 val isTouched = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)
-                if (!isTouched && wasTouched) {
+                // When the finger is also the steering stick, only a gesture that never
+                // travelled counts as a tap - otherwise every turn would cycle the camera.
+                val steeringByTouch = gameInput.delegate === touchSteerInput
+                if (!isTouched && wasTouched && !(steeringByTouch && touchSteerInput.wasDrag())) {
                     // Finger lifted - this is a tap
                     cameraViewModeText = renderer.cameraController.cycleViewMode()
                     cameraViewModeTimer = 1.5f  // Show text for 1.5 seconds
