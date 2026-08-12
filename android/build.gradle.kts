@@ -82,6 +82,9 @@ android {
     androidResources {
         // Keep archived wheel models in the repo but out of the APK
         ignoreAssetsPatterns.add("!old_Wheels")
+        // The sound effects live in assets/ so the web build can reach them; Android plays the
+        // same files out of res/raw through SoundPool, so shipping both would just be dead weight.
+        ignoreAssetsPatterns.add("!sounds")
     }
 
     packaging {
