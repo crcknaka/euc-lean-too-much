@@ -10,6 +10,7 @@ import com.badlogic.gdx.math.Vector3
 import kotlin.math.sqrt
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.*
+import com.eucleantoomuch.game.util.Easing
 import com.eucleantoomuch.game.platform.PlatformServices
 import com.eucleantoomuch.game.rendering.ProceduralModels
 
@@ -337,10 +338,17 @@ class PigeonSystem(
         model: ModelComponent,
         deltaTime: Float
     ) {
-        // Brief pause before taking off (0.1-0.2 seconds)
-        if (pigeon.stateTimer >= 0.15f) {
+        // Anticipation: the bird sinks onto its legs before it goes. The legs supply about a
+        // quarter of the take-off acceleration (Berg & Biewener, J Exp Biol 2010), and without
+        // a visible crouch the launch reads as the bird being teleported upwards.
+        pigeon.crouch = Easing.outN(pigeon.stateTimer / CROUCH_SECONDS, 2)
+        transform.position.y = pigeon.spawnPosition.y - pigeon.crouch * 0.045f
+
+        if (pigeon.stateTimer >= CROUCH_SECONDS) {
             pigeon.state = PigeonComponent.State.FLYING
             pigeon.stateTimer = 0f
+            pigeon.flightTime = 0f
+            pigeon.crouch = 0f
             pigeon.verticalSpeed = 5f  // Initial upward velocity
 
             // Switch to flying model
@@ -365,16 +373,40 @@ class PigeonSystem(
         model: ModelComponent,
         deltaTime: Float
     ) {
-        // Move horizontally
-        transform.position.x += pigeon.flightDirection.x * pigeon.flightSpeed * deltaTime
-        transform.position.z += pigeon.flightDirection.z * pigeon.flightSpeed * deltaTime
+        pigeon.flightTime += deltaTime
+        val t = pigeon.flightTime
 
-        // Move vertically with some physics
-        pigeon.verticalSpeed -= 2f * deltaTime  // Gravity effect (but mild for birds)
-        pigeon.verticalSpeed = pigeon.verticalSpeed.coerceAtLeast(1f)  // Birds keep climbing somewhat
+        // Thrust profile. A bird does not leave at cruising speed: the strongest acceleration
+        // comes around the second wingbeat and every beat after that produces less, so the
+        // burst is ramped in over the first couple of beats and then allowed to decay towards
+        // a steady cruise. Constant speed from frame one was what made this look weightless.
+        val rampIn = Easing.outN(t / BURST_PEAK_SECONDS, 2)
+        val burst = rampIn * Easing.decay((t - BURST_PEAK_SECONDS).coerceAtLeast(0f), BURST_TAU)
+        val speed = pigeon.flightSpeed * (1f + BURST_GAIN * burst)
 
-        pigeon.flightAltitude += pigeon.verticalSpeed * deltaTime
-        transform.position.y = pigeon.spawnPosition.y + pigeon.flightAltitude
+        transform.position.x += pigeon.flightDirection.x * speed * deltaTime
+        transform.position.z += pigeon.flightDirection.z * speed * deltaTime
+
+        // The climb is spent in the same way: steep while the burst lasts, easing into a
+        // shallow rise rather than holding a fixed climb rate for ever.
+        pigeon.verticalSpeed -= 2f * deltaTime
+        pigeon.verticalSpeed = pigeon.verticalSpeed.coerceAtLeast(1f)
+        pigeon.flightAltitude += (pigeon.verticalSpeed + CLIMB_BURST * burst) * deltaTime
+
+        // Wingbeat: fastest on take-off, settling towards the ~5.5 Hz of level flight. The
+        // models have no articulated wings, so the beat is carried by the body - a small
+        // vertical surge on each downstroke, which is what the eye actually reads as effort.
+        val wingHz = CRUISE_HZ + (TAKEOFF_HZ - CRUISE_HZ) * Easing.decay(t, WINGBEAT_TAU)
+        pigeon.wingPhase += wingHz * deltaTime
+        val surge = Easing.sinPhase(pigeon.wingPhase) * WING_SURGE * (0.35f + 0.65f * burst)
+
+        transform.position.y = pigeon.spawnPosition.y + pigeon.flightAltitude + surge
+
+        // Body angle swings from nose-down on the first downstroke to nose-up as it settles
+        pigeon.pitch = PITCH_LAUNCH + (PITCH_CRUISE - PITCH_LAUNCH) * Easing.smooth(t / PITCH_SECONDS)
+        // Set directly rather than through updateRotationFromYaw(), which only knows about yaw.
+        // Safe to do here: the flight direction is fixed at launch, so nothing rewrites this.
+        transform.rotation.setEulerAngles(transform.yaw, pigeon.pitch, 0f)
 
         // Remove when high enough and far enough
         val dx = transform.position.x - pigeon.spawnPosition.x
@@ -384,5 +416,27 @@ class PigeonSystem(
         if (pigeon.flightAltitude > pigeon.maxFlightAltitude || horizontalDist > 30f) {
             pigeon.state = PigeonComponent.State.LANDED
         }
+    }
+
+    private companion object {
+        /** Sink onto the legs before launching. */
+        const val CROUCH_SECONDS = 0.15f
+
+        // Take-off thrust: ramps in over roughly the first two wingbeats, then is spent.
+        const val BURST_PEAK_SECONDS = 0.22f
+        const val BURST_TAU = 0.55f
+        const val BURST_GAIN = 1.35f
+        const val CLIMB_BURST = 4.5f
+
+        // Wingbeat rate, take-off down to level flight (~5.5 Hz measured in pigeons)
+        const val TAKEOFF_HZ = 9.5f
+        const val CRUISE_HZ = 5.5f
+        const val WINGBEAT_TAU = 0.9f
+        const val WING_SURGE = 0.05f
+
+        // Body angle: wing root below the rump on the first beat, nose-up once settled
+        const val PITCH_LAUNCH = -13f
+        const val PITCH_CRUISE = 19f
+        const val PITCH_SECONDS = 1.2f
     }
 }

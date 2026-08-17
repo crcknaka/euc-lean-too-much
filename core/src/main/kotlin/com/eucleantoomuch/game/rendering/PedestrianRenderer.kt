@@ -3,6 +3,8 @@ package com.eucleantoomuch.game.rendering
 import com.badlogic.ashley.core.ComponentMapper
 import com.badlogic.ashley.core.Engine
 import com.badlogic.gdx.graphics.Camera
+import com.badlogic.gdx.math.MathUtils
+import com.eucleantoomuch.game.util.Easing
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.g3d.Environment
 import com.badlogic.gdx.graphics.g3d.Model
@@ -17,7 +19,6 @@ import com.eucleantoomuch.game.ecs.components.PedestrianComponent
 import com.eucleantoomuch.game.ecs.components.PedestrianState
 import com.eucleantoomuch.game.ecs.components.TransformComponent
 import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * Renders pedestrians with articulated body parts and walking animation.
@@ -70,6 +71,11 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
     // Animation parameters
     private val armSwingAngle = 25f  // Degrees
     private val legSwingAngle = 30f  // Degrees
+
+    /** Share of the gait cycle a foot spends on the ground; the rest is the swing. */
+    private val STANCE_SHARE = 0.6f
+    private val BOB_HEIGHT = 0.035f   // Metres, peak to peak roughly a human's 4-5 cm
+    private val ROLL_DEGREES = 2.2f
 
     private fun getOrCreateInstances(shirtColor: Color): BodyPartInstances {
         val colorKey = shirtColor.toIntBits()
@@ -134,16 +140,30 @@ class PedestrianRenderer(private val engine: Engine, private val models: Procedu
                            pedestrian.state == PedestrianState.CROSSING ||
                            pedestrian.state == PedestrianState.WALKING_TO_CROSSING
 
-            // Arm and leg swing angles (opposite for natural walk cycle)
-            val leftArmSwing = if (isWalking) sin(phase) * armSwingAngle else 0f
-            val rightArmSwing = if (isWalking) -sin(phase) * armSwingAngle else 0f
-            val leftLegSwing = if (isWalking) -sin(phase) * legSwingAngle else 0f
-            val rightLegSwing = if (isWalking) sin(phase) * legSwingAngle else 0f
+            // A foot is on the ground for about 60% of the gait cycle and swinging for the
+            // other 40%. Driving both off a plain sine gives them equal time, which is what
+            // made everyone walk like a metronome; warping the phase spends the right share
+            // on each and makes the swing visibly quicker than the stance.
+            val cycle = phase / MathUtils.PI2
+            val warped = Easing.warpPhase(cycle, STANCE_SHARE)
+            val swing = if (isWalking) Easing.sinPhase(warped) else 0f
+
+            val leftArmSwing = swing * armSwingAngle
+            val rightArmSwing = -swing * armSwingAngle
+            val leftLegSwing = -swing * legSwingAngle
+            val rightLegSwing = swing * legSwingAngle
+
+            // The body rises and falls twice per stride - once per step, highest over the
+            // supporting leg - and rolls slightly towards it. Without this the figure glides
+            // along on an invisible rail, which reads as wrong long before anyone can say why.
+            val bob = if (isWalking) -MathUtils.cos(warped * MathUtils.PI2 * 2f) * BOB_HEIGHT else 0f
+            val roll = if (isWalking) swing * ROLL_DEGREES else 0f
 
             // Base transform (position + yaw rotation)
             baseMatrix.idt()
-            baseMatrix.translate(transform.position)
+            baseMatrix.translate(transform.position.x, transform.position.y + bob, transform.position.z)
             baseMatrix.rotate(Vector3.Y, -transform.yaw)
+            if (roll != 0f) baseMatrix.rotate(Vector3.Z, roll)
 
             // Render each body part with appropriate transform
 
