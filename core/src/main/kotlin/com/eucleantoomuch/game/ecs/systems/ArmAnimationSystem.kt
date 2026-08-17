@@ -24,6 +24,17 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         // Update balance animation time
         arm.balanceTime += deltaTime
 
+        // How much correcting is going on: how fast the lean is changing, plus any wobble.
+        // Arms come out when the rider is fighting the wheel and settle when they are not -
+        // a sway of fixed size, running whatever happens, is what made this look like a
+        // metronome bolted to the shoulders.
+        val leanRate = kotlin.math.abs(euc.visualSideLean - arm.lastSideLean) / deltaTime.coerceAtLeast(0.0001f)
+        arm.lastSideLean = euc.visualSideLean
+        val demand = (leanRate * LEAN_RATE_GAIN).coerceAtMost(1f).coerceAtLeast(euc.wobbleIntensity)
+        // Rises quickly, falls away slowly - the same asymmetry as a real startle
+        val settle = if (demand > arm.correction) CORRECTION_ATTACK else CORRECTION_RELEASE
+        arm.correction = MathUtils.lerp(arm.correction, demand, (settle * deltaTime).coerceAtMost(1f))
+
         // Detect start of acceleration (forward lean becoming positive)
         // Re-roll pose choice with 20% chance for behind-back
         val isAccelerating = euc.visualForwardLean > 0.15f
@@ -53,11 +64,11 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         // Yaw controls how high the arm is raised (90 = horizontal, >90 = above horizontal, <90 = below)
         val baseYaw = 90f  // Arms straight out to sides (horizontal)
 
-        // Add up/down swaying motion for balance effect by varying the lift angle
-        val swaySpeed = 2.5f  // Oscillation speed
-        val swayAmount = 20f  // Max degrees of vertical sway
+        // Sway that answers to what the wheel is doing: quicker and wider while the rider is
+        // correcting, almost still when the ride is smooth.
+        val swaySpeed = 2.5f + arm.correction * 4f
+        val swayAmount = 6f + arm.correction * 22f
 
-        // Use sine waves for smooth balancing motion
         // Left and right arms move in opposite directions (seesaw motion)
         val sway = MathUtils.sin(arm.balanceTime * swaySpeed) * swayAmount
 
@@ -116,9 +127,9 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
         val leftTargetPitch = MathUtils.lerp(0f, -180f, leftEffectiveAccel)
         val rightTargetPitch = MathUtils.lerp(0f, -180f, rightEffectiveAccel)
 
-        // Minimal idle sway - very subtle
-        val swingTime = arm.balanceTime * 1.2f
-        val idleSway = MathUtils.sin(swingTime) * 3f * (1f - accelFactor)
+        // Minimal idle sway - very subtle, and it grows if the rider starts correcting
+        val swingTime = arm.balanceTime * (1.2f + arm.correction * 3f)
+        val idleSway = MathUtils.sin(swingTime) * (3f + arm.correction * 14f) * (1f - accelFactor * 0.6f)
 
         // Turn response - arms swing to opposite side of turn for balance
         val turnSwing = -euc.visualSideLean * 25f
@@ -201,5 +212,12 @@ class ArmAnimationSystem : IteratingSystem(Families.rider, 5) {
             arm.rightArmRoll = MathUtils.lerp(balanceRightRoll, arm.rightArmRoll, blendFactor)
             arm.rightForearmBend = MathUtils.lerp(balanceRightBend, arm.rightForearmBend, blendFactor)
         }
+    }
+
+    private companion object {
+        /** Turns lean-per-second into a 0..1 sense of how hard the rider is working. */
+        const val LEAN_RATE_GAIN = 0.45f
+        const val CORRECTION_ATTACK = 12f
+        const val CORRECTION_RELEASE = 2.5f
     }
 }

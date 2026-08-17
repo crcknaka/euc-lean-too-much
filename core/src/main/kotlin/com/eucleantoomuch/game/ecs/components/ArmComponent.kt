@@ -37,6 +37,11 @@ class ArmComponent : Component, Pool.Poolable {
     // Balance animation time (for swaying motion at low speeds)
     var balanceTime: Float = 0f
 
+    // How hard the rider is currently correcting, 0..1. Balance flails are a response to
+    // something, so the sway is driven by this rather than running at a fixed amplitude.
+    var correction: Float = 0f
+    var lastSideLean: Float = 0f
+
     // Shoulder attachment offsets from rider body center (set once based on model)
     // Torso is at Y=1.0 with height 0.6, so top of torso (shoulders) is at Y=1.3
     // Torso width is 0.35, half = 0.175. Add arm thickness (0.09) to place arms outside body
@@ -63,5 +68,7 @@ class ArmComponent : Component, Pool.Poolable {
         leftForearmBend = 0f
         rightForearmBend = 0f
         balanceTime = 0f
+        correction = 0f
+        lastSideLean = 0f
     }
 }

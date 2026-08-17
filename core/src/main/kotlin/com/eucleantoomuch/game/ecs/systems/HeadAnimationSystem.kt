@@ -7,10 +7,18 @@ import com.badlogic.gdx.math.MathUtils
 import com.eucleantoomuch.game.ecs.Families
 import com.eucleantoomuch.game.ecs.components.HeadComponent
 import com.eucleantoomuch.game.ecs.components.EucComponent
+import com.eucleantoomuch.game.util.Easing
 
 /**
- * System that animates head movement at low speeds.
- * Below 30 km/h the rider occasionally moves their head as if dancing/looking around.
+ * Head motion for the rider.
+ *
+ * The head is rendered inside the already-leaned body, so whatever the body does the head
+ * inherits. That is the opposite of how a rider actually holds their head: the body throws
+ * itself into a turn and folds forward under acceleration while the head stays level and
+ * keeps looking up the road. Most of the work here is therefore taking the body's lean back
+ * out again - without it the rider stares at the tarmac every time they accelerate.
+ *
+ * The rest is idle behaviour: an occasional glance rather than a permanent sway.
  */
 class HeadAnimationSystem : IteratingSystem(Families.rider, 6) {
     private val headMapper = ComponentMapper.getFor(HeadComponent::class.java)
@@ -22,40 +30,81 @@ class HeadAnimationSystem : IteratingSystem(Families.rider, 6) {
 
         head.animTime += deltaTime
 
+        // === Gaze stabilisation ===
+        // The renderer leans the body by these amounts before the head is placed, so cancelling
+        // most of them is what keeps the eyes near the horizon. Not all of it: a head pinned
+        // perfectly level looks mechanical, and a rider does drop their gaze a little when tucked.
+        val bodySideLean = euc.visualSideLean * BODY_SIDE_LEAN_DEGREES
+        val bodyForwardLean = euc.visualForwardLean * BODY_FORWARD_LEAN_DEGREES
+        val levelRoll = -bodySideLean * SIDE_STABILISATION
+        val levelPitch = -bodyForwardLean * FORWARD_STABILISATION
+
+        // Riders look where they are going, into the turn rather than straight over the bars
+        val turnYaw = euc.visualSideLean * TURN_LOOK_DEGREES
+
+        // === Idle glances ===
         val speedKmh = euc.speed * 3.6f
+        val calm = ((GLANCE_MAX_KMH - speedKmh) / GLANCE_MAX_KMH).coerceIn(0f, 1f)
+        updateGlance(head, deltaTime, calm)
 
-        // Turn-based head lean - head tilts into the turn direction
-        // sideLean: negative = turning left, positive = turning right
-        // Head should tilt in the direction of the turn (lean into the turn)
-        val turnLeanRoll = -euc.visualSideLean * 12f  // Tilt head into turn
-        val turnLeanYaw = euc.visualSideLean * 8f     // Look slightly into turn
+        val glance = Easing.outN(head.glanceProgress, 3)
+        val glanceYaw = MathUtils.lerp(head.glanceFromYaw, head.glanceToYaw, glance) * calm
+        val glancePitch = MathUtils.lerp(head.glanceFromPitch, head.glanceToPitch, glance) * calm
 
-        // Head dance effect from 0 to 50 km/h (full intensity at 0, fades to 0 at 50)
-        if (speedKmh < 50f) {
-            // Full intensity at 0 km/h, linearly fades to 0 at 50 km/h
-            val intensity = (50f - speedKmh) / 50f
+        // Wobble shakes the head loose - fast, small, and only while it lasts
+        val shake = if (euc.wobbleIntensity > 0.01f) {
+            MathUtils.sin(head.animTime * WOBBLE_SHAKE_HZ * MathUtils.PI2) * WOBBLE_SHAKE_DEGREES * euc.wobbleIntensity
+        } else 0f
 
-            // Random-looking but deterministic head movement using multiple sine waves
-            val t = head.animTime
+        // Approach the targets rather than snapping: necks have mass
+        head.yaw = MathUtils.lerp(head.yaw, turnYaw + glanceYaw, FOLLOW_SPEED * deltaTime)
+        head.pitch = MathUtils.lerp(head.pitch, levelPitch + glancePitch, FOLLOW_SPEED * deltaTime)
+        head.roll = MathUtils.lerp(head.roll, levelRoll + shake, FOLLOW_SPEED * deltaTime)
+    }
 
-            // Yaw: looking left/right occasionally - more noticeable
-            val yawBase = MathUtils.sin(t * 1.3f) * 15f + MathUtils.sin(t * 2.1f) * 8f
-            head.yaw = yawBase * intensity + turnLeanYaw
-
-            // Pitch: nodding - more noticeable
-            val pitchBase = MathUtils.sin(t * 1.7f) * 10f + MathUtils.sin(t * 0.8f) * 6f
-            head.pitch = pitchBase * intensity
-
-            // Roll: head tilt - combines dance with turn lean
-            val rollBase = MathUtils.sin(t * 1.1f) * 8f
-            head.roll = rollBase * intensity + turnLeanRoll
-        } else {
-            // At higher speed, head leans into turns more noticeably
-            val targetYaw = turnLeanYaw
-            val targetRoll = turnLeanRoll
-            head.yaw = MathUtils.lerp(head.yaw, targetYaw, 5f * deltaTime)
-            head.pitch = MathUtils.lerp(head.pitch, 0f, 5f * deltaTime)
-            head.roll = MathUtils.lerp(head.roll, targetRoll, 5f * deltaTime)
+    /** Picks a new place to look every few seconds, then holds it. */
+    private fun updateGlance(head: HeadComponent, deltaTime: Float, calm: Float) {
+        if (head.glanceProgress < 1f) {
+            head.glanceProgress = (head.glanceProgress + deltaTime / GLANCE_SECONDS).coerceAtMost(1f)
+            return
         }
+
+        head.glanceCountdown -= deltaTime
+        if (head.glanceCountdown > 0f || calm <= 0.05f) return
+
+        head.glanceFromYaw = head.glanceToYaw
+        head.glanceFromPitch = head.glanceToPitch
+        // Half the time the glance is a return to centre, which is what stops it wandering off
+        if (MathUtils.randomBoolean()) {
+            head.glanceToYaw = 0f
+            head.glanceToPitch = 0f
+        } else {
+            head.glanceToYaw = MathUtils.random(-GLANCE_YAW, GLANCE_YAW)
+            head.glanceToPitch = MathUtils.random(-GLANCE_PITCH, GLANCE_PITCH)
+        }
+        head.glanceProgress = 0f
+        head.glanceCountdown = MathUtils.random(GLANCE_GAP_MIN, GLANCE_GAP_MAX)
+    }
+
+    private companion object {
+        // Must match the lean the renderer applies to the rider before placing the head
+        const val BODY_SIDE_LEAN_DEGREES = 25f
+        const val BODY_FORWARD_LEAN_DEGREES = 60f
+
+        const val SIDE_STABILISATION = 0.8f
+        const val FORWARD_STABILISATION = 0.65f
+
+        const val TURN_LOOK_DEGREES = 14f
+        const val FOLLOW_SPEED = 8f
+
+        const val GLANCE_MAX_KMH = 50f
+        const val GLANCE_SECONDS = 0.35f
+        const val GLANCE_GAP_MIN = 1.2f
+        const val GLANCE_GAP_MAX = 3.5f
+        const val GLANCE_YAW = 22f
+        const val GLANCE_PITCH = 9f
+
+        const val WOBBLE_SHAKE_HZ = 6f
+        const val WOBBLE_SHAKE_DEGREES = 4f
     }
 }

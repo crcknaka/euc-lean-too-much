@@ -16,6 +16,16 @@ class HeadComponent : Component, Pool.Poolable {
     // Animation time for head movement
     var animTime: Float = 0f
 
+    // Glancing about. Held still between looks rather than swept continuously: a head that
+    // never stops moving reads as a bobblehead, while real idle motion is a quick look, a
+    // pause, and a look back.
+    var glanceCountdown: Float = 1.5f
+    var glanceProgress: Float = 1f
+    var glanceFromYaw: Float = 0f
+    var glanceToYaw: Float = 0f
+    var glanceFromPitch: Float = 0f
+    var glanceToPitch: Float = 0f
+
     // Head attachment offset from rider body (neck position)
     val riderScale = 1.55f
     var offsetX: Float = 0f
@@ -32,5 +42,11 @@ class HeadComponent : Component, Pool.Poolable {
         yaw = 0f
         roll = 0f
         animTime = 0f
+        glanceCountdown = 1.5f
+        glanceProgress = 1f
+        glanceFromYaw = 0f
+        glanceToYaw = 0f
+        glanceFromPitch = 0f
+        glanceToPitch = 0f
     }
 }
