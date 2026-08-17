@@ -60,6 +60,9 @@ class AndroidLauncher : AndroidApplication() {
 
         // Hide system bars for full immersive experience
         hideSystemBars()
+
+        // Side-loaded builds have no store to tell them a new version exists
+        AndroidUpdater(this).checkInBackground()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

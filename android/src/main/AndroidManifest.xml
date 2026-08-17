@@ -3,6 +3,9 @@
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- The build is side-loaded, so it checks for and installs its own updates -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Features -->
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />
@@ -27,6 +30,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Hands the downloaded APK to the system installer: a file:// URI is refused
+             from Android 7 on, so the update has to be shared through a provider. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.updates"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/update_paths" />
+        </provider>
+
     </application>
 
 </manifest>

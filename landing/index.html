@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>EUC Rider - Lean Too Much | Play in your browser</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="An electric unicycle arcade runner. Lean forward to go faster - lean too much and the tarmac gets you. Free, runs in the browser, no install.">
+    <meta name="theme-color" content="#0b0b12">
+    <link rel="icon" href="icon.jpg">
+
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="EUC Rider - Lean Too Much">
+    <meta property="og:description" content="An electric unicycle arcade runner. Lean forward to go faster - lean too much and the tarmac gets you.">
+    <meta property="og:image" content="hero.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <style>
+        @font-face {
+            font-family: 'Exo 2 Local';
+            src: url('fonts/Exo2-SemiBold.ttf') format('truetype');
+            font-weight: 400 700;
+            font-display: swap;
+        }
+
+        :root {
+            --bg: #0b0b12;
+            --surface: #16162280;
+            --border: #3a3a5066;
+            --accent: #ff6b00;
+            --accent-bright: #ff8c33;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --dim: #64748b;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Exo 2 Local', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        a { color: var(--accent-bright); }
+
+        .wrap {
+            max-width: 1080px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* === Hero === */
+        .hero {
+            position: relative;
+            min-height: 68vh;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+        }
+        .hero-art {
+            /* Deliberately taller than the hero and anchored to its bottom, so the top of the
+               art is clipped away. The key art carries its own painted "EUC RIDER" logo along
+               the top edge, which would otherwise sit right above the heading and read as the
+               title being printed twice. Clipping by geometry works at every window shape,
+               unlike nudging background-position, which does nothing once the image no longer
+               overflows vertically. */
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            top: -42%;
+            background: url('hero.jpg') center bottom / cover no-repeat;
+            filter: saturate(1.05);
+        }
+        .hero-art::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(11,11,18,0.42) 0%, rgba(11,11,18,0.78) 55%, var(--bg) 100%);
+        }
+        .hero-inner { position: relative; padding: 64px 0 72px; }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(40px, 9vw, 92px);
+            line-height: 0.95;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            text-shadow: 0 6px 30px rgba(0,0,0,0.6);
+        }
+        .sub {
+            margin: 10px 0 0;
+            font-size: clamp(16px, 3vw, 26px);
+            color: var(--accent-bright);
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+        }
+        .pitch {
+            margin: 24px 0 0;
+            max-width: 30em;
+            font-size: clamp(16px, 2.2vw, 20px);
+            line-height: 1.55;
+            color: #dbe2ea;
+        }
+
+        .cta-row {
+            margin-top: 34px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 18px;
+        }
+        .play {
+            display: inline-block;
+            padding: 20px 62px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, var(--accent-bright), var(--accent));
+            color: #1a1008;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            text-decoration: none;
+            box-shadow: 0 10px 34px rgba(255,107,0,0.35);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .play:hover { transform: translateY(-2px); box-shadow: 0 14px 40px rgba(255,107,0,0.45); }
+        .play:active { transform: translateY(1px); }
+        .cta-note { color: var(--muted); font-size: 15px; max-width: 22em; }
+        .apk {
+            display: inline-block;
+            padding: 18px 40px;
+            border-radius: 999px;
+            border: 1px solid #ffffff33;
+            background: #ffffff0f;
+            color: var(--text);
+            font-size: 17px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            text-decoration: none;
+            transition: background 0.15s ease, border-color 0.15s ease;
+        }
+        .apk:hover { background: #ffffff1c; border-color: #ffffff55; }
+        .apk small { display: block; font-size: 11px; letter-spacing: 0.06em; color: var(--muted); text-transform: none; margin-top: 3px; }
+
+        /* === Sections === */
+        section { padding: 52px 0; }
+        h2 {
+            margin: 0 0 28px;
+            font-size: clamp(22px, 3.4vw, 32px);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 18px;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 22px 24px;
+        }
+        .card h3 {
+            margin: 0 0 8px;
+            font-size: 17px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent-bright);
+        }
+        .card p { margin: 0; color: #cbd5e1; line-height: 1.55; font-size: 15px; }
+
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+        .keys { margin: 0; padding: 0; list-style: none; }
+        .keys li {
+            display: flex;
+            gap: 14px;
+            align-items: baseline;
+            padding: 9px 0;
+            border-bottom: 1px solid #ffffff0d;
+            font-size: 15px;
+            color: #cbd5e1;
+        }
+        .keys li:last-child { border-bottom: 0; }
+        kbd {
+            flex: none;
+            min-width: 96px;
+            font-family: inherit;
+            font-size: 13px;
+            letter-spacing: 0.06em;
+            color: var(--text);
+            background: #ffffff12;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            padding: 4px 10px;
+            text-align: center;
+        }
+
+        footer {
+            padding: 40px 0 60px;
+            border-top: 1px solid #ffffff0f;
+            color: var(--dim);
+            font-size: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 26px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+<header class="hero">
+    <div class="hero-art"></div>
+    <div class="hero-inner wrap">
+        <h1>EUC Rider</h1>
+        <p class="sub">Lean Too Much</p>
+        <p class="pitch">
+            An electric unicycle arcade runner. Lean forward to go faster, lean too much and
+            the tarmac gets you. Dodge traffic, pedestrians and pigeons, and watch the PWM -
+            the wheel gives out long before your nerve does.
+        </p>
+        <div class="cta-row">
+            <a class="play" href="play/">Play</a>
+            <a class="apk" href="https://github.com/crcknaka/euc-lean-too-much/releases/latest/download/EUC-Rider.apk">
+                Android APK
+                <small>Updates itself from then on</small>
+            </a>
+        </div>
+        <p class="cta-note">
+            The browser version needs nothing installed, though the first load pulls about
+            27&nbsp;MB. The Android build is downloaded once - after that it checks for new
+            versions on its own and offers to install them.
+        </p>
+    </div>
+</header>
+
+<main>
+    <section class="wrap">
+        <h2>What you are riding</h2>
+        <div class="grid">
+            <div class="card">
+                <h3>Three wheels</h3>
+                <p>
+                    Simple Wheel is a nimble 16" starter. Street Runner trades some agility for
+                    speed. Speed Demon is fast, heavy and very willing to throw you off.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Four modes</h3>
+                <p>
+                    Endless for the high score, Time Trial against the clock, and Hardcore -
+                    plus a night version of it, if the daylight was making things too easy.
+                </p>
+            </div>
+            <div class="card">
+                <h3>It fights back</h3>
+                <p>
+                    Battery drains, PWM climbs as you push, and the wheel beeps at you before it
+                    cuts out. Ignore it and the ragdoll physics take over from there.
+                </p>
+            </div>
+            <div class="card">
+                <h3>Sound of the motor</h3>
+                <p>
+                    A synthesised motor voice that tracks speed and load, with selectable AVAS
+                    modes - quiet electric, motorcycle, or a V8 that has no business being here.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section class="wrap">
+        <h2>Controls</h2>
+        <div class="controls">
+            <div class="card">
+                <h3>Keyboard</h3>
+                <ul class="keys">
+                    <li><kbd>W / &uarr;</kbd> <span>Lean forward - accelerate</span></li>
+                    <li><kbd>S / &darr;</kbd> <span>Lean back - brake</span></li>
+                    <li><kbd>A D / &larr; &rarr;</kbd> <span>Lean into the turn</span></li>
+                    <li><kbd>Shift</kbd> <span>Lean harder - and closer to the edge</span></li>
+                    <li><kbd>Space</kbd> <span>Start from the menu</span></li>
+                    <li><kbd>Esc</kbd> <span>Pause</span></li>
+                    <li><kbd>Click</kbd> <span>Change the camera</span></li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3>Phone</h3>
+                <p>
+                    Tilt the phone to steer, the way you would lean on the real thing - allow
+                    motion access when the browser asks. If the sensor is unavailable, drag
+                    anywhere on the screen instead: up to accelerate, sideways to turn.
+                </p>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="wrap">
+    <span>EUC Rider v1.2.0</span>
+    <span>Also runs on Android and desktop</span>
+    <a href="https://github.com/crcknaka/euc-lean-too-much">Source on GitHub</a>
+</footer>
+
+</body>
+</html>
