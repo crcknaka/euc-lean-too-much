@@ -205,13 +205,22 @@ class EucGame(
                     platformServices.playManholeSound()
                     voltsManager.onManholeHit()
                 }
-                ObstacleType.PUDDLE -> platformServices.playWaterSplashSound()
+                ObstacleType.PUDDLE -> {
+                    platformServices.playWaterSplashSound()
+                    playerTransformOrNull()?.let { renderer.particles.splash(it.position, playerSpeed()) }
+                }
                 ObstacleType.STREET_LIGHT -> platformServices.playStreetLightImpactSound()
                 ObstacleType.RECYCLE_BIN -> platformServices.playRecycleBinImpactSound()
                 ObstacleType.PEDESTRIAN -> platformServices.playPersonImpactSound()
                 ObstacleType.CAR -> platformServices.playCarCrashSound()
                 ObstacleType.BENCH -> platformServices.playBenchImpactSound()
                 ObstacleType.CURB, ObstacleType.POTHOLE -> platformServices.playGenericHitSound()
+            }
+            // Anything solid throws debris; a puddle already got its own splash above
+            if (obstacleType != ObstacleType.PUDDLE) {
+                playerTransformOrNull()?.let {
+                    renderer.particles.impact(it.position, (playerSpeed() / 12f).coerceIn(0.5f, 1.5f))
+                }
             }
             if (causesGameOver) {
                 handlePlayerFall()
@@ -334,6 +343,7 @@ class EucGame(
             // Set up ground impact callback to startle pigeons when ragdoll lands nearby
             ragdollPhysics?.onRagdollGroundImpact = { impactPosition ->
                 pigeonSystem.addStartleSource(impactPosition)
+                renderer.particles.groundPuff(impactPosition)
             }
 
             // Set up pedestrian ragdoll rendering (always active during gameplay)
@@ -438,6 +448,13 @@ class EucGame(
         val c = com.eucleantoomuch.game.ui.UITheme.background
         Gdx.gl.glClearColor(c.r, c.g, c.b, 1f)
     }
+
+    /** The player's transform, or null before a run has started. */
+    private fun playerTransformOrNull(): TransformComponent? =
+        playerEntity?.getComponent(TransformComponent::class.java)
+
+    private fun playerSpeed(): Float =
+        playerEntity?.getComponent(EucComponent::class.java)?.speed ?: 0f
 
     private fun raiseForegroundFpsCap() {
         if (Gdx.app.type == Application.ApplicationType.WebGL) return
@@ -941,6 +958,11 @@ class EucGame(
             // Update pedestrian road crossing probability based on distance/mode
             pedestrianAISystem.crossingProbability = worldGenerator.getPedestrianCrossingProbability(session.distanceTraveled)
 
+            // Dust off the contact patch, thrown backwards and scaled by how fast it is going
+            renderer.particles.tyreSpray(
+                playerTransform.position, playerTransform.yaw, eucComponent.speed, delta
+            )
+
             // Update camera with speed for FOV effect
             renderer.cameraController.update(playerTransform.position, playerTransform.yaw, delta, eucComponent.speed)
 
@@ -1172,6 +1194,9 @@ class EucGame(
     }
 
     private fun resetGame() {
+        // Otherwise the last run's dust hangs in the air over the new one
+        renderer.particles.clear()
+
         // Stop ragdoll physics completely
         ragdollPhysics?.stop()
         renderer.activeRagdollRenderer = null

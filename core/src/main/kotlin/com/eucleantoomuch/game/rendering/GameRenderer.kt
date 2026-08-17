@@ -134,6 +134,9 @@ class GameRenderer(
     // Post-processing effects
     val postProcessing = PostProcessing()
 
+    /** Spray, splashes and debris. Drawn last in the 3D pass so it sits over the world. */
+    val particles = ParticleSystem()
+
     // SceneManager for PBR/GLTF models
     val sceneManager: SceneManager
     private val pbrLight: DirectionalLightEx
@@ -538,6 +541,10 @@ class GameRenderer(
         // Clear renderableProviders for next frame
         sceneManager.getRenderableProviders().clear()
 
+        // After everything solid, and inside post-processing so the effects apply to it too
+        particles.update(Gdx.graphics.deltaTime)
+        particles.render(camera)
+
         // End post-processing (apply effects and render to screen)
         postProcessing.end()
     }
@@ -668,6 +675,7 @@ class GameRenderer(
         modelBatch.dispose()
         sceneManager.dispose()
         postProcessing.dispose()
+        particles.dispose()
         pedestrianRenderer.dispose()
         starFieldRenderer.dispose()
         headlightRenderer.dispose()
