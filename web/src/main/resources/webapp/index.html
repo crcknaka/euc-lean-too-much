@@ -97,6 +97,31 @@
                 cursor: pointer;
             }
             #tilt-permission.show { display: block; }
+            #rotate-hint {
+                position: fixed;
+                inset: 0;
+                display: none;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 16px;
+                z-index: 30;
+                background: #0b0b12;
+                color: #e8e8f0;
+                font: 600 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                text-align: center;
+                padding: 24px;
+            }
+            #rotate-hint.show { display: flex; }
+            #rotate-hint .glyph {
+                font-size: 46px;
+                animation: tip 1.6s ease-in-out infinite;
+            }
+            @keyframes tip {
+                0%, 45%, 100% { transform: rotate(0deg); }
+                65%, 85%      { transform: rotate(-90deg); }
+            }
+            #rotate-hint small { display: block; opacity: 0.6; font-weight: 400; }
         </style>
     </head>
     <body oncontextmenu="return false">
@@ -111,6 +136,13 @@
         </div>
 
         <button id="tilt-permission" type="button">Tilt to steer</button>
+
+        <div id="rotate-hint">
+            <div class="glyph">&#9634;</div>
+            <div>Turn your phone sideways
+                <small>The game is played in landscape</small>
+            </div>
+        </div>
 
         <!-- FreeType (asm.js) defines the global `Module` the font generator calls into.
              Nothing loads it at runtime, so it has to be a plain script tag ahead of the
@@ -144,16 +176,58 @@
                             window.__eucTiltEnable();
                         }
                         button.classList.remove("show");
+                        lockLandscape();
                     }).catch(function () {
                         button.classList.remove("show");
                     });
                 });
             }
 
+            // Steering by tilt only makes sense if the screen stays put - otherwise the
+            // browser reorients mid-corner and the controls swap under the player's hands.
+            //
+            // Locking is only allowed from fullscreen, and fullscreen only from a user gesture,
+            // so both are asked for on the first touch. iOS supports neither lock nor this API
+            // at all, which is what the rotate prompt below is for.
+            var isTouch = (navigator.maxTouchPoints || 0) > 0 || "ontouchstart" in window;
+
+            function lockLandscape() {
+                var el = document.documentElement;
+                var request = el.requestFullscreen || el.webkitRequestFullscreen;
+                var done = request ? request.call(el) : Promise.reject();
+                Promise.resolve(done).then(function () {
+                    if (screen.orientation && screen.orientation.lock) {
+                        return screen.orientation.lock("landscape");
+                    }
+                }).catch(function () {
+                    // Refused or unsupported - the prompt handles it
+                    updateRotateHint();
+                });
+            }
+
+            function updateRotateHint() {
+                var hint = document.getElementById("rotate-hint");
+                if (!hint) return;
+                var portrait = window.innerHeight > window.innerWidth;
+                hint.classList.toggle("show", isTouch && portrait);
+            }
+
+            function setUpOrientation() {
+                if (!isTouch) return;
+                updateRotateHint();
+                window.addEventListener("resize", updateRotateHint);
+                window.addEventListener("orientationchange", updateRotateHint);
+                document.addEventListener("touchend", function once() {
+                    document.removeEventListener("touchend", once);
+                    lockLandscape();
+                }, { passive: true });
+            }
+
             async function start() {
                 %MODE%
                 setTimeout(hideBootScreen, 400);
                 setUpTiltPermission();
+                setUpOrientation();
             }
             window.addEventListener("load", start);
         </script>
