@@ -429,6 +429,16 @@ class EucGame(
         else -> keyboardInput
     }
 
+    /**
+     * Clear to the palette's own background rather than an arbitrary slate blue. Menu screens
+     * paint their own backdrop over it, but anything they do not cover - and the moment before
+     * they draw - used to flash a washed-out blue that belongs to no part of the design.
+     */
+    private fun clearToThemeBackground() {
+        val c = com.eucleantoomuch.game.ui.UITheme.background
+        Gdx.gl.glClearColor(c.r, c.g, c.b, 1f)
+    }
+
     private fun raiseForegroundFpsCap() {
         if (Gdx.app.type == Application.ApplicationType.WebGL) return
         try {
@@ -557,7 +567,7 @@ class EucGame(
     }
 
     private fun renderMenu() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         // Play menu music
@@ -596,7 +606,7 @@ class EucGame(
     }
 
     private fun renderModeSelection() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         musicManager.update(Gdx.graphics.deltaTime)
@@ -636,7 +646,7 @@ class EucGame(
     }
 
     private fun renderTimeTrialLevelSelection() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         musicManager.update(Gdx.graphics.deltaTime)
@@ -655,7 +665,7 @@ class EucGame(
     }
 
     private fun renderWheelSelection() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         // Continue menu music during wheel selection
@@ -683,7 +693,7 @@ class EucGame(
     }
 
     private fun renderSettings() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         // Continue music during settings
@@ -707,7 +717,7 @@ class EucGame(
     }
 
     private fun renderCredits() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         // Continue music during credits
@@ -722,7 +732,7 @@ class EucGame(
     }
 
     private fun renderHelp() {
-        Gdx.gl.glClearColor(0.2f, 0.3f, 0.4f, 1f)
+        clearToThemeBackground()
         Gdx.gl.glClear(com.badlogic.gdx.graphics.GL20.GL_COLOR_BUFFER_BIT)
 
         // Continue music during help

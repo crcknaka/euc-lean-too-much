@@ -43,6 +43,9 @@ class CreditsRenderer : Disposable {
 
         ui.beginShapes()
 
+        // Same backdrop as the other secondary screens
+        ui.gradientBackground()
+
         // Dark overlay
         ui.shapes.color = UITheme.withAlpha(Color.BLACK, overlayAlpha)
         ui.shapes.rect(0f, 0f, sw, sh)
@@ -54,9 +57,7 @@ class CreditsRenderer : Disposable {
         val panelY = (sh - panelHeight) / 2
 
         // Main panel
-        ui.panel(panelX, panelY, panelWidth, panelHeight,
-            backgroundColor = UITheme.surface,
-            borderColor = UITheme.accent)
+        ui.glassPanel(panelX, panelY, panelWidth, panelHeight, borderGlow = UITheme.accent)
 
         // Back button at bottom
         val buttonWidth = 200f * scale
@@ -65,7 +66,7 @@ class CreditsRenderer : Disposable {
         val buttonY = panelY + 40f * scale
         backButton.set(buttonX, buttonY, buttonWidth, buttonHeight)
 
-        ui.button(backButton, UITheme.surfaceLight, glowIntensity = backHover * 0.4f)
+        ui.neonButton(backButton, UITheme.surfaceLight, UITheme.textSecondary, backHover * 0.5f)
 
         ui.endShapes()
 
