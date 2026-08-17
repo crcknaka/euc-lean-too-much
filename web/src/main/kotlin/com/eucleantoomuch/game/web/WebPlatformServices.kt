@@ -1,8 +1,6 @@
 package com.eucleantoomuch.game.web
 
-import com.badlogic.gdx.Gdx
-import com.badlogic.gdx.audio.Sound
-import com.eucleantoomuch.game.platform.DefaultPlatformServices
+import com.eucleantoomuch.game.platform.GdxSoundPlatformServices
 
 /**
  * Browser platform layer.
@@ -17,34 +15,16 @@ import com.eucleantoomuch.game.platform.DefaultPlatformServices
  * is asynchronous, which JoltRagdollPhysics already accounts for: until the module is in, it
  * reports not-ready and the game plays the scripted fall animation instead.
  */
-class WebPlatformServices : DefaultPlatformServices() {
+class WebPlatformServices : GdxSoundPlatformServices() {
 
     private val vibrationSupported: Boolean = WebVibration.isSupported()
-
-    /**
-     * Loaded on first use, not up front: this object is built before WebApplication has
-     * installed Gdx.audio, so touching it in the constructor would fail. A name that failed
-     * to load is remembered as absent so a missing file cannot retry every frame.
-     */
-    private val sounds = HashMap<String, Sound?>()
 
     private var motorPlaying = false
     private var wobblePlaying = false
 
-    private fun play(name: String, volume: Float = 1f) {
-        val sound = sounds.getOrPut(name) {
-            try {
-                Gdx.audio?.newSound(Gdx.files.internal("sounds/$name.ogg"))
-            } catch (t: Throwable) {
-                Gdx.app?.error("WebPlatformServices", "sound $name failed to load: ${t.message}")
-                null
-            }
-        } ?: return
-
-        // Browsers keep the audio context suspended until the page has been interacted with;
-        // by the time anything in-game fires, the player has tapped through the menu.
+    /** Browsers keep the audio context suspended until the page has been interacted with. */
+    override fun onBeforePlay() {
         WebAudio.resume()
-        sound.play(volume.coerceIn(0f, 1f))
     }
 
     override fun hasVibrator(): Boolean = vibrationSupported
@@ -102,23 +82,10 @@ class WebPlatformServices : DefaultPlatformServices() {
         wobblePlaying = false
     }
 
-    override fun playPowerupSound() = play("powerup")
-    override fun playWhooshSound() = play("swoosh")
-    override fun playPigeonFlyOffSound() = play("pigeon_wings")
-    override fun playManholeSound() = play("manhole")
-    override fun playWaterSplashSound() = play("water_splash")
-    override fun playStreetLightImpactSound(volume: Float) = play("impact_street_light", volume)
-    override fun playRecycleBinImpactSound(volume: Float) = play("impact_recycle", volume)
-    override fun playPersonImpactSound(volume: Float) = play("personimpact", volume)
-    override fun playGenericHitSound(volume: Float) = play("hit1", volume)
-    override fun playCarCrashSound(volume: Float) = play("carcrash", volume)
-    override fun playBenchImpactSound(volume: Float) = play("bench", volume)
-
     override fun releaseAudio() {
         stopMotorSound()
         stopWobbleSound()
-        sounds.values.forEach { it?.dispose() }
-        sounds.clear()
+        super.releaseAudio()
     }
 
     override fun canExit(): Boolean = false
