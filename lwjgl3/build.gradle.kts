@@ -23,6 +23,10 @@ dependencies {
     // LibGDX LWJGL3 backend
     implementation("com.badlogicgames.gdx:gdx-backend-lwjgl3:$gdxVersion")
     implementation("com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop")
+    // FreeType's own native, which gdx-platform does not carry. Without it the generator
+    // throws on startup and every screen silently falls back to libGDX's built-in bitmap
+    // font - upscaled, jagged, and nothing like the UI font the game ships.
+    runtimeOnly("com.badlogicgames.gdx:gdx-freetype-platform:$gdxVersion:natives-desktop")
 
 
     // Jolt physics natives for desktop (Windows/Linux/macOS Intel+ARM)

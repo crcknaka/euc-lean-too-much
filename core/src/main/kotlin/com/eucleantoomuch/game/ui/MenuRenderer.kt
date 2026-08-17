@@ -104,6 +104,9 @@ class MenuRenderer : Disposable {
 
         ui.beginShapes()
 
+        // Lift the UI off the artwork before anything else is drawn on top of it
+        ui.screenScrim(topAlpha = 0.34f, bottomAlpha = 0.62f)
+
         // Animated trail particles (tire marks effect) - orange falling lines
         trailParticles.forEach { p ->
             ui.shapes.color = UITheme.withAlpha(UITheme.accent, p.alpha * enterAnimProgress)

@@ -137,6 +137,24 @@ class UIRenderer : Disposable {
         shapes.circle(x + width - r, y + height - r, r)
     }
 
+    /**
+     * Darken the whole screen behind the UI, more towards the bottom.
+     *
+     * The menu art is bright and busy - light text sitting straight on it (the stat labels
+     * over the sunset especially) is barely legible. A scrim lifts every label off the
+     * background at once, which is far steadier than tuning each text colour against
+     * whatever pixels happen to be behind it.
+     */
+    fun screenScrim(topAlpha: Float, bottomAlpha: Float, color: Color = Color.BLACK) {
+        val bands = 24
+        val bandHeight = screenHeight / bands
+        for (i in 0 until bands) {
+            val t = i.toFloat() / (bands - 1)
+            shapes.setColor(color.r, color.g, color.b, com.badlogic.gdx.math.MathUtils.lerp(bottomAlpha, topAlpha, t))
+            shapes.rect(0f, i * bandHeight, screenWidth, bandHeight + 1f)
+        }
+    }
+
     /** Draw a panel with shadow and optional border */
     fun panel(
         x: Float, y: Float, width: Float, height: Float,

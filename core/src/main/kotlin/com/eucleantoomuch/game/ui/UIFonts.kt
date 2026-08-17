@@ -97,12 +97,17 @@ object UIFonts : Disposable {
 
         // Try to use custom font file
         generator = try {
-            // Load Roboto font (download from fonts.google.com and place in assets/)
-            val fontFile = Gdx.files.internal("Roboto-Medium.ttf")
-            if (fontFile.exists()) {
+            // Exo 2 SemiBold: a techno-leaning grotesque with full Cyrillic, which suits a
+            // vehicle game far better than a neutral UI face. Roboto stays as a fallback so
+            // an older asset folder still renders something sensible. (SIL OFL, see
+            // assets/fonts/Exo2-OFL.txt)
+            val fontFile = listOf("fonts/Exo2-SemiBold.ttf", "Roboto-Medium.ttf")
+                .map { Gdx.files.internal(it) }
+                .firstOrNull { it.exists() }
+            if (fontFile != null) {
                 FreeTypeFontGenerator(fontFile)
             } else {
-                Gdx.app.log("UIFonts", "Font file not found: Roboto-Medium.ttf - using default bitmap font")
+                Gdx.app.log("UIFonts", "No UI font found in assets - using default bitmap font")
                 null
             }
         } catch (e: Exception) {

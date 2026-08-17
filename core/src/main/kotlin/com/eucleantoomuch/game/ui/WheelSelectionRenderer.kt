@@ -3,6 +3,7 @@ package com.eucleantoomuch.game.ui
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Input
 import com.badlogic.gdx.graphics.GL20
+import com.badlogic.gdx.graphics.glutils.HdpiUtils
 import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.graphics.g3d.ModelInstance
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
@@ -503,7 +504,11 @@ class WheelSelectionRenderer(
         val viewportY = y.toInt()
         val viewportSize = size.toInt()
 
-        Gdx.gl.glViewport(viewportX, viewportY, viewportSize, viewportSize)
+        // HdpiUtils, not glViewport: the rect is in the UI's logical coordinates, while GL
+        // wants framebuffer pixels. On a HiDPI screen the buffer is twice the logical size,
+        // so passing logical values straight through put the preview in the wrong place at
+        // half the size - and left the viewport wrong for everything drawn afterwards.
+        HdpiUtils.glViewport(viewportX, viewportY, viewportSize, viewportSize)
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glClear(GL20.GL_DEPTH_BUFFER_BIT)
 
@@ -548,7 +553,7 @@ class WheelSelectionRenderer(
         sceneManager.removeScene(scene)
 
         // Restore full viewport
-        Gdx.gl.glViewport(0, 0, Gdx.graphics.width, Gdx.graphics.height)
+        HdpiUtils.glViewport(0, 0, Gdx.graphics.width, Gdx.graphics.height)
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
     }
 
