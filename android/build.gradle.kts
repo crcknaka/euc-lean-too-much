@@ -26,8 +26,8 @@ android {
         applicationId = "com.eucleantoomuch.game"
         minSdk = 24
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.3.2"
+        versionCode = 7
+        versionName = "1.3.3"
         ndk {
             // Real phones only - x86/x86_64 would add ~13 MB of natives for Intel emulators
             abiFilters += listOf("armeabi-v7a", "arm64-v8a")
