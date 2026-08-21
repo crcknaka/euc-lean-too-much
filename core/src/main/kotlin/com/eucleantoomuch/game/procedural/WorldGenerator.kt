@@ -111,7 +111,6 @@ class WorldGenerator(
     private val backgroundBuildingModelsFar = mutableListOf<ModelInstance>()   // Heavy fog
 
     // Fog wall model for front boundary
-    private var fogWallModel: ModelInstance
 
     // Tower crane model
     private var towerCraneModel: ModelInstance
@@ -288,9 +287,6 @@ class WorldGenerator(
             val height = MathUtils.random(40f, 100f)
             backgroundBuildingModelsFar.add(ModelInstance(models.createBackgroundBuildingModel(height, 2)))
         }
-
-        // Create fog wall for front boundary
-        fogWallModel = ModelInstance(models.createFogWallModel(300f, 120f))
 
         // Create tower crane model
         towerCraneModel = ModelInstance(models.createTowerCraneModel())
@@ -1220,9 +1216,6 @@ class WorldGenerator(
             z += 15f + MathUtils.random(-2f, 2f)
         }
 
-        // Add fog wall at front of chunk (only for chunks far ahead)
-        entities.add(createFogWallEntity(chunkStartZ + Constants.CHUNK_LENGTH, chunkIndex))
-
         return entities
     }
 
@@ -1338,26 +1331,6 @@ class WorldGenerator(
         })
 
         // No collider - pigeons are small and fly away, not an obstacle
-
-        engine.addEntity(entity)
-        return entity
-    }
-
-    private fun createFogWallEntity(z: Float, chunkIndex: Int): Entity {
-        val entity = engine.createEntity()
-
-        entity.add(TransformComponent().apply {
-            position.set(0f, 0f, z)
-        })
-
-        entity.add(ModelComponent().apply {
-            modelInstance = ModelInstance(fogWallModel.model)
-        })
-
-        entity.add(GroundComponent().apply {
-            type = GroundType.BUILDING
-            this.chunkIndex = chunkIndex
-        })
 
         engine.addEntity(entity)
         return entity

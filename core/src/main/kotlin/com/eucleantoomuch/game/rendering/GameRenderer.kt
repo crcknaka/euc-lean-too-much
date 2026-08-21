@@ -9,6 +9,8 @@ import com.badlogic.gdx.graphics.g3d.Environment
 import com.badlogic.gdx.graphics.g3d.ModelBatch
 import com.badlogic.gdx.graphics.g3d.attributes.ColorAttribute
 import com.badlogic.gdx.graphics.g3d.environment.DirectionalLight
+import com.badlogic.gdx.graphics.g3d.shaders.DefaultShader
+import com.badlogic.gdx.graphics.g3d.utils.DefaultShaderProvider
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Matrix4
 import com.badlogic.gdx.utils.Disposable
@@ -41,7 +43,24 @@ class GameRenderer(
     private val engine: Engine,
     private val models: ProceduralModels
 ) : Disposable {
-    private val modelBatch = ModelBatch()
+    // Three directional lights, not one: sun, sky fill from above and a bounce from the ground
+    // give flat-shaded geometry a sense of which way is up. The default config allows two.
+    private val modelBatch = ModelBatch(DefaultShaderProvider(DefaultShader.Config().also {
+        it.numDirectionalLights = 3
+    }))
+
+    private val skyRenderer = SkyRenderer()
+
+    /**
+     * Direction sunlight travels by day: from behind the rider's right shoulder, high up. The
+     * sun used to sit ahead of the rider, which put every facade facing the camera in its own
+     * shadow - the whole city read as a grey canyon at noon. From here facades are lit, the
+     * sides of buildings catch strong light, and the road is bright.
+     */
+    private val SUN_DIR = Vector3(-0.7f, -1f, 0.35f).nor()
+    private val sunLight = DirectionalLight()
+    private val skyFillLight = DirectionalLight()
+    private val bounceLight = DirectionalLight()
     val camera = PerspectiveCamera(67f, Gdx.graphics.width.toFloat(), Gdx.graphics.height.toFloat())
     val cameraController = CameraController(camera)
 
@@ -49,8 +68,7 @@ class GameRenderer(
     private val fogColor = Color(0.5f, 0.7f, 0.9f, 1f)
 
     private val environment = Environment().apply {
-        set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
-        add(DirectionalLight().set(0.9f, 0.9f, 0.9f, -0.5f, -1f, -0.3f))
+        add(sunLight, skyFillLight, bounceLight)  // Colours and directions come from applyAtmosphere()
         // Add fog that matches sky color - objects fade into sky at distance
         set(ColorAttribute(ColorAttribute.Fog, fogColor))
     }
@@ -164,7 +182,7 @@ class GameRenderer(
 
         // Setup directional light for PBR
         pbrLight = DirectionalLightEx()
-        pbrLight.direction.set(-0.5f, -1f, -0.3f).nor()
+        pbrLight.direction.set(SUN_DIR).nor()
         pbrLight.color.set(1.0f, 1.0f, 1.0f, 1f)
         pbrLight.intensity = 3.0f
         sceneManager.environment.add(pbrLight)
@@ -193,6 +211,56 @@ class GameRenderer(
         // Initialize night mode renderers
         starFieldRenderer.initialize()
         headlightRenderer.initialize()
+
+        applyAtmosphere(night = false)
+    }
+
+    /**
+     * Sky, lights, fog and bloom for day or night, set together so they agree with each other.
+     *
+     * Before this the night toggle changed the PBR light and the ambient but left the default
+     * shader's directional light at full white, so the procedural city stood in noon sun under
+     * a navy sky. The fog colour is the sky's horizon colour on purpose: far geometry then
+     * dissolves into the band of sky it is actually in front of.
+     */
+    private fun applyAtmosphere(night: Boolean) {
+        if (night) {
+            skyRenderer.setPalette(
+                zenith = Color(0.010f, 0.015f, 0.050f, 1f),
+                horizon = Color(0.060f, 0.070f, 0.140f, 1f),
+                ground = Color(0.020f, 0.020f, 0.030f, 1f),
+                sunDir = Vector3(-0.3f, 0.8f, -0.5f),
+                sunColor = Color(0.75f, 0.80f, 0.95f, 1f),
+                sunScale = 0.35f
+            )
+            // Brighter than a real night on purpose: obstacles have to be readable at speed.
+            // The old night only looked fine because the day sun was still switched on under it.
+            sunLight.set(0.42f, 0.46f, 0.62f, 0.3f, -0.8f, 0.5f)       // moon
+            skyFillLight.set(0.08f, 0.09f, 0.16f, 0f, -1f, 0.15f)
+            bounceLight.set(0.02f, 0.02f, 0.03f, 0f, 1f, 0f)
+            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.22f, 0.23f, 0.30f, 1f))
+            fogColor.set(0.060f, 0.070f, 0.140f, 1f)
+            postProcessing.bloomStrength = 0.75f
+            postProcessing.bloomThreshold = 0.50f
+        } else {
+            skyRenderer.setPalette(
+                zenith = Color(0.22f, 0.45f, 0.85f, 1f),
+                horizon = Color(0.80f, 0.86f, 0.93f, 1f),
+                ground = Color(0.55f, 0.58f, 0.60f, 1f),
+                sunDir = Vector3(-SUN_DIR.x, -SUN_DIR.y, -SUN_DIR.z),
+                sunColor = Color(1.0f, 0.93f, 0.80f, 1f),
+                sunScale = 1f
+            )
+            sunLight.set(0.98f, 0.92f, 0.80f, SUN_DIR.x, SUN_DIR.y, SUN_DIR.z)   // warm key
+            skyFillLight.set(0.30f, 0.38f, 0.52f, 0f, -1f, 0.2f)       // cool sky from above
+            bounceLight.set(0.20f, 0.19f, 0.15f, 0f, 1f, 0f)           // ground bounce from below
+            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.30f, 0.31f, 0.34f, 1f))
+            fogColor.set(0.80f, 0.86f, 0.93f, 1f)
+            postProcessing.bloomStrength = 0.30f
+            postProcessing.bloomThreshold = 0.82f
+        }
+        skyR = fogColor.r; skyG = fogColor.g; skyB = fogColor.b
+        environment.set(ColorAttribute(ColorAttribute.Fog, fogColor))
     }
 
     /**
@@ -204,17 +272,7 @@ class GameRenderer(
         isNightMode = enabled
 
         if (enabled) {
-            // Night sky - deep navy blue
-            skyR = 0.02f
-            skyG = 0.02f
-            skyB = 0.08f
-
-            // Update fog to match night sky
-            fogColor.set(0.03f, 0.03f, 0.1f, 1f)
-            environment.set(ColorAttribute(ColorAttribute.Fog, fogColor))
-
-            // Ambient light for night - bright enough to see objects
-            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.25f, 0.25f, 0.3f, 1f))
+            applyAtmosphere(night = true)
 
             // Change to moonlight (dimmer, bluish tint)
             pbrLight.direction.set(0.3f, -0.8f, 0.5f).nor()
@@ -228,20 +286,10 @@ class GameRenderer(
             // Add PBR point light for illuminating cars
             sceneManager.environment.add(headlightPbrLight)
         } else {
-            // Day sky - light blue
-            skyR = 0.5f
-            skyG = 0.7f
-            skyB = 0.9f
-
-            // Restore day fog
-            fogColor.set(0.5f, 0.7f, 0.9f, 1f)
-            environment.set(ColorAttribute(ColorAttribute.Fog, fogColor))
-
-            // Restore ambient light
-            environment.set(ColorAttribute(ColorAttribute.AmbientLight, 0.5f, 0.5f, 0.5f, 1f))
+            applyAtmosphere(night = false)
 
             // Restore sunlight
-            pbrLight.direction.set(-0.5f, -1f, -0.3f).nor()
+            pbrLight.direction.set(SUN_DIR).nor()
             pbrLight.color.set(1.0f, 1.0f, 1.0f, 1f)
             pbrLight.intensity = 3.0f
 
@@ -267,8 +315,15 @@ class GameRenderer(
         sceneManager.environment.set(PBRCubemapAttribute.createDiffuseEnv(diffuseCubemap))
     }
 
+    /**
+     * The far plane sits just past the render distance on purpose. libGDX's fog is quadratic
+     * in distance and reaches full strength at about 0.95 x far, so this puts 100% fog exactly
+     * where chunks spawn: new geometry appears already dissolved into the horizon instead of
+     * popping in. That is what the old 120 m "fog wall" at the end of every chunk was for -
+     * and the wall also blanked out the sky from the horizon to the top of the frame.
+     */
     fun setCameraFar(distance: Float) {
-        camera.far = distance + 150f  // Larger buffer = weaker fog effect
+        camera.far = distance * 1.05f
         camera.update()
     }
 
@@ -299,9 +354,10 @@ class GameRenderer(
         // Begin post-processing (render to framebuffer)
         postProcessing.begin()
 
-        // Clear screen with sky color
+        // Clear, then paint the sky behind everything
         Gdx.gl.glClearColor(skyR, skyG, skyB, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT or GL20.GL_DEPTH_BUFFER_BIT)
+        skyRenderer.render(camera)
 
         Gdx.gl.glEnable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glEnable(GL20.GL_CULL_FACE)
@@ -678,6 +734,7 @@ class GameRenderer(
         particles.dispose()
         pedestrianRenderer.dispose()
         starFieldRenderer.dispose()
+        skyRenderer.dispose()
         headlightRenderer.dispose()
         diffuseCubemap?.dispose()
         specularCubemap?.dispose()

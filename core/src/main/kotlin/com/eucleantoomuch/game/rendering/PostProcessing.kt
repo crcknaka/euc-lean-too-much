@@ -3,6 +3,7 @@ package com.eucleantoomuch.game.rendering
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.Texture
 import com.badlogic.gdx.graphics.glutils.FrameBuffer
 import com.badlogic.gdx.graphics.glutils.ShaderProgram
 import com.badlogic.gdx.graphics.Mesh
@@ -27,7 +28,7 @@ class PostProcessing : Disposable {
     var blurDirection = 0f to -1f  // Direction of movement (normalized)
 
     // Vignette parameters
-    var vignetteStrength = 0.3f  // Base vignette (always present)
+    var vignetteStrength = 0.22f  // Base vignette - 0.3 crushed the top of the frame to 64%, which dulled the sky
     var vignetteDanger = 0f  // Extra vignette when in danger (0-1)
 
     // Danger tint (red overlay)
@@ -35,6 +36,17 @@ class PostProcessing : Disposable {
 
     // Chromatic aberration
     var chromaticAberration = 0f  // 0 = none, 1 = strong
+
+    // Bloom: everything above the threshold is blurred at quarter resolution and added back.
+    // The scene is LDR, so the threshold sits high by day (only the sun and near-white catches)
+    // and lower at night, where lamps and headlights are the brightest things around.
+    var bloomStrength = 0.3f
+    var bloomThreshold = 0.82f
+
+    private var bloomA: FrameBuffer? = null
+    private var bloomB: FrameBuffer? = null
+    private var brightShader: ShaderProgram? = null
+    private var blurShader: ShaderProgram? = null
 
     private var enabled = true
     private var initialized = false
@@ -75,6 +87,10 @@ class PostProcessing : Disposable {
 
         // Chromatic aberration
         uniform float u_chromatic;
+
+        // Bloom
+        uniform sampler2D u_bloom;
+        uniform float u_bloomStrength;
 
         const int BLUR_SAMPLES = 6;
 
@@ -134,6 +150,18 @@ class PostProcessing : Disposable {
                 }
             }
 
+            // === BLOOM + HIGHLIGHT ROLL-OFF ===
+            color.rgb += texture2D(u_bloom, v_texCoord).rgb * u_bloomStrength;
+            // Soft clip above 0.75 instead of a hard cut at 1.0: whatever bloom pushes over
+            // white rolls into it rather than flattening into a blown patch. Below 0.75 this
+            // is the identity, so the scene's mid-tones are left exactly as lit.
+            vec3 hi = max(color.rgb - 0.75, 0.0);
+            color.rgb = min(color.rgb, 0.75) + 0.25 * (1.0 - exp(-hi * 4.0));
+            // A touch more saturation and contrast: flat-shaded colour needs it to not read as grey
+            float lum = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722));
+            color.rgb = mix(vec3(lum), color.rgb, 1.08);
+            color.rgb = (color.rgb - 0.5) * 1.04 + 0.5;
+
             // === DANGER TINT ===
             if (u_dangerTint > 0.001) {
                 // Red tint that pulses slightly
@@ -163,14 +191,49 @@ class PostProcessing : Disposable {
         }
     """.trimIndent()
 
+    private val brightFragment = """
+        #ifdef GL_ES
+        precision mediump float;
+        #endif
+        varying vec2 v_texCoord;
+        uniform sampler2D u_texture;
+        uniform float u_threshold;
+        void main() {
+            vec3 c = texture2D(u_texture, v_texCoord).rgb;
+            float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+            // Smooth knee rather than a step, or the threshold crawls as things move
+            float k = smoothstep(u_threshold, u_threshold + 0.25, l);
+            gl_FragColor = vec4(c * k, 1.0);
+        }
+    """.trimIndent()
+
+    private val blurFragment = """
+        #ifdef GL_ES
+        precision mediump float;
+        #endif
+        varying vec2 v_texCoord;
+        uniform sampler2D u_texture;
+        uniform vec2 u_step;
+        void main() {
+            vec3 c = texture2D(u_texture, v_texCoord).rgb * 0.227027;
+            c += (texture2D(u_texture, v_texCoord + u_step * 1.0).rgb + texture2D(u_texture, v_texCoord - u_step * 1.0).rgb) * 0.194594;
+            c += (texture2D(u_texture, v_texCoord + u_step * 2.0).rgb + texture2D(u_texture, v_texCoord - u_step * 2.0).rgb) * 0.121622;
+            c += (texture2D(u_texture, v_texCoord + u_step * 3.0).rgb + texture2D(u_texture, v_texCoord - u_step * 3.0).rgb) * 0.054054;
+            c += (texture2D(u_texture, v_texCoord + u_step * 4.0).rgb + texture2D(u_texture, v_texCoord - u_step * 4.0).rgb) * 0.016216;
+            gl_FragColor = vec4(c, 1.0);
+        }
+    """.trimIndent()
+
     fun initialize() {
         if (initialized) return
 
         ShaderProgram.pedantic = false
         shader = ShaderProgram(vertexShader, fragmentShader)
+        brightShader = ShaderProgram(vertexShader, brightFragment)
+        blurShader = ShaderProgram(vertexShader, blurFragment)
 
-        if (!shader!!.isCompiled) {
-            Gdx.app.error("PostProcessing", "Shader compilation failed: ${shader!!.log}")
+        if (!shader!!.isCompiled || !brightShader!!.isCompiled || !blurShader!!.isCompiled) {
+            Gdx.app.error("PostProcessing", "Shader compilation failed: ${shader!!.log} ${brightShader!!.log} ${blurShader!!.log}")
             enabled = false
             return
         }
@@ -203,7 +266,8 @@ class PostProcessing : Disposable {
         val hasVignette = vignetteStrength > 0.01f || vignetteDanger > 0.01f
         val hasDanger = dangerTint > 0.001f
         val hasChromatic = chromaticAberration > 0.001f
-        return hasBlur || hasVignette || hasDanger || hasChromatic
+        val hasBloom = bloomStrength > 0.001f
+        return hasBlur || hasVignette || hasDanger || hasChromatic || hasBloom
     }
 
     fun begin() {
@@ -213,12 +277,23 @@ class PostProcessing : Disposable {
         effectsActive = hasActiveEffects()
         if (!effectsActive) return
 
-        val width = Gdx.graphics.width
-        val height = Gdx.graphics.height
+        // Back-buffer size, not logical size: on a HiDPI desktop the two differ by 2x and a
+        // logical-sized buffer stretched to the screen softened the whole picture
+        val width = Gdx.graphics.backBufferWidth
+        val height = Gdx.graphics.backBufferHeight
 
         if (frameBuffer == null || frameBuffer!!.width != width || frameBuffer!!.height != height) {
             frameBuffer?.dispose()
             frameBuffer = FrameBuffer(Pixmap.Format.RGBA8888, width, height, true)
+            bloomA?.dispose(); bloomB?.dispose()
+            val bw = (width / 4).coerceAtLeast(1)
+            val bh = (height / 4).coerceAtLeast(1)
+            bloomA = FrameBuffer(Pixmap.Format.RGBA8888, bw, bh, false).also {
+                it.colorBufferTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+            }
+            bloomB = FrameBuffer(Pixmap.Format.RGBA8888, bw, bh, false).also {
+                it.colorBufferTexture.setFilter(Texture.TextureFilter.Linear, Texture.TextureFilter.Linear)
+            }
         }
 
         frameBuffer?.begin()
@@ -231,8 +306,39 @@ class PostProcessing : Disposable {
 
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST)
         Gdx.gl.glDisable(GL20.GL_CULL_FACE)
+        Gdx.gl.glDisable(GL20.GL_BLEND)
+
+        // Bloom: bright pass into a quarter-res buffer, then a separable blur across it
+        val a = bloomA
+        val b = bloomB
+        if (a != null && b != null && bloomStrength > 0.001f) {
+            a.begin()
+            brightShader?.bind()
+            brightShader?.setUniformi("u_texture", 0)
+            brightShader?.setUniformf("u_threshold", bloomThreshold)
+            frameBuffer?.colorBufferTexture?.bind(0)
+            screenQuad?.render(brightShader, GL20.GL_TRIANGLES)
+            a.end()
+
+            b.begin()
+            blurShader?.bind()
+            blurShader?.setUniformi("u_texture", 0)
+            blurShader?.setUniformf("u_step", 1f / a.width, 0f)
+            a.colorBufferTexture.bind(0)
+            screenQuad?.render(blurShader, GL20.GL_TRIANGLES)
+            b.end()
+
+            a.begin()
+            blurShader?.setUniformf("u_step", 0f, 1f / a.height)
+            b.colorBufferTexture.bind(0)
+            screenQuad?.render(blurShader, GL20.GL_TRIANGLES)
+            a.end()
+        }
 
         shader?.bind()
+        shader?.setUniformi("u_bloom", 1)
+        shader?.setUniformf("u_bloomStrength", if (a != null) bloomStrength else 0f)
+        a?.colorBufferTexture?.bind(1)
         shader?.setUniformf("u_blurStrength", blurStrength)
         shader?.setUniformf("u_blurDirection", blurDirection.first, blurDirection.second)
         shader?.setUniformf("u_vignetteStrength", vignetteStrength)
@@ -255,10 +361,18 @@ class PostProcessing : Disposable {
 
     override fun dispose() {
         frameBuffer?.dispose()
+        bloomA?.dispose()
+        bloomB?.dispose()
         shader?.dispose()
+        brightShader?.dispose()
+        blurShader?.dispose()
         screenQuad?.dispose()
         frameBuffer = null
+        bloomA = null
+        bloomB = null
         shader = null
+        brightShader = null
+        blurShader = null
         screenQuad = null
         initialized = false
     }

@@ -33,7 +33,7 @@ class ProceduralModels : Disposable {
     private val riderSkinColor = Color(0.9f, 0.7f, 0.6f, 1f)     // Skin
     private val helmetColor = Color(0.15f, 0.15f, 0.15f, 1f)     // Dark helmet
     private val helmetVisorColor = Color(0.1f, 0.1f, 0.12f, 1f)  // Slightly reflective visor
-    private val roadColor = Color(0.3f, 0.3f, 0.3f, 1f)          // Dark gray
+    private val roadColor = Color(0.39f, 0.39f, 0.39f, 1f)  // Lifted ~30%: real asphalt in sun is a mid grey, not near-black          // Dark gray
     private val sidewalkColor = Color(0.5f, 0.5f, 0.5f, 1f)      // Medium gray
     private val roadLineColor = Color(1f, 1f, 1f, 1f)            // White
     private val manholeColor = Color(0.15f, 0.15f, 0.15f, 1f)    // Very dark
@@ -75,20 +75,22 @@ class ProceduralModels : Disposable {
 
     // Background/silhouette colors (faded to look distant) - multiple layers
     // Layer 1 - closest background (behind main buildings)
-    private val bgBuildingColor1 = Color(0.5f, 0.55f, 0.65f, 1f)   // Blue-gray
-    private val bgBuildingColor2 = Color(0.45f, 0.5f, 0.6f, 1f)    // Darker blue-gray
-    private val bgBuildingColor3 = Color(0.55f, 0.6f, 0.7f, 1f)    // Lighter blue-gray
+    // Plain greys, lighter with distance. The fading into the horizon is the fog's job now,
+    // and the fog colour is the sky's horizon - the old "almost sky blue" far layer was a
+    // baked-in stand-in for fog and clashed with any sky that was not exactly that blue.
+    private val bgBuildingColor1 = Color(0.52f, 0.54f, 0.60f, 1f)
+    private val bgBuildingColor2 = Color(0.47f, 0.49f, 0.55f, 1f)
+    private val bgBuildingColor3 = Color(0.58f, 0.60f, 0.66f, 1f)
 
-    // Layer 2 - mid-distance (more faded)
-    private val bgBuildingMidColor1 = Color(0.55f, 0.62f, 0.75f, 1f)  // More faded
-    private val bgBuildingMidColor2 = Color(0.52f, 0.6f, 0.72f, 1f)
+    // Layer 2 - mid-distance
+    private val bgBuildingMidColor1 = Color(0.60f, 0.63f, 0.70f, 1f)
+    private val bgBuildingMidColor2 = Color(0.57f, 0.60f, 0.67f, 1f)
 
-    // Layer 3 - far distance (almost sky color - heavy fog)
-    private val bgBuildingFarColor1 = Color(0.48f, 0.65f, 0.82f, 1f)  // Very faded, close to sky
-    private val bgBuildingFarColor2 = Color(0.46f, 0.63f, 0.8f, 1f)
+    // Layer 3 - far distance
+    private val bgBuildingFarColor1 = Color(0.68f, 0.72f, 0.78f, 1f)
+    private val bgBuildingFarColor2 = Color(0.66f, 0.70f, 0.76f, 1f)
 
     // Fog wall color (matches sky for seamless blend)
-    private val fogWallColor = Color(0.5f, 0.7f, 0.9f, 1f)  // Same as sky
 
     // Shadow color (semi-transparent dark)
     private val shadowColor = Color(0f, 0f, 0f, 0.15f)
@@ -1528,24 +1530,6 @@ class ProceduralModels : Disposable {
     /**
      * Create a fog wall - large plane that blends with sky to hide world edges
      */
-    fun createFogWallModel(width: Float, height: Float): Model {
-        modelBuilder.begin()
-
-        val material = Material(ColorAttribute.createDiffuse(fogWallColor))
-
-        // Vertical plane facing the camera
-        val wall = modelBuilder.part("fog_wall", GL20.GL_TRIANGLES, attributes, material)
-        wall.rect(
-            -width / 2, 0f, 0f,
-            width / 2, 0f, 0f,
-            width / 2, height, 0f,
-            -width / 2, height, 0f,
-            0f, 0f, -1f  // Normal facing back towards camera
-        )
-
-        return modelBuilder.end().also { models.add(it) }
-    }
-
     fun getRandomBackgroundBuildingColor(): Color {
         return listOf(bgBuildingColor1, bgBuildingColor2, bgBuildingColor3).randomItem()
     }
