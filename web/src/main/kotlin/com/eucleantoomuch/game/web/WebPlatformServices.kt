@@ -97,4 +97,8 @@ class WebPlatformServices : GdxSoundPlatformServices() {
         WebTiltProvider()
 
     override fun hasTouchScreen(): Boolean = WebDeviceMotion.hasTouchScreen()
+
+    /** Streamed, not preloaded: the tracks are served next to the assets but kept out of the manifest. */
+    override fun createMusic(path: String): com.badlogic.gdx.audio.Music =
+        WebStreamingMusic("assets/$path")
 }

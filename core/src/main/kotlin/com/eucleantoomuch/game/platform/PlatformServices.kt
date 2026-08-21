@@ -190,6 +190,16 @@ interface PlatformServices {
         com.eucleantoomuch.game.input.GdxTiltProvider()
 
     /**
+     * Background music for [path] (relative to assets), or null if there is none. The default
+     * goes through libGDX, which needs the file preloaded; the browser build streams it instead,
+     * so 9 MB of mp3 stops being part of the first load.
+     */
+    fun createMusic(path: String): com.badlogic.gdx.audio.Music? {
+        val file = com.badlogic.gdx.Gdx.files.internal(path)
+        return if (file.exists()) com.badlogic.gdx.Gdx.audio.newMusic(file) else null
+    }
+
+    /**
      * Whether the player is on a touch screen, which decides if drag-steering is a sensible
      * fallback when no tilt sensor is available. libGDX's web backend reports every peripheral
      * as absent, so the browser build answers this itself.

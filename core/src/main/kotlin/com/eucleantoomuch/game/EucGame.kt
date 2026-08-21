@@ -26,6 +26,7 @@ import com.eucleantoomuch.game.input.AccelerometerInput
 import com.eucleantoomuch.game.input.GameInput
 import com.eucleantoomuch.game.input.KeyboardInput
 import com.eucleantoomuch.game.input.SwitchableGameInput
+import com.eucleantoomuch.game.input.TouchOrKeyboardInput
 import com.eucleantoomuch.game.input.TouchSteerInput
 import com.eucleantoomuch.game.platform.DefaultPlatformServices
 import com.eucleantoomuch.game.platform.PlatformServices
@@ -66,6 +67,7 @@ class EucGame(
     private lateinit var accelerometerInput: AccelerometerInput
     private lateinit var touchSteerInput: TouchSteerInput
     private lateinit var keyboardInput: KeyboardInput
+    private lateinit var touchOrKeyboardInput: TouchOrKeyboardInput
     private lateinit var tiltProvider: com.eucleantoomuch.game.input.TiltProvider
     private lateinit var models: ProceduralModels
     private lateinit var renderer: GameRenderer
@@ -162,6 +164,7 @@ class EucGame(
         accelerometerInput = AccelerometerInput(tiltProvider)
         touchSteerInput = TouchSteerInput()
         keyboardInput = KeyboardInput()
+        touchOrKeyboardInput = TouchOrKeyboardInput(touchSteerInput, keyboardInput)
         // Wrapped, because the answer can change after startup: a browser only starts
         // reporting tilt once the player has granted permission.
         gameInput = SwitchableGameInput(pickInput())
@@ -216,11 +219,13 @@ class EucGame(
                 ObstacleType.BENCH -> platformServices.playBenchImpactSound()
                 ObstacleType.CURB, ObstacleType.POTHOLE -> platformServices.playGenericHitSound()
             }
-            // Anything solid throws debris; a puddle already got its own splash above
+            // Anything solid throws debris and jolts the camera; a puddle got its splash above
             if (obstacleType != ObstacleType.PUDDLE) {
-                playerTransformOrNull()?.let {
-                    renderer.particles.impact(it.position, (playerSpeed() / 12f).coerceIn(0.5f, 1.5f))
-                }
+                val strength = (playerSpeed() / 12f).coerceIn(0.5f, 1.5f)
+                playerTransformOrNull()?.let { renderer.particles.impact(it.position, strength) }
+                renderer.cameraController.kick(0.08f * strength)
+            } else {
+                renderer.cameraController.kick(0.025f)
             }
             if (causesGameOver) {
                 handlePlayerFall()
@@ -344,6 +349,7 @@ class EucGame(
             ragdollPhysics?.onRagdollGroundImpact = { impactPosition ->
                 pigeonSystem.addStartleSource(impactPosition)
                 renderer.particles.groundPuff(impactPosition)
+                renderer.cameraController.kick(0.09f)
             }
 
             // Set up pedestrian ragdoll rendering (always active during gameplay)
@@ -358,7 +364,7 @@ class EucGame(
 
         // Initialize music manager
         musicManager = MusicManager()
-        musicManager.initialize()
+        musicManager.initialize { platformServices.createMusic(it) }
         musicManager.setEnabled(settingsManager.musicEnabled)
 
         // Initialize UI feedback (sounds and haptics)
@@ -435,7 +441,7 @@ class EucGame(
      */
     private fun pickInput(): GameInput = when {
         tiltProvider.isAvailable() -> accelerometerInput
-        platformServices.hasTouchScreen() -> touchSteerInput
+        platformServices.hasTouchScreen() -> touchOrKeyboardInput
         else -> keyboardInput
     }
 
@@ -561,7 +567,7 @@ class EucGame(
                 val isTouched = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)
                 // When the finger is also the steering stick, only a gesture that never
                 // travelled counts as a tap - otherwise every turn would cycle the camera.
-                val steeringByTouch = gameInput.delegate === touchSteerInput
+                val steeringByTouch = gameInput.delegate === touchOrKeyboardInput
                 if (!isTouched && wasTouched && !(steeringByTouch && touchSteerInput.wasDrag())) {
                     // Finger lifted - this is a tap
                     cameraViewModeText = renderer.cameraController.cycleViewMode()

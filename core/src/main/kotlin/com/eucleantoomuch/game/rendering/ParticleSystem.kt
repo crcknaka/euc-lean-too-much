@@ -231,8 +231,9 @@ class ParticleSystem(private val maxParticles: Int = 400) : Disposable {
         val toEmit = TYRE_RATE * intensity * deltaTime
         val n = toEmit.toInt() + if (MathUtils.random() < toEmit % 1f) 1 else 0
 
+        // Forward in world space is (-sin yaw, cos yaw) - see MovementSystem - so this is behind
         val rad = heading * MathUtils.degreesToRadians
-        val backX = -MathUtils.sin(rad)
+        val backX = MathUtils.sin(rad)
         val backZ = -MathUtils.cos(rad)
 
         repeat(n) {

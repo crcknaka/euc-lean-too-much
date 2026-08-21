@@ -2,10 +2,15 @@ package com.eucleantoomuch.game.rendering
 
 import com.badlogic.gdx.graphics.PerspectiveCamera
 import com.badlogic.gdx.math.MathUtils
+import com.eucleantoomuch.game.util.Easing
 import com.badlogic.gdx.math.Vector3
 import com.eucleantoomuch.game.util.Constants
 
 class CameraController(private val camera: PerspectiveCamera) {
+    private companion object {
+        const val IMPACT_TAU = 0.16f
+    }
+
     private val currentPosition = Vector3()
     private val currentLookAt = Vector3()
     private val targetPosition = Vector3()
@@ -75,6 +80,10 @@ class CameraController(private val camera: PerspectiveCamera) {
 
     // Fall animation effects
     private var shakeIntensity = 0f
+
+    // Impact jolt: a kick that rings down, separate from the fall controller's shake
+    private var impactAmplitude = 0f
+    private var impactTime = 0f
     private var fovPunch = 0f
     private var dropOffset = 0f
     private var forwardOffset = 0f  // Moves camera forward (toward player)
@@ -185,6 +194,20 @@ class CameraController(private val camera: PerspectiveCamera) {
             camera.position.add(shakeX, shakeY, shakeZ)
         }
 
+        // Impact jolt. Two incommensurate sines under an exponential decay read as a knock that
+        // rings down; a fresh random offset every frame - which the fall shake above uses - reads
+        // as static, which is right for a crash in progress but wrong for a single hit.
+        if (impactAmplitude > 0f) {
+            impactTime += deltaTime
+            val amp = impactAmplitude * Easing.decay(impactTime, IMPACT_TAU)
+            camera.position.add(
+                MathUtils.sin(impactTime * 31f) * amp,
+                MathUtils.cos(impactTime * 47f) * amp * 0.7f,
+                0f
+            )
+            if (amp < 0.002f) impactAmplitude = 0f
+        }
+
         // Apply wobble shake (smoother than fall shake)
         if (wobbleShakeX != 0f || wobbleShakeY != 0f) {
             camera.position.add(wobbleShakeX * 0.02f, wobbleShakeY * 0.02f, 0f)
@@ -201,6 +224,12 @@ class CameraController(private val camera: PerspectiveCamera) {
         }
 
         camera.update()
+    }
+
+    /** Jolt the camera by [strength] metres, decaying over a few tenths of a second. */
+    fun kick(strength: Float) {
+        if (strength > impactAmplitude) impactAmplitude = strength
+        impactTime = 0f
     }
 
     fun shake(intensity: Float) {

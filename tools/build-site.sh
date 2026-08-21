@@ -35,5 +35,16 @@ cp "$ROOT/assets/fonts/Exo2-SemiBold.ttf" "$OUT/fonts/Exo2-SemiBold.ttf"
 
 cp -R "$GAME/." "$OUT/play/"
 
+echo "==> Mirroring the published APK"
+# Served from this origin as well as from GitHub: Chrome on Android stalled at 100% on the
+# GitHub download's redirect chain, and a same-origin link also lets the download attribute
+# work. The release stays the single source of truth - this is a copy of it, not a second build.
+if gh release download -R crcknaka/euc-lean-too-much -p EUC-Rider.apk -D "$OUT" --clobber > /dev/null 2>&1; then
+  sed -i '' 's#https://github.com/crcknaka/euc-lean-too-much/releases/latest/download/EUC-Rider.apk#EUC-Rider.apk#' "$OUT/index.html"
+  echo "    mirrored $(du -h "$OUT/EUC-Rider.apk" | cut -f1)"
+else
+  echo "    no published APK found - the download button stays on GitHub"
+fi
+
 echo "==> Done: $(du -sh "$OUT" | cut -f1) in $OUT"
 echo "    deploy with: vercel deploy \"$OUT\" --prod"

@@ -29,6 +29,9 @@ class TouchSteerInput : GameInput {
     /** True once the current (or last) touch moved far enough to count as steering, not a tap. */
     fun wasDrag(): Boolean = dragged
 
+    /** Whether a steering finger is down right now. */
+    fun isTouching(): Boolean = tracking
+
     override fun update(deltaTime: Float) {
         // Steering is one-finger; a second finger is the pause gesture and must not steer.
         val touching = Gdx.input.isTouched(0) && !Gdx.input.isTouched(1)

@@ -38,23 +38,20 @@ class MusicManager : Disposable {
      * Initialize and load music files.
      * Call this after LibGDX is initialized.
      */
-    fun initialize() {
+    /** [factory] turns an asset path into a Music, or null when that track is unavailable. */
+    fun initialize(factory: (String) -> Music?) {
         try {
             // Load menu music if exists
-            if (Gdx.files.internal(MENU_MUSIC_PATH).exists()) {
-                menuMusic = Gdx.audio.newMusic(Gdx.files.internal(MENU_MUSIC_PATH))
+            menuMusic = factory(MENU_MUSIC_PATH)
                 menuMusic?.isLooping = true
-            }
         } catch (e: Exception) {
             Gdx.app.log("MusicManager", "Could not load menu music: ${e.message}")
         }
 
         try {
             // Load gameplay music if exists
-            if (Gdx.files.internal(GAMEPLAY_MUSIC_PATH).exists()) {
-                gameplayMusic = Gdx.audio.newMusic(Gdx.files.internal(GAMEPLAY_MUSIC_PATH))
+            gameplayMusic = factory(GAMEPLAY_MUSIC_PATH)
                 gameplayMusic?.isLooping = true
-            }
         } catch (e: Exception) {
             Gdx.app.log("MusicManager", "Could not load gameplay music: ${e.message}")
         }

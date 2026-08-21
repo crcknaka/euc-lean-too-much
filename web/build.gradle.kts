@@ -72,7 +72,9 @@ dependencies {
 // are kept in the repo for reference but nothing loads them, and .DS_Store is Finder noise.
 val stageWebAssets = tasks.register<Sync>("stageWebAssets") {
     from("../assets") {
-        exclude("old_Wheels/**", "**/.DS_Store")
+        // Music is streamed on demand (WebStreamingMusic), so it stays out of the manifest -
+        // in it, the backend would download all 9 MB before showing the menu
+        exclude("old_Wheels/**", "**/.DS_Store", "music/**")
     }
     into(layout.buildDirectory.dir("webAssets"))
 }
@@ -136,5 +138,11 @@ tasks.matching { it.name == "gdx_teavm_web_js_build" }.configureEach {
                 .replace("%JS_SCRIPT%", bundleTag)
         )
         logger.lifecycle("index.html: replaced with the project template (FreeType + responsive canvas)")
+
+        // The music lives next to the preloaded assets but is not listed among them
+        copy {
+            from("../assets/music")
+            into(layout.buildDirectory.dir("dist/js/webapp/assets/music"))
+        }
     }
 }
