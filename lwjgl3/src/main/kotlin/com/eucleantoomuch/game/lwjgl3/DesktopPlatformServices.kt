@@ -21,6 +21,10 @@ class DesktopPlatformServices : GdxSoundPlatformServices() {
 
     override fun createRagdollEngine(): RagdollEngine = JoltRagdollPhysics()
 
+    /** A desktop GPU is not the constraint here, and the view is what the game is worth looking at for. */
+    override fun defaultRenderDistance(): Float =
+        com.eucleantoomuch.game.state.SettingsManager.RENDER_DISTANCE_ULTRA
+
     override fun playBeep(frequencyHz: Int, durationMs: Int) = synth.beep(frequencyHz, durationMs)
 
     override fun playCrashSound(intensity: Float) = synth.crash(intensity)

@@ -4,7 +4,13 @@ import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.Preferences
 import com.eucleantoomuch.game.model.WheelType
 
-class SettingsManager {
+/**
+  * [defaultRenderDistance] is asked of the platform rather than fixed here: the fog reaches
+  * full strength at the render distance, so that one number decides how much of the world is
+  * visible and how hazy the near field looks. A desktop can afford to see much further than
+  * a phone.
+  */
+class SettingsManager(private val defaultRenderDistance: Float = RENDER_DISTANCE_HIGH) {
     private val prefs: Preferences by lazy {
         Gdx.app.getPreferences("EucLeanTooMuch_Settings")
     }
@@ -69,7 +75,7 @@ class SettingsManager {
     }
 
     var renderDistance: Float
-        get() = prefs.getFloat(KEY_RENDER_DISTANCE, RENDER_DISTANCE_MEDIUM)
+        get() = prefs.getFloat(KEY_RENDER_DISTANCE, defaultRenderDistance)
         set(value) {
             prefs.putFloat(KEY_RENDER_DISTANCE, value)
             prefs.flush()

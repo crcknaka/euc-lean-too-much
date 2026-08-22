@@ -200,6 +200,17 @@ interface PlatformServices {
     }
 
     /**
+     * How far the world is drawn by default, in metres.
+     *
+     * This is the single biggest lever on how the game looks. Fog now reaches full strength at
+     * the render distance - that is what hides chunks appearing - so a short distance does not
+     * merely cut the view, it drops a haze over the near field and washes the colour out of it.
+     * Anything that can afford the geometry should see further.
+     */
+    fun defaultRenderDistance(): Float =
+        com.eucleantoomuch.game.state.SettingsManager.RENDER_DISTANCE_HIGH
+
+    /**
      * Whether the player is on a touch screen, which decides if drag-steering is a sensible
      * fallback when no tilt sensor is available. libGDX's web backend reports every peripheral
      * as absent, so the browser build answers this itself.
