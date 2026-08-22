@@ -2,7 +2,7 @@ package com.eucleantoomuch.game.util
 
 object Constants {
     // Game version - keep in sync with versionName in android/build.gradle.kts
-    const val GAME_VERSION = "1.3.3"
+    const val GAME_VERSION = "1.3.4"
 
     // Screen
     const val VIRTUAL_WIDTH = 1280f
